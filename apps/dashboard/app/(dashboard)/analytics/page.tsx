@@ -35,6 +35,8 @@ import {
   PieChart,
   Gauge,
 } from "lucide-react";
+import { METRIC_TOOLTIPS } from "../../../lib/metric-tooltips";
+import { MetricTooltip } from "../../components/MetricTooltip";
 
 function formatUsd(value: number, decimals = 0): string {
   return new Intl.NumberFormat("en-US", {
@@ -59,12 +61,14 @@ function MetricCard({
   sub,
   icon: Icon,
   variant = "default",
+  tooltipKey,
 }: {
   title: string;
   value: string;
   sub?: string;
   icon: React.ComponentType<{ className?: string }>;
   variant?: "default" | "positive" | "negative";
+  tooltipKey?: string;
 }) {
   const color =
     variant === "positive"
@@ -72,16 +76,18 @@ function MetricCard({
       : variant === "negative"
         ? "bg-rose-500/20 text-rose-400"
         : "bg-indigo-500/20 text-indigo-400";
+  const tooltip = tooltipKey ? METRIC_TOOLTIPS[tooltipKey] : undefined;
   return (
     <div className="rounded-xl border border-slate-800/60 bg-slate-900/50 p-4">
       <div className="flex items-center gap-3">
         <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${color}`}>
           <Icon className="h-4 w-4" />
         </div>
-        <div className="min-w-0">
-          <p className="truncate text-xs font-medium uppercase tracking-wider text-slate-500">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 truncate text-xs font-medium uppercase tracking-wider text-slate-500">
             {title}
-          </p>
+            {tooltip && <MetricTooltip content={tooltip} />}
+          </div>
           <p className="truncate font-semibold text-white">{value}</p>
           {sub && <p className="text-xs text-slate-500">{sub}</p>}
         </div>
@@ -178,18 +184,21 @@ export default async function AnalyticsPage() {
                 value={trades.length.toString()}
                 sub={`${roundTrips.length} round-trips`}
                 icon={Activity}
+                tooltipKey="Total Trades"
               />
               <MetricCard
                 title="Buy Volume"
                 value={formatUsd(trades.filter((t) => t.side === "BUY").reduce((s, t) => s + t.usdcSize, 0))}
                 icon={ArrowDownLeft}
                 variant="positive"
+                tooltipKey="Buy Volume"
               />
               <MetricCard
                 title="Sell Volume"
                 value={formatUsd(trades.filter((t) => t.side === "SELL").reduce((s, t) => s + t.usdcSize, 0))}
                 icon={ArrowUpRight}
                 variant="negative"
+                tooltipKey="Sell Volume"
               />
               <MetricCard
                 title="Win Rate"
@@ -197,63 +206,64 @@ export default async function AnalyticsPage() {
                 sub={`${tradeMetrics.profitFactor.toFixed(2)} profit factor`}
                 icon={Zap}
                 variant={tradeMetrics.winRate >= 0.5 ? "positive" : "negative"}
+                tooltipKey="Win Rate"
               />
             </div>
 
             {/* 1. Return Metrics */}
             <MetricSection title="1. Return Metrics" icon={TrendingUp}>
               <MetricsGrid>
-                <MetricCard title="Total Return" value={formatPct(returnMetrics.totalReturn)} sub={`${formatUsd(returnMetrics.totalPnl)} PnL`} icon={Percent} variant={returnMetrics.totalReturn >= 0 ? "positive" : "negative"} />
-                <MetricCard title="Annualized Return" value={formatPct(returnMetrics.annualizedReturn)} icon={TrendingUp} variant={returnMetrics.annualizedReturn >= 0 ? "positive" : "negative"} />
-                <MetricCard title="CAGR" value={formatPct(returnMetrics.cagr)} sub="Compound Annual Growth Rate" icon={Percent} />
-                <MetricCard title="Geometric Return" value={formatPct(returnMetrics.geometricReturn)} icon={Percent} />
-                <MetricCard title="Arithmetic Mean Return" value={formatPct(returnMetrics.arithmeticMeanReturn)} icon={Percent} />
-                <MetricCard title="Rolling Return (30d)" value={formatPct(returnMetrics.rollingReturn)} icon={Calendar} />
-                <MetricCard title="Cumulative Return" value={formatPct(returnMetrics.cumulativeReturn)} icon={Target} />
-                <MetricCard title="Excess Return (vs CSPX)" value={formatPct(excessReturn)} sub="vs benchmark" icon={Target} variant={excessReturn >= 0 ? "positive" : "negative"} />
+                <MetricCard title="Total Return" value={formatPct(returnMetrics.totalReturn)} sub={`${formatUsd(returnMetrics.totalPnl)} PnL`} icon={Percent} variant={returnMetrics.totalReturn >= 0 ? "positive" : "negative"} tooltipKey="Total Return" />
+                <MetricCard title="Annualized Return" value={formatPct(returnMetrics.annualizedReturn)} icon={TrendingUp} variant={returnMetrics.annualizedReturn >= 0 ? "positive" : "negative"} tooltipKey="Annualized Return" />
+                <MetricCard title="CAGR" value={formatPct(returnMetrics.cagr)} sub="Compound Annual Growth Rate" icon={Percent} tooltipKey="CAGR" />
+                <MetricCard title="Geometric Return" value={formatPct(returnMetrics.geometricReturn)} icon={Percent} tooltipKey="Geometric Return" />
+                <MetricCard title="Arithmetic Mean Return" value={formatPct(returnMetrics.arithmeticMeanReturn)} icon={Percent} tooltipKey="Arithmetic Mean Return" />
+                <MetricCard title="Rolling Return (30d)" value={formatPct(returnMetrics.rollingReturn)} icon={Calendar} tooltipKey="Rolling Return (30d)" />
+                <MetricCard title="Cumulative Return" value={formatPct(returnMetrics.cumulativeReturn)} icon={Target} tooltipKey="Cumulative Return" />
+                <MetricCard title="Excess Return (vs CSPX)" value={formatPct(excessReturn)} sub="vs benchmark" icon={Target} variant={excessReturn >= 0 ? "positive" : "negative"} tooltipKey="Excess Return (vs CSPX)" />
               </MetricsGrid>
             </MetricSection>
 
             {/* 2. Risk-Adjusted Performance */}
             <MetricSection title="2. Risk-Adjusted Performance Metrics" icon={Shield}>
               <MetricsGrid>
-                <MetricCard title="Sharpe Ratio" value={formatNum(riskAdjusted.sharpeRatio)} sub="Annualized" icon={Shield} />
-                <MetricCard title="Sortino Ratio" value={formatNum(riskAdjusted.sortinoRatio)} icon={Shield} />
-                <MetricCard title="Information Ratio" value={benchComparison.informationRatio != null ? formatNum(benchComparison.informationRatio) : "—"} sub="vs CSPX" icon={Target} />
-                <MetricCard title="Treynor Ratio" value={formatNum(riskAdjusted.treynorRatio)} icon={Shield} />
-                <MetricCard title="Calmar Ratio" value={formatNum(riskAdjusted.calmarRatio)} icon={Shield} />
-                <MetricCard title="Sterling Ratio" value={formatNum(riskAdjusted.sterlingRatio)} icon={Shield} />
-                <MetricCard title="Omega Ratio" value={formatNum(riskAdjusted.omegaRatio)} icon={Shield} />
-                <MetricCard title="Burke Ratio" value={formatNum(riskAdjusted.burkeRatio)} icon={Shield} />
-                <MetricCard title="Gain-Loss Ratio" value={formatNum(riskAdjusted.gainLossRatio)} icon={Target} />
-                <MetricCard title="Modigliani (M²)" value={formatNum(riskAdjusted.modiglianiRatio)} icon={Shield} />
+                <MetricCard title="Sharpe Ratio" value={formatNum(riskAdjusted.sharpeRatio)} sub="Annualized" icon={Shield} tooltipKey="Sharpe Ratio" />
+                <MetricCard title="Sortino Ratio" value={formatNum(riskAdjusted.sortinoRatio)} icon={Shield} tooltipKey="Sortino Ratio" />
+                <MetricCard title="Information Ratio" value={benchComparison.informationRatio != null ? formatNum(benchComparison.informationRatio) : "—"} sub="vs CSPX" icon={Target} tooltipKey="Information Ratio" />
+                <MetricCard title="Treynor Ratio" value={formatNum(riskAdjusted.treynorRatio)} icon={Shield} tooltipKey="Treynor Ratio" />
+                <MetricCard title="Calmar Ratio" value={formatNum(riskAdjusted.calmarRatio)} icon={Shield} tooltipKey="Calmar Ratio" />
+                <MetricCard title="Sterling Ratio" value={formatNum(riskAdjusted.sterlingRatio)} icon={Shield} tooltipKey="Sterling Ratio" />
+                <MetricCard title="Omega Ratio" value={formatNum(riskAdjusted.omegaRatio)} icon={Shield} tooltipKey="Omega Ratio" />
+                <MetricCard title="Burke Ratio" value={formatNum(riskAdjusted.burkeRatio)} icon={Shield} tooltipKey="Burke Ratio" />
+                <MetricCard title="Gain-Loss Ratio" value={formatNum(riskAdjusted.gainLossRatio)} icon={Target} tooltipKey="Gain-Loss Ratio" />
+                <MetricCard title="Modigliani (M²)" value={formatNum(riskAdjusted.modiglianiRatio)} icon={Shield} tooltipKey="Modigliani (M²)" />
               </MetricsGrid>
             </MetricSection>
 
             {/* 3. Risk Metrics */}
             <MetricSection title="3. Risk Metrics" icon={AlertTriangle}>
               <MetricsGrid>
-                <MetricCard title="Volatility (Ann.)" value={formatPct(riskMetrics.volatility)} sub="Std Dev" icon={AlertTriangle} />
-                <MetricCard title="Downside Deviation" value={formatPct(riskMetrics.downsideDeviation)} icon={AlertTriangle} />
-                <MetricCard title="Semi-Variance" value={formatNum(riskMetrics.semiVariance, 6)} icon={AlertTriangle} />
-                <MetricCard title="VaR 95%" value={formatPct(riskMetrics.var95)} icon={AlertTriangle} variant="negative" />
-                <MetricCard title="CVaR 95%" value={formatPct(riskMetrics.cvar95)} sub="Expected Shortfall" icon={AlertTriangle} variant="negative" />
-                <MetricCard title="Tail Ratio" value={formatNum(riskMetrics.tailRatio)} icon={AlertTriangle} />
-                <MetricCard title="Skewness" value={formatNum(riskMetrics.skewness)} icon={AlertTriangle} />
-                <MetricCard title="Kurtosis" value={formatNum(riskMetrics.kurtosis)} icon={AlertTriangle} />
-                <MetricCard title="Ulcer Index" value={formatNum(riskMetrics.ulcerIndex)} icon={AlertTriangle} />
+                <MetricCard title="Volatility (Ann.)" value={formatPct(riskMetrics.volatility)} sub="Std Dev" icon={AlertTriangle} tooltipKey="Volatility (Ann.)" />
+                <MetricCard title="Downside Deviation" value={formatPct(riskMetrics.downsideDeviation)} icon={AlertTriangle} tooltipKey="Downside Deviation" />
+                <MetricCard title="Semi-Variance" value={formatNum(riskMetrics.semiVariance, 6)} icon={AlertTriangle} tooltipKey="Semi-Variance" />
+                <MetricCard title="VaR 95%" value={formatPct(riskMetrics.var95)} icon={AlertTriangle} variant="negative" tooltipKey="VaR 95%" />
+                <MetricCard title="CVaR 95%" value={formatPct(riskMetrics.cvar95)} sub="Expected Shortfall" icon={AlertTriangle} variant="negative" tooltipKey="CVaR 95%" />
+                <MetricCard title="Tail Ratio" value={formatNum(riskMetrics.tailRatio)} icon={AlertTriangle} tooltipKey="Tail Ratio" />
+                <MetricCard title="Skewness" value={formatNum(riskMetrics.skewness)} icon={AlertTriangle} tooltipKey="Skewness" />
+                <MetricCard title="Kurtosis" value={formatNum(riskMetrics.kurtosis)} icon={AlertTriangle} tooltipKey="Kurtosis" />
+                <MetricCard title="Ulcer Index" value={formatNum(riskMetrics.ulcerIndex)} icon={AlertTriangle} tooltipKey="Ulcer Index" />
               </MetricsGrid>
             </MetricSection>
 
             {/* 4. Drawdown Metrics */}
             <MetricSection title="4. Drawdown Metrics" icon={AlertTriangle}>
               <MetricsGrid>
-                <MetricCard title="Max Drawdown" value={formatPct(drawdownMetrics.maxDrawdown)} icon={AlertTriangle} variant="negative" />
-                <MetricCard title="Average Drawdown" value={formatPct(drawdownMetrics.averageDrawdown)} icon={AlertTriangle} />
-                <MetricCard title="Drawdown Duration" value={`${drawdownMetrics.drawdownDuration} days`} icon={Calendar} />
-                <MetricCard title="Recovery Time" value={`${drawdownMetrics.recoveryTime} days`} icon={Calendar} />
-                <MetricCard title="Pain Index" value={formatPct(drawdownMetrics.painIndex)} icon={AlertTriangle} />
-                <MetricCard title="Pain Ratio" value={formatNum(drawdownMetrics.painRatio)} icon={AlertTriangle} />
+                <MetricCard title="Max Drawdown" value={formatPct(drawdownMetrics.maxDrawdown)} icon={AlertTriangle} variant="negative" tooltipKey="Max Drawdown" />
+                <MetricCard title="Average Drawdown" value={formatPct(drawdownMetrics.averageDrawdown)} icon={AlertTriangle} tooltipKey="Average Drawdown" />
+                <MetricCard title="Drawdown Duration" value={`${drawdownMetrics.drawdownDuration} days`} icon={Calendar} tooltipKey="Drawdown Duration" />
+                <MetricCard title="Recovery Time" value={`${drawdownMetrics.recoveryTime} days`} icon={Calendar} tooltipKey="Recovery Time" />
+                <MetricCard title="Pain Index" value={formatPct(drawdownMetrics.painIndex)} icon={AlertTriangle} tooltipKey="Pain Index" />
+                <MetricCard title="Pain Ratio" value={formatNum(drawdownMetrics.painRatio)} icon={AlertTriangle} tooltipKey="Pain Ratio" />
               </MetricsGrid>
             </MetricSection>
 
@@ -261,18 +271,18 @@ export default async function AnalyticsPage() {
             <div className="grid gap-6 sm:grid-cols-2">
               <MetricSection title="5. Market Exposure (vs CSPX)" icon={Target}>
                 <MetricsGrid>
-                  <MetricCard title="Beta" value={benchComparison.beta != null ? formatNum(benchComparison.beta) : "—"} icon={Target} />
-                  <MetricCard title="Alpha (Jensen)" value={benchComparison.alpha != null ? formatPct(benchComparison.alpha) : "—"} icon={Target} variant={benchComparison.alpha != null && benchComparison.alpha >= 0 ? "positive" : "negative"} />
-                  <MetricCard title="Tracking Error" value={benchComparison.trackingError != null ? formatPct(benchComparison.trackingError) : "—"} icon={Target} />
-                  <MetricCard title="Active Return" value={benchComparison.activeReturn != null ? formatPct(benchComparison.activeReturn) : "—"} icon={Target} />
+                  <MetricCard title="Beta" value={benchComparison.beta != null ? formatNum(benchComparison.beta) : "—"} icon={Target} tooltipKey="Beta" />
+                  <MetricCard title="Alpha (Jensen)" value={benchComparison.alpha != null ? formatPct(benchComparison.alpha) : "—"} icon={Target} variant={benchComparison.alpha != null && benchComparison.alpha >= 0 ? "positive" : "negative"} tooltipKey="Alpha (Jensen)" />
+                  <MetricCard title="Tracking Error" value={benchComparison.trackingError != null ? formatPct(benchComparison.trackingError) : "—"} icon={Target} tooltipKey="Tracking Error" />
+                  <MetricCard title="Active Return" value={benchComparison.activeReturn != null ? formatPct(benchComparison.activeReturn) : "—"} icon={Target} tooltipKey="Active Return" />
                 </MetricsGrid>
               </MetricSection>
               <MetricSection title="6. Portfolio Efficiency" icon={Gauge}>
                 <MetricsGrid>
-                  <MetricCard title="Return over Max DD (RoMaD)" value={formatNum(portEfficiency.returnOverMaxDrawdown)} icon={Gauge} />
-                  <MetricCard title="Kelly Fraction" value={formatPct(capEfficiency.kellyFraction)} sub="Optimal bet size" icon={Gauge} />
-                  <MetricCard title="Risk of Ruin" value={formatPct(capEfficiency.riskOfRuin)} icon={AlertTriangle} variant="negative" />
-                  <MetricCard title="Expected Growth Rate" value={formatPct(capEfficiency.expectedGrowthRate)} icon={TrendingUp} />
+                  <MetricCard title="Return over Max DD (RoMaD)" value={formatNum(portEfficiency.returnOverMaxDrawdown)} icon={Gauge} tooltipKey="Return over Max DD (RoMaD)" />
+                  <MetricCard title="Kelly Fraction" value={formatPct(capEfficiency.kellyFraction)} sub="Optimal bet size" icon={Gauge} tooltipKey="Kelly Fraction" />
+                  <MetricCard title="Risk of Ruin" value={formatPct(capEfficiency.riskOfRuin)} icon={AlertTriangle} variant="negative" tooltipKey="Risk of Ruin" />
+                  <MetricCard title="Expected Growth Rate" value={formatPct(capEfficiency.expectedGrowthRate)} icon={TrendingUp} tooltipKey="Expected Growth Rate" />
                 </MetricsGrid>
               </MetricSection>
             </div>
@@ -280,41 +290,41 @@ export default async function AnalyticsPage() {
             {/* 7. Trade-Level Metrics */}
             <MetricSection title="7. Trade-Level Metrics" icon={Activity}>
               <MetricsGrid>
-                <MetricCard title="Win Rate" value={formatPct(tradeMetrics.winRate)} icon={Target} />
-                <MetricCard title="Loss Rate" value={formatPct(tradeMetrics.lossRate)} icon={Target} />
-                <MetricCard title="Average Win" value={formatUsd(tradeMetrics.averageWin, 2)} icon={TrendingUp} variant="positive" />
-                <MetricCard title="Average Loss" value={formatUsd(tradeMetrics.averageLoss, 2)} icon={AlertTriangle} variant="negative" />
-                <MetricCard title="Largest Win" value={formatUsd(tradeMetrics.largestWin, 2)} icon={TrendingUp} variant="positive" />
-                <MetricCard title="Largest Loss" value={formatUsd(tradeMetrics.largestLoss, 2)} icon={AlertTriangle} variant="negative" />
-                <MetricCard title="Profit Factor" value={formatNum(tradeMetrics.profitFactor)} icon={Target} />
-                <MetricCard title="Expectancy" value={formatUsd(tradeMetrics.expectancy, 2)} icon={Target} variant={tradeMetrics.expectancy >= 0 ? "positive" : "negative"} />
-                <MetricCard title="Payoff Ratio" value={formatNum(tradeMetrics.payoffRatio)} icon={Target} />
-                <MetricCard title="Avg Holding Time" value={`${tradeMetrics.averageHoldingTime.toFixed(1)} days`} icon={Calendar} />
-                <MetricCard title="Trade Frequency" value={`${tradeMetrics.tradeFrequency.toFixed(3)}/day`} icon={Activity} />
+                <MetricCard title="Win Rate" value={formatPct(tradeMetrics.winRate)} icon={Target} tooltipKey="Win Rate" />
+                <MetricCard title="Loss Rate" value={formatPct(tradeMetrics.lossRate)} icon={Target} tooltipKey="Loss Rate" />
+                <MetricCard title="Average Win" value={formatUsd(tradeMetrics.averageWin, 2)} icon={TrendingUp} variant="positive" tooltipKey="Average Win" />
+                <MetricCard title="Average Loss" value={formatUsd(tradeMetrics.averageLoss, 2)} icon={AlertTriangle} variant="negative" tooltipKey="Average Loss" />
+                <MetricCard title="Largest Win" value={formatUsd(tradeMetrics.largestWin, 2)} icon={TrendingUp} variant="positive" tooltipKey="Largest Win" />
+                <MetricCard title="Largest Loss" value={formatUsd(tradeMetrics.largestLoss, 2)} icon={AlertTriangle} variant="negative" tooltipKey="Largest Loss" />
+                <MetricCard title="Profit Factor" value={formatNum(tradeMetrics.profitFactor)} icon={Target} tooltipKey="Profit Factor" />
+                <MetricCard title="Expectancy" value={formatUsd(tradeMetrics.expectancy, 2)} icon={Target} variant={tradeMetrics.expectancy >= 0 ? "positive" : "negative"} tooltipKey="Expectancy" />
+                <MetricCard title="Payoff Ratio" value={formatNum(tradeMetrics.payoffRatio)} icon={Target} tooltipKey="Payoff Ratio" />
+                <MetricCard title="Avg Holding Time" value={`${tradeMetrics.averageHoldingTime.toFixed(1)} days`} icon={Calendar} tooltipKey="Avg Holding Time" />
+                <MetricCard title="Trade Frequency" value={`${tradeMetrics.tradeFrequency.toFixed(3)}/day`} icon={Activity} tooltipKey="Trade Frequency" />
               </MetricsGrid>
             </MetricSection>
 
             {/* 8. Distribution Metrics */}
             <MetricSection title="8. Distribution Metrics" icon={BarChart3}>
               <MetricsGrid>
-                <MetricCard title="Mean Return" value={formatPct(distMetrics.meanReturn)} icon={Percent} />
-                <MetricCard title="Median Return" value={formatPct(distMetrics.medianReturn)} icon={Percent} />
-                <MetricCard title="Variance" value={formatNum(distMetrics.variance, 6)} icon={BarChart3} />
-                <MetricCard title="Std Deviation" value={formatPct(distMetrics.standardDeviation)} icon={BarChart3} />
-                <MetricCard title="P5" value={formatPct(distMetrics.percentile5)} icon={Percent} />
-                <MetricCard title="P25" value={formatPct(distMetrics.percentile25)} icon={Percent} />
-                <MetricCard title="P50" value={formatPct(distMetrics.percentile50)} icon={Percent} />
-                <MetricCard title="P75" value={formatPct(distMetrics.percentile75)} icon={Percent} />
-                <MetricCard title="P95" value={formatPct(distMetrics.percentile95)} icon={Percent} />
+                <MetricCard title="Mean Return" value={formatPct(distMetrics.meanReturn)} icon={Percent} tooltipKey="Mean Return" />
+                <MetricCard title="Median Return" value={formatPct(distMetrics.medianReturn)} icon={Percent} tooltipKey="Median Return" />
+                <MetricCard title="Variance" value={formatNum(distMetrics.variance, 6)} icon={BarChart3} tooltipKey="Variance" />
+                <MetricCard title="Std Deviation" value={formatPct(distMetrics.standardDeviation)} icon={BarChart3} tooltipKey="Std Deviation" />
+                <MetricCard title="P5" value={formatPct(distMetrics.percentile5)} icon={Percent} tooltipKey="P5" />
+                <MetricCard title="P25" value={formatPct(distMetrics.percentile25)} icon={Percent} tooltipKey="P25" />
+                <MetricCard title="P50" value={formatPct(distMetrics.percentile50)} icon={Percent} tooltipKey="P50" />
+                <MetricCard title="P75" value={formatPct(distMetrics.percentile75)} icon={Percent} tooltipKey="P75" />
+                <MetricCard title="P95" value={formatPct(distMetrics.percentile95)} icon={Percent} tooltipKey="P95" />
               </MetricsGrid>
             </MetricSection>
 
             {/* 9. Tail / Stress */}
             <MetricSection title="9. Tail / Stress Risk Metrics" icon={AlertTriangle}>
               <MetricsGrid>
-                <MetricCard title="Stress Loss" value={formatPct(tailMetrics.stressLoss)} icon={AlertTriangle} variant="negative" />
-                <MetricCard title="Tail Conditional Expectation" value={formatPct(tailMetrics.tailConditionalExpectation)} icon={AlertTriangle} />
-                <MetricCard title="Historical Stress Test" value={formatPct(tailMetrics.historicalStressTest)} icon={AlertTriangle} variant="negative" />
+                <MetricCard title="Stress Loss" value={formatPct(tailMetrics.stressLoss)} icon={AlertTriangle} variant="negative" tooltipKey="Stress Loss" />
+                <MetricCard title="Tail Conditional Expectation" value={formatPct(tailMetrics.tailConditionalExpectation)} icon={AlertTriangle} tooltipKey="Tail Conditional Expectation" />
+                <MetricCard title="Historical Stress Test" value={formatPct(tailMetrics.historicalStressTest)} icon={AlertTriangle} variant="negative" tooltipKey="Historical Stress Test" />
               </MetricsGrid>
             </MetricSection>
 
@@ -328,8 +338,8 @@ export default async function AnalyticsPage() {
             {/* 12. Portfolio Construction */}
             <MetricSection title="12. Portfolio Construction" icon={PieChart}>
               <MetricsGrid>
-                <MetricCard title="Diversification Ratio" value={formatNum(portConstruction.diversificationRatio)} icon={PieChart} />
-                <MetricCard title="Concentration (HHI)" value={formatNum(portConstruction.herfindahlIndex, 4)} sub="Herfindahl index" icon={PieChart} />
+                <MetricCard title="Diversification Ratio" value={formatNum(portConstruction.diversificationRatio)} icon={PieChart} tooltipKey="Diversification Ratio" />
+                <MetricCard title="Concentration (HHI)" value={formatNum(portConstruction.herfindahlIndex, 4)} sub="Herfindahl index" icon={PieChart} tooltipKey="Concentration (HHI)" />
               </MetricsGrid>
             </MetricSection>
 

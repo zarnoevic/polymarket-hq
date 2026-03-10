@@ -398,7 +398,7 @@ export default async function HomePage() {
                         </div>
                         <div className="mt-1 flex flex-wrap items-center gap-4 text-xs">
                           <span className="text-slate-400">
-                            {pos.size.toLocaleString(undefined, { maximumFractionDigits: 0 })} @ {pos.avgPrice.toFixed(1)}¢
+                            {pos.size.toLocaleString(undefined, { maximumFractionDigits: 0 })} @ {(pos.avgPrice * 100).toFixed(2)}¢
                           </span>
                           <span className="text-slate-300">
                             {formatUsd(pos.currentValue, 2)}
