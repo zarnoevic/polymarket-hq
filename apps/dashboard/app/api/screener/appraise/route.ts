@@ -149,7 +149,23 @@ async function appraiseOne(
     ? `\n\nAnalyst note (consider in your appraisal): ${event.note.trim()}`
     : "";
 
-  const userMessage = `Event: ${event.title}\n${event.description ? `\nDescription: ${event.description}\n` : ""}${noteSuffix}\n\n${prompt}`;
+  const createdOrRaw =
+    event.createdAt
+    ?? (typeof (event.raw as { createdAt?: string } | null)?.createdAt === "string"
+      ? new Date((event.raw as { createdAt: string }).createdAt)
+      : null);
+  const createdStr = createdOrRaw && !isNaN(createdOrRaw.getTime())
+    ? createdOrRaw.toISOString().slice(0, 10)
+    : null;
+  const endStr = event.endDate && !isNaN(event.endDate.getTime())
+    ? event.endDate.toISOString().slice(0, 10)
+    : null;
+  const dateRangeSuffix =
+    createdStr || endStr
+      ? `\n\nImportant: the market was created on ${createdStr ?? "unknown"} and will end on ${endStr ?? "unknown"}. Unless specified otherwise, the event(s) referenced apply only to this specific period.`
+      : "";
+
+  const userMessage = `Event: ${event.title}\n${event.description ? `\nDescription: ${event.description}\n` : ""}${dateRangeSuffix}${noteSuffix}\n\n${prompt}`;
 
   const model =
     isThink
