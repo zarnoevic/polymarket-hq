@@ -10,6 +10,38 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Events from Gamma API (screener)
+model ScreenerEvent {
+  id           String   @id @default(uuid()) @map("id")
+  externalId   String   @unique @map("external_id") // Gamma market id
+  slug         String   @map("slug")
+  title        String   @map("title")
+  description  String?  @db.Text @map("description")
+  image        String?  @map("image")
+  icon         String?  @map("icon")
+  volume       Float    @default(0) @map("volume")
+  liquidity    Float    @default(0) @map("liquidity")
+  endDate      DateTime? @map("end_date")
+  active       Boolean  @default(true) @map("active")
+  closed       Boolean  @default(false) @map("closed")
+  restricted   Boolean  @default(false) @map("restricted")
+  probabilityYes Float? @map("probability_yes") // From market outcomePrices
+  probabilityNo  Float? @map("probability_no")
+  appraisedYes   Float? @map("appraised_yes") // AI appraisal
+  appraisedNo    Float? @map("appraised_no")
+  lastAppraised DateTime? @map("last_appraised")
+  yev                Float? @map("yev") // Yes Expected Value = appraisedYes / quotedYes
+  nev                Float? @map("nev") // No Expected Value = appraisedNo / quotedNo
+  appraisalExplanation String? @db.Text @map("appraisal_explanation") // Explanation with sources
+  appraisalRaw       Json?    @map("appraisal_raw") // Full OpenAI appraisal API response
+  raw           Json?    @map("raw") // Full Gamma API payload
+  syncedAt      DateTime @default(now()) @map("synced_at")
+
+  @@index([syncedAt])
+  @@index([volume])
+  @@map("screener_events")
+}
+
 // Placeholder for future Polymarket data sync
 model SyncLog {
   id         String   @id @default(uuid()) @map("id")

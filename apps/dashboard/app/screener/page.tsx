@@ -1,0 +1,34 @@
+import { prisma } from "@polymarket-hq/dashboard-prisma";
+import { ScreenerContent } from "../components/ScreenerContent";
+
+export const dynamic = "force-dynamic";
+
+export default async function ScreenerPage() {
+  const events = await prisma.screenerEvent.findMany({
+    orderBy: [{ endDate: "asc" }, { volume: "desc" }, { syncedAt: "desc" }],
+    take: 500,
+  });
+  // Sort by max(YEV, NEV) descending; events without appraisal go last
+  const sorted = [...events].sort((a, b) => {
+    const maxA = a.yev != null && a.nev != null ? Math.max(a.yev, a.nev) : -1;
+    const maxB = b.yev != null && b.nev != null ? Math.max(b.yev, b.nev) : -1;
+    return maxB - maxA;
+  });
+
+  return (
+    <div className="min-h-screen bg-[rgb(var(--background-rgb))]">
+      <div
+        className="pointer-events-none fixed inset-0 opacity-[0.03]"
+        style={{
+          backgroundImage: `linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px)`,
+          backgroundSize: "60px 60px",
+        }}
+      />
+
+      <div className="relative z-10 mx-auto max-w-6xl px-6 py-12">
+        <ScreenerContent initialEvents={sorted} />
+      </div>
+    </div>
+  );
+}

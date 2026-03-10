@@ -2,9 +2,14 @@ import { PrismaClient } from "./generated/client";
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
+// Pass datasource URL explicitly to avoid PrismaClientConstructorValidationError
+// when DATABASE_URL is undefined or empty.
+const dbUrl = process.env.DATABASE_URL?.trim();
+
 const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
+    datasourceUrl: dbUrl,
     log:
       process.env.NODE_ENV === "development"
         ? [
