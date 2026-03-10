@@ -1,0 +1,25 @@
+{
+  "name": "@polymarket-hq/dashboard-prisma",
+  "private": true,
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": {
+      "types": "./index.ts",
+      "default": "./index.ts"
+    },
+    "./client": {
+      "types": "./client.ts",
+      "default": "./client.ts"
+    }
+  },
+  "scripts": {
+    "db:generate": "prisma generate --schema=./schema.prisma"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.2"
+  },
+  "devDependencies": {
+    "prisma": "6.19.2"
+  }
+}

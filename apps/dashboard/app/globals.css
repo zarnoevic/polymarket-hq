@@ -1,0 +1,25 @@
+@config "../tailwind.config.js";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 30, 41, 59;
+  --background-rgb: 241, 245, 249;
+  --accent-rgb: 37, 99, 235;
+}
+
+html.dark {
+  --foreground-rgb: 255, 255, 255;
+  --background-rgb: 15, 23, 42;
+  --accent-rgb: 59, 130, 246;
+}
+
+body {
+  background: rgb(var(--background-rgb));
+  min-height: 100vh;
+  color: rgb(var(--foreground-rgb));
+  font-family: ui-sans-serif, system-ui, sans-serif, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

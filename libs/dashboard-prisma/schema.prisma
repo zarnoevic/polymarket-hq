@@ -1,0 +1,26 @@
+// Polymarket HQ - Dashboard database schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "./generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Placeholder for future Polymarket data sync
+model SyncLog {
+  id         String   @id @default(uuid()) @map("id")
+  source     String   @map("source") // e.g. "gamma-api", "clob-api"
+  status     String   @map("status") // "success" | "failed"
+  recordCount Int?    @map("record_count")
+  error      String?  @map("error")
+  startedAt  DateTime @default(now()) @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+
+  @@index([source])
+  @@index([startedAt])
+  @@map("sync_logs")
+}

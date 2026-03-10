@@ -1,0 +1,45 @@
+{
+  "name": "polymarket-hq",
+  "version": "0.1.0",
+  "description": "Polymarket HQ — Private dashboard for Polymarket market analysis",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "libs/*"
+  ],
+  "scripts": {
+    "dev": "pnpm --filter @polymarket-hq/dashboard dev",
+    "build": "pnpm --filter @polymarket-hq/dashboard build",
+    "start": "pnpm --filter @polymarket-hq/dashboard start",
+    "gen": "prisma generate --schema=./libs/dashboard-prisma/schema.prisma",
+    "db:docker:up": "docker-compose up -d",
+    "db:docker:down": "docker-compose down",
+    "db:docker:logs": "docker-compose logs -f postgres",
+    "db:migrate": "prisma migrate dev --schema=./libs/dashboard-prisma/schema.prisma",
+    "db:migrate:deploy": "prisma migrate deploy --schema=./libs/dashboard-prisma/schema.prisma"
+  },
+  "devDependencies": {
+    "@prisma/config": "6.19.2",
+    "@nx/eslint": "22.5.0",
+    "@nx/js": "22.5.0",
+    "@nx/next": "22.5.0",
+    "@typescript-eslint/eslint-plugin": "8.54.0",
+    "@typescript-eslint/parser": "8.54.0",
+    "autoprefixer": "10.4.20",
+    "dotenv": "17.2.4",
+    "eslint": "9.18.0",
+    "eslint-config-next": "15.5.12",
+    "eslint-import-resolver-typescript": "4.4.4",
+    "eslint-plugin-import": "2.32.0",
+    "eslint-plugin-react": "7.37.5",
+    "eslint-plugin-react-hooks": "7.0.1",
+    "nx": "22.5.0",
+    "prisma": "6.19.2",
+    "tsx": "4.21.0",
+    "typescript": "5"
+  },
+  "packageManager": "pnpm@10.19.0",
+  "pnpm": {
+    "onlyBuiltDependencies": []
+  }
+}

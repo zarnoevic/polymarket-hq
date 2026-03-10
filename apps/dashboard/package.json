@@ -1,0 +1,28 @@
+{
+  "name": "@polymarket-hq/dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "postinstall": "node ../../scripts/generate-build-info.mjs",
+    "predev": "node ../../scripts/generate-build-info.mjs",
+    "dev": "next dev -p 3213",
+    "prebuild": "node ../../scripts/generate-build-info.mjs",
+    "build": "next build",
+    "start": "next start -p 3213"
+  },
+  "dependencies": {
+    "@polymarket-hq/dashboard-prisma": "workspace:*",
+    "lucide-react": "0.563.0",
+    "next": "15.5.12",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "sonner": "^2.0.7"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.2",
+    "@types/react": "19.0.6",
+    "@types/react-dom": "19.0.2",
+    "postcss": "8.5.6",
+    "tailwindcss": "3.4.17"
+  }
+}

@@ -1,0 +1,40 @@
+# Dependencies (installed in container)
+node_modules
+
+# Build outputs
+.next
+apps/*/dist
+apps/*/.next
+
+# Git & IDE
+.git
+.gitignore
+.cursor
+.vscode
+*.swp
+*.swo
+
+# Env (secrets - use Render env vars)
+.env
+.env.*
+!.env.example
+
+# Dev & test
+coverage
+.nyc_output
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+__tests__
+e2e
+
+# Docs & misc
+*.md
+!libs/resources/README.md
+docker/
+.dockerignore
+
+# Nx
+.nx
+nx.json
