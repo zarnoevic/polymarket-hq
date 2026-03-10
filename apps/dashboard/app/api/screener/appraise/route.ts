@@ -106,96 +106,73 @@ function computeYevNev(
   return { yev, nev };
 }
 
-export async function POST(req: Request) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "OPENAI_API_KEY is not configured" },
-      { status: 500 }
-    );
+type AppraisalMode = "deep" | "mini" | "reappraise" | "think";
+
+async function appraiseOne(
+  openai: OpenAI,
+  event: Awaited<ReturnType<typeof prisma.screenerEvent.findUnique>>,
+  mode: AppraisalMode
+): Promise<{ ok: true; appraisedYes: number; appraisedNo: number; yev: number | null; nev: number | null } | { ok: false; error: string }> {
+  if (!event) return { ok: false, error: "Event not found" };
+  const eventId = event.id;
+
+  if (mode === "reappraise") {
+    if (
+      event.lastAppraised == null ||
+      event.appraisedYes == null ||
+      event.appraisedNo == null
+    ) {
+      return {
+        ok: false,
+        error: "Reappraise requires a previous deep appraisal (last_appraised must exist)",
+      };
+    }
   }
 
-  const openai = new OpenAI({ apiKey });
+  const quotedYes =
+    event.probabilityYes != null ? event.probabilityYes * 100 : 50;
+  const quotedNo =
+    event.probabilityNo != null ? event.probabilityNo * 100 : 50;
+
+  const isReappraise = mode === "reappraise";
+  const isDeep = mode === "deep";
+  const isMini = mode === "mini";
+  const isThink = mode === "think";
+
+  let prompt: string;
+  if (isReappraise) {
+    prompt = REAPPRAISE_PROMPT.replace(
+      "{appraisedYes}",
+      ((event.appraisedYes ?? 0) * 100).toFixed(1)
+    )
+      .replace("{appraisedNo}", ((event.appraisedNo ?? 0) * 100).toFixed(1))
+      .replace(
+        "{lastAppraised}",
+        event.lastAppraised?.toISOString?.() ?? "unknown"
+      );
+  } else if (isMini) {
+    prompt = MINI_APPRAISE_PROMPT.replace("{quotedYes}", quotedYes.toFixed(1))
+      .replace("{quotedNo}", quotedNo.toFixed(1));
+  } else if (isThink) {
+    prompt = DEEP_APPRAISE_PROMPT.replace("{quotedYes}", quotedYes.toFixed(1))
+      .replace("{quotedNo}", quotedNo.toFixed(1));
+  } else {
+    prompt = DEEP_APPRAISE_PROMPT.replace("{quotedYes}", quotedYes.toFixed(1))
+      .replace("{quotedNo}", quotedNo.toFixed(1));
+  }
+
+  const userMessage = `Event: ${event.title}\n${event.description ? `\nDescription: ${event.description}\n` : ""}\n${prompt}`;
+
+  const model =
+    isThink
+      ? "gpt-5"
+      : isDeep
+        ? "o3-deep-research"
+        : isMini
+          ? "o4-mini-deep-research"
+          : "gpt-4o";
 
   try {
-    const body = await req.json();
-    const { eventId, mode } = body as {
-      eventId: string;
-      mode: "deep" | "mini" | "reappraise" | "think";
-    };
-    if (!eventId || !mode) {
-      return NextResponse.json(
-        { error: "eventId and mode (deep|mini|reappraise|think) required" },
-        { status: 400 }
-      );
-    }
-
-    const event = await prisma.screenerEvent.findUnique({
-      where: { id: eventId },
-    });
-    if (!event) {
-      return NextResponse.json({ error: "Event not found" }, { status: 404 });
-    }
-
-    if (mode === "reappraise") {
-      if (
-        event.lastAppraised == null ||
-        event.appraisedYes == null ||
-        event.appraisedNo == null
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              "Reappraise requires a previous deep appraisal (last_appraised must exist)",
-          },
-          { status: 400 }
-        );
-      }
-    }
-
-    const quotedYes =
-      event.probabilityYes != null ? event.probabilityYes * 100 : 50;
-    const quotedNo =
-      event.probabilityNo != null ? event.probabilityNo * 100 : 50;
-
-    const isReappraise = mode === "reappraise";
-    const isDeep = mode === "deep";
-    const isMini = mode === "mini";
-    const isThink = mode === "think";
-
-    let prompt: string;
-    if (isReappraise) {
-      prompt = REAPPRAISE_PROMPT.replace(
-        "{appraisedYes}",
-        ((event.appraisedYes ?? 0) * 100).toFixed(1)
-      )
-        .replace("{appraisedNo}", ((event.appraisedNo ?? 0) * 100).toFixed(1))
-        .replace(
-          "{lastAppraised}",
-          event.lastAppraised?.toISOString?.() ?? "unknown"
-        );
-    } else if (isMini) {
-      prompt = MINI_APPRAISE_PROMPT.replace("{quotedYes}", quotedYes.toFixed(1))
-        .replace("{quotedNo}", quotedNo.toFixed(1));
-    } else if (isThink) {
-      prompt = DEEP_APPRAISE_PROMPT.replace("{quotedYes}", quotedYes.toFixed(1))
-        .replace("{quotedNo}", quotedNo.toFixed(1));
-    } else {
-      prompt = DEEP_APPRAISE_PROMPT.replace("{quotedYes}", quotedYes.toFixed(1))
-        .replace("{quotedNo}", quotedNo.toFixed(1));
-    }
-
-    const userMessage = `Event: ${event.title}\n${event.description ? `\nDescription: ${event.description}\n` : ""}\n${prompt}`;
-
-    const model =
-      isThink
-        ? "gpt-5"
-        : isDeep
-          ? "o3-deep-research"
-          : isMini
-            ? "o4-mini-deep-research"
-            : "gpt-4o";
-
     const response = await openai.responses.create({
       model,
       ...(isThink && { reasoning: { effort: "high" } }),
@@ -205,7 +182,7 @@ export async function POST(req: Request) {
       tools:
         isReappraise
           ? [{ type: "web_search" as const, search_context_size: "low" as const }]
-          : [{ type: "web_search" as const, search_context_size: isReappraise ? ("low" as const) : ("medium" as const) }],
+          : [{ type: "web_search" as const, search_context_size: "medium" as const }],
       text: { format: { type: "text" } },
     });
 
@@ -213,13 +190,10 @@ export async function POST(req: Request) {
       typeof response.output_text === "string" ? response.output_text : "";
     const parsed = parseAppraisalJson(text);
     if (!parsed) {
-      return NextResponse.json(
-        {
-          error: "Failed to parse appraisal from model",
-          raw: text?.slice(0, 500),
-        },
-        { status: 500 }
-      );
+      return {
+        ok: false,
+        error: "Failed to parse appraisal from model",
+      };
     }
 
     const sourcesSuffix = extractCitationsFromOutput(response.output);
@@ -256,12 +230,86 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json({
+    return {
       ok: true,
       appraisedYes: parsed.appraised_yes,
       appraisedNo: parsed.appraised_no,
       yev,
       nev,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: msg };
+  }
+}
+
+export async function POST(req: Request) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "OPENAI_API_KEY is not configured" },
+      { status: 500 }
+    );
+  }
+
+  const openai = new OpenAI({ apiKey });
+
+  try {
+    const body = await req.json();
+    const { eventId, eventIds, mode } = body as {
+      eventId?: string;
+      eventIds?: string[];
+      mode: "deep" | "mini" | "reappraise" | "think";
+    };
+
+    const ids: string[] = eventIds?.length
+      ? eventIds
+      : eventId
+        ? [eventId]
+        : [];
+
+    if (!ids.length || !mode) {
+      return NextResponse.json(
+        { error: "eventId, eventIds, and mode (deep|mini|reappraise|think) required (provide eventId or eventIds)" },
+        { status: 400 }
+      );
+    }
+
+    const events = await prisma.screenerEvent.findMany({
+      where: { id: { in: ids } },
+    });
+    const eventMap = new Map(events.map((e) => [e.id, e]));
+
+    const results = await Promise.all(
+      ids.map(async (id) => {
+        const event = eventMap.get(id);
+        const result = await appraiseOne(openai, event ?? null, mode);
+        return { eventId: id, ...result };
+      })
+    );
+
+    const okCount = results.filter((r) => r.ok).length;
+    const failCount = results.filter((r) => !r.ok).length;
+
+    if (ids.length === 1) {
+      const r = results[0];
+      if (!r.ok) {
+        const err = r as { ok: false; error: string };
+        return NextResponse.json({ error: err.error }, { status: 500 });
+      }
+      return NextResponse.json({
+        ok: true,
+        appraisedYes: r.appraisedYes,
+        appraisedNo: r.appraisedNo,
+        yev: r.yev,
+        nev: r.nev,
+      });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      results,
+      summary: { ok: okCount, failed: failCount },
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

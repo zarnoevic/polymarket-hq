@@ -37,8 +37,10 @@ model ScreenerEvent {
   appraisalRaw       Json?    @map("appraisal_raw") // Full OpenAI appraisal API response
   raw           Json?    @map("raw") // Full Gamma API payload
   syncedAt      DateTime @default(now()) @map("synced_at")
+  label         String?  @map("label") // "opportunity" | "unknowable" | "well_priced" | null (null = discovery)
 
   @@index([syncedAt])
+  @@index([label])
   @@index([volume])
   @@map("screener_events")
 }

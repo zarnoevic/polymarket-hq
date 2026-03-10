@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { RefreshCw, Filter, Calendar, BarChart3, ExternalLink, Loader2, Search, RotateCw, Sparkles, FileText, X, Brain } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { RefreshCw, Filter, Calendar, BarChart3, ExternalLink, Loader2, Search, RotateCw, Sparkles, FileText, X, Brain, Star, Compass, HelpCircle, BadgeCheck, TrendingUp, ClipboardList, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+
+type LabelType = "vetted" | "unknowable" | "well_priced" | "traded" | "evaluating" | null;
 
 type ScreenerEvent = {
   id: string;
@@ -27,6 +29,7 @@ type ScreenerEvent = {
   yev: number | null;
   nev: number | null;
   appraisalExplanation: string | null;
+  label: LabelType;
   syncedAt: Date;
 };
 
@@ -109,24 +112,112 @@ export function ScreenerContent({
 }: {
   initialEvents: ScreenerEvent[];
 }) {
-  const [events, setEvents] = useState(initialEvents);
+  const [events, setEvents] = useState<ScreenerEvent[]>(
+    initialEvents.map((e) => ({
+      ...e,
+      label: (e as ScreenerEvent & { watchlisted?: boolean; label?: LabelType }).label
+        ?? ((e as ScreenerEvent & { watchlisted?: boolean }).watchlisted ? "vetted" : null),
+    }))
+  );
   const [refreshing, setRefreshing] = useState(false);
-  const [appraising, setAppraising] = useState<string | null>(null);
+  const [appraisingIds, setAppraisingIds] = useState<Set<string>>(new Set());
   const [explanationEventId, setExplanationEventId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"discovery" | "evaluating" | "vetted" | "traded" | "unknowable" | "well_priced">("discovery");
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
+        setMoreOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const discoveryEvents = events
+    .filter((e) => e.label == null)
+    .sort((a, b) => {
+      const distA = a.probabilityYes != null ? Math.abs(a.probabilityYes - 0.5) : Infinity;
+      const distB = b.probabilityYes != null ? Math.abs(b.probabilityYes - 0.5) : Infinity;
+      return distA - distB;
+    });
+  const tabToLabel: Record<Exclude<typeof activeTab, "discovery">, LabelType> = {
+    evaluating: "evaluating",
+    vetted: "vetted",
+    traded: "traded",
+    unknowable: "unknowable",
+    well_priced: "well_priced",
+  };
+  const displayedEvents =
+    activeTab === "discovery"
+      ? discoveryEvents
+      : events.filter((e) => e.label === tabToLabel[activeTab]);
+
+  async function handleSetLabel(eventId: string, label: LabelType) {
+    try {
+      const res = await fetch("/api/screener/watchlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId, label }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Failed to update label");
+      setEvents((prev) =>
+        prev.map((e) => (e.id === eventId ? { ...e, label } : e))
+      );
+      const msg =
+        label === null
+          ? "Moved back to discovery"
+          : label === "vetted"
+            ? "Added to vetted"
+            : label === "unknowable"
+              ? "Marked as unknowable"
+              : label === "well_priced"
+                ? "Marked as well-priced"
+                : label === "traded"
+                  ? "Marked as traded"
+                  : "Marked as evaluating";
+      toast.success(msg);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to update label";
+      toast.error(msg);
+    }
+  }
+
+  const canReappraise = (e: ScreenerEvent) =>
+    e.lastAppraised != null && e.appraisedYes != null && e.appraisedNo != null;
 
   async function handleAppraise(eventId: string, mode: "deep" | "mini" | "reappraise" | "think") {
-    setAppraising(eventId);
-    const labels = { deep: "Running deep research…", mini: "Running mini research…", reappraise: "Checking for new news…", think: "Extended thinking (GPT‑5)…" };
+    const ev = events.find((x) => x.id === eventId);
+    if (mode === "reappraise" && ev && !canReappraise(ev)) {
+      toast.error("Reappraise requires a previous appraisal");
+      return;
+    }
+
+    setAppraisingIds((prev) => new Set(prev).add(eventId));
+    const labels = {
+      deep: "Running deep research…",
+      mini: "Running mini research…",
+      reappraise: "Checking for new news…",
+      think: "Extended thinking (GPT‑5)…",
+    };
     toast.info(labels[mode]);
     try {
       const res = await fetch("/api/screener/appraise", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventId, mode }),
+        body: JSON.stringify({ eventIds: [eventId], mode }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Appraise failed");
-      const successLabels = { deep: "Deep appraisal complete", mini: "Mini appraisal complete", reappraise: "Reappraisal complete", think: "Think appraisal complete" };
+      const successLabels = {
+        deep: "Deep appraisal complete",
+        mini: "Mini appraisal complete",
+        reappraise: "Reappraisal complete",
+        think: "Think appraisal complete",
+      };
       toast.success(successLabels[mode]);
       const listRes = await fetch("/api/screener/events");
       const list = await listRes.json();
@@ -135,7 +226,11 @@ export function ScreenerContent({
       const msg = e instanceof Error ? e.message : "Appraise failed";
       toast.error(msg);
     } finally {
-      setAppraising(null);
+      setAppraisingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(eventId);
+        return next;
+      });
     }
   }
 
@@ -174,18 +269,133 @@ export function ScreenerContent({
               Events from Gamma API (tag_id=100265) · closed=false · end_date within today–3 months
             </p>
           </div>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="flex items-center gap-2 rounded-xl border border-slate-700/60 bg-slate-800/60 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-700/60 disabled:opacity-50"
-          >
-            {refreshing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-            Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1 rounded-lg border border-slate-700/60 bg-slate-800/40 p-0.5">
+              <button
+                onClick={() => setActiveTab("discovery")}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  activeTab === "discovery"
+                    ? "bg-slate-700/60 text-white"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <Compass className="h-4 w-4" />
+                Discovery
+                {discoveryEvents.length > 0 && (
+                  <span className="rounded bg-slate-600/50 px-1.5 py-0.5 text-xs">
+                    {discoveryEvents.length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab("evaluating")}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  activeTab === "evaluating"
+                    ? "bg-slate-700/60 text-white"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <ClipboardList className="h-4 w-4" />
+                Evaluating
+                {events.filter((e) => e.label === "evaluating").length > 0 && (
+                  <span className="rounded bg-violet-500/30 px-1.5 py-0.5 text-xs">
+                    {events.filter((e) => e.label === "evaluating").length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab("vetted")}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  activeTab === "vetted"
+                    ? "bg-slate-700/60 text-white"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <Star className="h-4 w-4" />
+                Vetted
+                {events.filter((e) => e.label === "vetted").length > 0 && (
+                  <span className="rounded bg-amber-500/30 px-1.5 py-0.5 text-xs">
+                    {events.filter((e) => e.label === "vetted").length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab("traded")}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  activeTab === "traded"
+                    ? "bg-slate-700/60 text-white"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <TrendingUp className="h-4 w-4" />
+                Traded
+                {events.filter((e) => e.label === "traded").length > 0 && (
+                  <span className="rounded bg-indigo-500/30 px-1.5 py-0.5 text-xs">
+                    {events.filter((e) => e.label === "traded").length}
+                  </span>
+                )}
+              </button>
+              <div className="relative" ref={moreRef}>
+                <button
+                  onClick={() => setMoreOpen(!moreOpen)}
+                  className={`flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
+                    activeTab === "unknowable" || activeTab === "well_priced"
+                      ? "bg-slate-700/60 text-white"
+                      : "text-slate-500 hover:text-slate-400"
+                  }`}
+                  title="More categories"
+                >
+                  <ChevronDown className={`h-4 w-4 transition-transform ${moreOpen ? "rotate-180" : ""}`} />
+                </button>
+                {moreOpen && (
+                  <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-lg border border-slate-700/60 bg-slate-800 py-1 shadow-xl">
+                    <button
+                      onClick={() => {
+                        setActiveTab("unknowable");
+                        setMoreOpen(false);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-slate-300 hover:bg-slate-700/60 hover:text-white"
+                    >
+                      <HelpCircle className="h-4 w-4" />
+                      Unknowable
+                      {events.filter((e) => e.label === "unknowable").length > 0 && (
+                        <span className="ml-auto rounded bg-slate-600/50 px-1.5 py-0.5 text-xs">
+                          {events.filter((e) => e.label === "unknowable").length}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActiveTab("well_priced");
+                        setMoreOpen(false);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-slate-300 hover:bg-slate-700/60 hover:text-white"
+                    >
+                      <BadgeCheck className="h-4 w-4" />
+                      Well-priced
+                      {events.filter((e) => e.label === "well_priced").length > 0 && (
+                        <span className="ml-auto rounded bg-emerald-500/30 px-1.5 py-0.5 text-xs">
+                          {events.filter((e) => e.label === "well_priced").length}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="flex items-center gap-2 rounded-xl border border-slate-700/60 bg-slate-800/60 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-700/60 disabled:opacity-50"
+            >
+              {refreshing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Refresh
+            </button>
+          </div>
         </div>
       </header>
 
@@ -213,20 +423,149 @@ export function ScreenerContent({
             Refresh
           </button>
         </div>
+      ) : displayedEvents.length === 0 ? (
+        <div className="rounded-2xl border border-slate-800/60 bg-slate-900/50 px-8 py-16 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-700/50 text-slate-500">
+            {activeTab === "discovery" ? (
+              <Compass className="h-8 w-8" />
+            ) : activeTab === "evaluating" ? (
+              <ClipboardList className="h-8 w-8" />
+            ) : activeTab === "vetted" ? (
+              <Star className="h-8 w-8" />
+            ) : activeTab === "traded" ? (
+              <TrendingUp className="h-8 w-8" />
+            ) : activeTab === "unknowable" ? (
+              <HelpCircle className="h-8 w-8" />
+            ) : (
+              <BadgeCheck className="h-8 w-8" />
+            )}
+          </div>
+          <h3 className="mt-4 text-lg font-semibold text-white">
+            {activeTab === "discovery"
+              ? "No events in discovery"
+              : activeTab === "evaluating"
+                ? "No evaluating markets"
+                : activeTab === "vetted"
+                  ? "No vetted markets yet"
+                  : activeTab === "traded"
+                    ? "No traded markets"
+                    : activeTab === "unknowable"
+                      ? "No unknowable markets"
+                      : "No well-priced markets"}
+          </h3>
+          <p className="mt-2 text-slate-400">
+            {activeTab === "discovery"
+              ? "All events are labeled. Clear labels to add events to discovery."
+              : activeTab === "evaluating"
+                ? "Use the Evaluating button in Discovery to move markets here."
+                : activeTab === "vetted"
+                  ? "Click the star on any market in Discovery to add it to vetted."
+                  : activeTab === "traded"
+                    ? "Use the Traded button in Discovery to move markets here."
+                    : activeTab === "unknowable"
+                      ? "Use the Unknowable button in Discovery to move markets here."
+                      : "Use the Well-priced button in Discovery to move markets here."}
+          </p>
+          <button
+            onClick={() => setActiveTab("discovery")}
+            className="mt-6 inline-flex items-center gap-2 rounded-xl border border-slate-600/60 bg-slate-800/60 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-700/60"
+          >
+            <Compass className="h-4 w-4" />
+            View discovery
+          </button>
+        </div>
       ) : (
         <div className="space-y-4">
           <div className="flex items-center gap-2 text-sm text-slate-500">
             <BarChart3 className="h-4 w-4" />
-            <span>{events.length} markets · appraised first, then quoted closest to 50%</span>
+            <span>
+              {displayedEvents.length} markets
+              {activeTab === "discovery" && " · sorted by probability closest to 50%"}
+              {activeTab === "evaluating" && " evaluating"}
+              {activeTab === "vetted" && " vetted"}
+              {activeTab === "traded" && " traded"}
+              {activeTab === "unknowable" && " unknowable"}
+              {activeTab === "well_priced" && " well-priced"}
+            </span>
           </div>
 
           <div className="space-y-4">
-            {events.map((e) => (
+            {displayedEvents.map((e) => (
               <div
                 key={e.id}
                 className="overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-700/60"
               >
                 <div className="flex gap-4 p-5">
+                  <div className="flex shrink-0 flex-col items-center gap-0.5 pt-1">
+                    <button
+                      onClick={() => handleSetLabel(e.id, "evaluating")}
+                      className={`rounded p-0.5 transition-colors ${
+                        e.label === "evaluating"
+                          ? "text-violet-400"
+                          : "text-slate-500 hover:text-violet-400/70"
+                      }`}
+                      title="Mark as evaluating"
+                    >
+                      <ClipboardList className="h-5 w-5" />
+                    </button>
+                    <button
+                      onClick={() =>
+                        handleSetLabel(e.id, e.label === "vetted" ? null : "vetted")
+                      }
+                      className={`rounded p-0.5 transition-colors ${
+                        e.label === "vetted"
+                          ? "text-amber-400 hover:text-amber-300"
+                          : "text-slate-500 hover:text-amber-400/70"
+                      }`}
+                      title={e.label === "vetted" ? "Remove from vetted" : "Add to vetted"}
+                    >
+                      <Star
+                        className={`h-5 w-5 ${e.label === "vetted" ? "fill-current" : ""}`}
+                      />
+                    </button>
+                    <button
+                      onClick={() => handleSetLabel(e.id, "traded")}
+                      className={`rounded p-0.5 transition-colors ${
+                        e.label === "traded"
+                          ? "text-indigo-400"
+                          : "text-slate-500 hover:text-indigo-400/70"
+                      }`}
+                      title="Mark as traded"
+                    >
+                      <TrendingUp className="h-5 w-5" />
+                    </button>
+                    <button
+                      onClick={() => handleSetLabel(e.id, "unknowable")}
+                      className={`rounded p-0.5 transition-colors ${
+                        e.label === "unknowable"
+                          ? "text-slate-400"
+                          : "text-slate-500 hover:text-slate-400"
+                      }`}
+                      title="Mark as unknowable"
+                    >
+                      <HelpCircle className="h-5 w-5" />
+                    </button>
+                    <button
+                      onClick={() => handleSetLabel(e.id, "well_priced")}
+                      className={`rounded p-0.5 transition-colors ${
+                        e.label === "well_priced"
+                          ? "text-emerald-400"
+                          : "text-slate-500 hover:text-emerald-400/70"
+                      }`}
+                      title="Mark as well-priced"
+                    >
+                      <BadgeCheck className="h-5 w-5" />
+                    </button>
+                    {e.label != null && (
+                      <button
+                        onClick={() => handleSetLabel(e.id, null)}
+                        className="rounded p-0.5 text-slate-500 transition-colors hover:text-white"
+                        title="Clear label (back to discovery)"
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
+                    )}
+                  </div>
                   {(e.image ?? e.icon) && (
                     <img
                       src={e.image ?? e.icon ?? ""}
@@ -315,10 +654,10 @@ export function ScreenerContent({
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <button
                         onClick={() => handleAppraise(e.id, "deep")}
-                        disabled={!!appraising}
+                        disabled={appraisingIds.has(e.id)}
                         className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-slate-700/60 disabled:opacity-50"
                       >
-                        {appraising === e.id ? (
+                        {appraisingIds.has(e.id) ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
                         ) : (
                           <Search className="h-3 w-3" />
@@ -327,10 +666,10 @@ export function ScreenerContent({
                       </button>
                       <button
                         onClick={() => handleAppraise(e.id, "think")}
-                        disabled={!!appraising}
+                        disabled={appraisingIds.has(e.id)}
                         className="flex items-center gap-1.5 rounded-lg border border-indigo-500/60 bg-indigo-500/20 px-3 py-1.5 text-xs font-medium text-indigo-300 transition-colors hover:bg-indigo-500/30 disabled:opacity-50"
                       >
-                        {appraising === e.id ? (
+                        {appraisingIds.has(e.id) ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
                         ) : (
                           <Brain className="h-3 w-3" />
@@ -339,10 +678,10 @@ export function ScreenerContent({
                       </button>
                       <button
                         onClick={() => handleAppraise(e.id, "mini")}
-                        disabled={!!appraising}
+                        disabled={appraisingIds.has(e.id)}
                         className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-slate-700/60 disabled:opacity-50"
                       >
-                        {appraising === e.id ? (
+                        {appraisingIds.has(e.id) ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
                         ) : (
                           <Sparkles className="h-3 w-3" />
@@ -351,10 +690,10 @@ export function ScreenerContent({
                       </button>
                       <button
                         onClick={() => handleAppraise(e.id, "reappraise")}
-                        disabled={!!appraising || e.lastAppraised == null}
+                        disabled={appraisingIds.has(e.id) || e.lastAppraised == null}
                         className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-slate-700/60 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {appraising === e.id ? (
+                        {appraisingIds.has(e.id) ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
                         ) : (
                           <RotateCw className="h-3 w-3" />
