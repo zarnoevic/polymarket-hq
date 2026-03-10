@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { RefreshCw, Filter, Calendar, BarChart3, ExternalLink, Loader2, Search, RotateCw, Sparkles, FileText, X } from "lucide-react";
+import { RefreshCw, Filter, Calendar, BarChart3, ExternalLink, Loader2, Search, RotateCw, Sparkles, FileText, X, Brain } from "lucide-react";
 import { toast } from "sonner";
 
 type ScreenerEvent = {
   id: string;
   externalId: string;
   slug: string;
+  parentEventSlug: string | null;
   title: string;
   description: string | null;
   image: string | null;
@@ -113,9 +114,9 @@ export function ScreenerContent({
   const [appraising, setAppraising] = useState<string | null>(null);
   const [explanationEventId, setExplanationEventId] = useState<string | null>(null);
 
-  async function handleAppraise(eventId: string, mode: "deep" | "mini" | "reappraise") {
+  async function handleAppraise(eventId: string, mode: "deep" | "mini" | "reappraise" | "think") {
     setAppraising(eventId);
-    const labels = { deep: "Running deep research…", mini: "Running mini research…", reappraise: "Checking for new news…" };
+    const labels = { deep: "Running deep research…", mini: "Running mini research…", reappraise: "Checking for new news…", think: "Extended thinking (GPT‑5)…" };
     toast.info(labels[mode]);
     try {
       const res = await fetch("/api/screener/appraise", {
@@ -125,7 +126,7 @@ export function ScreenerContent({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Appraise failed");
-      const successLabels = { deep: "Deep appraisal complete", mini: "Mini appraisal complete", reappraise: "Reappraisal complete" };
+      const successLabels = { deep: "Deep appraisal complete", mini: "Mini appraisal complete", reappraise: "Reappraisal complete", think: "Think appraisal complete" };
       toast.success(successLabels[mode]);
       const listRes = await fetch("/api/screener/events");
       const list = await listRes.json();
@@ -170,7 +171,7 @@ export function ScreenerContent({
               Screener
             </h1>
             <p className="mt-1 text-slate-400">
-              Events from Gamma API (tag_id=100265) · closed=false · filtered by end_date ≤ 3 months
+              Events from Gamma API (tag_id=100265) · closed=false · end_date within today–3 months
             </p>
           </div>
           <button
@@ -216,7 +217,7 @@ export function ScreenerContent({
         <div className="space-y-4">
           <div className="flex items-center gap-2 text-sm text-slate-500">
             <BarChart3 className="h-4 w-4" />
-            <span>{events.length} markets · sorted by max(YEV, NEV) desc, then end date</span>
+            <span>{events.length} markets · appraised first, then quoted closest to 50%</span>
           </div>
 
           <div className="space-y-4">
@@ -325,6 +326,18 @@ export function ScreenerContent({
                         Deep Appraise
                       </button>
                       <button
+                        onClick={() => handleAppraise(e.id, "think")}
+                        disabled={!!appraising}
+                        className="flex items-center gap-1.5 rounded-lg border border-indigo-500/60 bg-indigo-500/20 px-3 py-1.5 text-xs font-medium text-indigo-300 transition-colors hover:bg-indigo-500/30 disabled:opacity-50"
+                      >
+                        {appraising === e.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Brain className="h-3 w-3" />
+                        )}
+                        Think Appraise
+                      </button>
+                      <button
                         onClick={() => handleAppraise(e.id, "mini")}
                         disabled={!!appraising}
                         className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-slate-700/60 disabled:opacity-50"
@@ -359,7 +372,7 @@ export function ScreenerContent({
                       )}
                     </div>
                     <a
-                      href={`https://polymarket.com/event/${e.slug}`}
+                      href={`https://polymarket.com/event/${e.parentEventSlug ?? e.slug}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="mt-3 inline-flex items-center gap-1.5 text-sm text-indigo-400 hover:text-indigo-300"

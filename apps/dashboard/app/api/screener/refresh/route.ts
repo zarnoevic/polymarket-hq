@@ -30,6 +30,7 @@ type GammaMarket = {
   restricted?: boolean;
   outcomePrices?: string | string[];
   outcomes?: string | string[];
+  events?: Array<{ slug?: string }>;
   [k: string]: unknown;
 };
 
@@ -62,6 +63,8 @@ export async function POST() {
     let pageNum = 0;
 
     const endDateMax = getEndDateMax();
+    const endDateMin = new Date();
+    endDateMin.setUTCHours(0, 0, 0, 0);
     const gammaParams = `tag_id=100265&closed=false`;
 
     while (hasMore && pageNum < MAX_PAGES) {
@@ -86,23 +89,30 @@ export async function POST() {
       offset += PAGE_LIMIT;
     }
 
+    // Delete past events from DB so they don't linger
+    await prisma.screenerEvent.deleteMany({
+      where: { endDate: { lt: endDateMin } },
+    });
+
     // Process each market directly (child-level); no parent event aggregation
     // Filter: active + closed + end date (API returns ready:false for all; filter after fetch)
     let upserted = 0;
     const filtered = allMarkets.filter((m) => {
       if (m.active !== true || m.closed !== false) return false;
       const raw = (m.endDate ?? m.end_date) ?? null;
-      if (!raw) return true; // no end date = include
+      if (!raw) return false; // no end date = exclude (can't verify it's not past)
       const d = new Date(raw);
-      return !isNaN(d.getTime()) && d <= endDateMax;
+      return !isNaN(d.getTime()) && d >= endDateMin && d <= endDateMax;
     });
     for (const m of filtered) {
       if (!m?.id) continue;
       const endDate = (m.endDate ?? m.end_date) ? new Date((m.endDate ?? m.end_date) as string) : null;
       const { yes: probYes, no: probNo } = parseProbabilities(m);
+      const parentEventSlug = m.events?.[0]?.slug ?? null;
       const base = {
         externalId: m.id,
         slug: m.slug ?? m.id,
+        parentEventSlug: parentEventSlug && parentEventSlug !== (m.slug ?? m.id) ? parentEventSlug : null,
         title: m.question ?? "",
         description: m.description ?? null,
         image: m.image ?? null,

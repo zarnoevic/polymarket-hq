@@ -15,6 +15,7 @@ model ScreenerEvent {
   id           String   @id @default(uuid()) @map("id")
   externalId   String   @unique @map("external_id") // Gamma market id
   slug         String   @map("slug")
+  parentEventSlug String? @map("parent_event_slug") // Parent event slug for child markets; use for Polymarket link
   title        String   @map("title")
   description  String?  @db.Text @map("description")
   image        String?  @map("image")

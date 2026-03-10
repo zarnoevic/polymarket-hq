@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@polymarket-hq/dashboard-prisma";
 import OpenAI from "openai";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
 const DEEP_APPRAISE_PROMPT = `You are an expert market analyst for prediction markets on Polymarket.
 
 Given a prediction market event, perform DEEP RESEARCH using web search. Investigate:
@@ -117,15 +115,17 @@ export async function POST(req: Request) {
     );
   }
 
+  const openai = new OpenAI({ apiKey });
+
   try {
     const body = await req.json();
     const { eventId, mode } = body as {
       eventId: string;
-      mode: "deep" | "mini" | "reappraise";
+      mode: "deep" | "mini" | "reappraise" | "think";
     };
     if (!eventId || !mode) {
       return NextResponse.json(
-        { error: "eventId and mode (deep|mini|reappraise) required" },
+        { error: "eventId and mode (deep|mini|reappraise|think) required" },
         { status: 400 }
       );
     }
@@ -161,6 +161,7 @@ export async function POST(req: Request) {
     const isReappraise = mode === "reappraise";
     const isDeep = mode === "deep";
     const isMini = mode === "mini";
+    const isThink = mode === "think";
 
     let prompt: string;
     if (isReappraise) {
@@ -176,6 +177,9 @@ export async function POST(req: Request) {
     } else if (isMini) {
       prompt = MINI_APPRAISE_PROMPT.replace("{quotedYes}", quotedYes.toFixed(1))
         .replace("{quotedNo}", quotedNo.toFixed(1));
+    } else if (isThink) {
+      prompt = DEEP_APPRAISE_PROMPT.replace("{quotedYes}", quotedYes.toFixed(1))
+        .replace("{quotedNo}", quotedNo.toFixed(1));
     } else {
       prompt = DEEP_APPRAISE_PROMPT.replace("{quotedYes}", quotedYes.toFixed(1))
         .replace("{quotedNo}", quotedNo.toFixed(1));
@@ -184,14 +188,17 @@ export async function POST(req: Request) {
     const userMessage = `Event: ${event.title}\n${event.description ? `\nDescription: ${event.description}\n` : ""}\n${prompt}`;
 
     const model =
-      isDeep
-        ? "o3-deep-research"
-        : isMini
-          ? "o4-mini-deep-research"
-          : "gpt-4o";
+      isThink
+        ? "gpt-5"
+        : isDeep
+          ? "o3-deep-research"
+          : isMini
+            ? "o4-mini-deep-research"
+            : "gpt-4o";
 
     const response = await openai.responses.create({
       model,
+      ...(isThink && { reasoning: { effort: "high" } }),
       input: userMessage,
       instructions:
         "You are a precise market analyst. Output ONLY valid JSON with appraised_yes, appraised_no (0-100), and explanation (string with sources). No other text.",
