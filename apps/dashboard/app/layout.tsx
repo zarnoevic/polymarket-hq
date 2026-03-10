@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import { DM_Sans } from "next/font/google";
-import { Toaster } from "sonner";
-import { Nav } from "./components/Nav";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -23,9 +21,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`dark ${dmSans.variable}`} suppressHydrationWarning>
       <body className="antialiased flex min-h-screen flex-col font-sans">
-        <Toaster richColors position="top-right" theme="dark" />
-        <Nav />
-        <main className="flex-1">{children}</main>
+        {children}
       </body>
     </html>
   );

@@ -10,10 +10,6 @@ Given a prediction market event, perform DEEP RESEARCH using web search. Investi
 - Similar past events and their resolutions
 - Factors that could swing the outcome either way
 
-Current Polymarket quoted probabilities (what the market believes):
-- YES: {quotedYes}%
-- NO: {quotedNo}%
-
 Based on your thorough research, output your APPRAISED probabilities and a detailed explanation.
 
 Respond ONLY with valid JSON in this exact format, no other text:
@@ -26,10 +22,6 @@ Given a prediction market event, perform research using web search. Investigate:
 - The underlying question and relevant facts
 - Recent news and data that bear on the outcome
 - Factors that could swing the outcome either way
-
-Current Polymarket quoted probabilities (what the market believes):
-- YES: {quotedYes}%
-- NO: {quotedNo}%
 
 Based on your research, output your APPRAISED probabilities and a concise explanation.
 
@@ -129,11 +121,6 @@ async function appraiseOne(
     }
   }
 
-  const quotedYes =
-    event.probabilityYes != null ? event.probabilityYes * 100 : 50;
-  const quotedNo =
-    event.probabilityNo != null ? event.probabilityNo * 100 : 50;
-
   const isReappraise = mode === "reappraise";
   const isDeep = mode === "deep";
   const isMini = mode === "mini";
@@ -151,17 +138,18 @@ async function appraiseOne(
         event.lastAppraised?.toISOString?.() ?? "unknown"
       );
   } else if (isMini) {
-    prompt = MINI_APPRAISE_PROMPT.replace("{quotedYes}", quotedYes.toFixed(1))
-      .replace("{quotedNo}", quotedNo.toFixed(1));
+    prompt = MINI_APPRAISE_PROMPT;
   } else if (isThink) {
-    prompt = DEEP_APPRAISE_PROMPT.replace("{quotedYes}", quotedYes.toFixed(1))
-      .replace("{quotedNo}", quotedNo.toFixed(1));
+    prompt = DEEP_APPRAISE_PROMPT;
   } else {
-    prompt = DEEP_APPRAISE_PROMPT.replace("{quotedYes}", quotedYes.toFixed(1))
-      .replace("{quotedNo}", quotedNo.toFixed(1));
+    prompt = DEEP_APPRAISE_PROMPT;
   }
 
-  const userMessage = `Event: ${event.title}\n${event.description ? `\nDescription: ${event.description}\n` : ""}\n${prompt}`;
+  const noteSuffix = event.note?.trim()
+    ? `\n\nAnalyst note (consider in your appraisal): ${event.note.trim()}`
+    : "";
+
+  const userMessage = `Event: ${event.title}\n${event.description ? `\nDescription: ${event.description}\n` : ""}${noteSuffix}\n\n${prompt}`;
 
   const model =
     isThink

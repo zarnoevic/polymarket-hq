@@ -1,8 +1,8 @@
 import {
   fetchActivity,
-} from "../../lib/polymarket";
-import { fetchMarketData } from "../../lib/benchmark";
-import { matchRoundTrips } from "../../lib/round-trip";
+} from "../../../lib/polymarket";
+import { fetchMarketData } from "../../../lib/benchmark";
+import { matchRoundTrips } from "../../../lib/round-trip";
 import {
   buildEquityCurve,
   computeReturnMetrics,
@@ -18,7 +18,7 @@ import {
   computePortfolioConstruction,
   computeCapitalEfficiency,
   computeExcessReturn,
-} from "../../lib/metrics";
+} from "../../../lib/metrics";
 import {
   Activity,
   ArrowDownLeft,

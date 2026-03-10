@@ -24,6 +24,9 @@ type LeaderboardEntry = {
 
 const DEFAULT_WALLET = "0x25012ec798e4861e38c645df919f86dc3c177e28";
 
+// Total traders on Polymarket (for percentile calculation; not displayed)
+const TOTAL_TRADERS = 2_360_397;
+
 // Polygon USDC.e (bridged) - 6 decimals
 const USDC_E_POLYGON = "0x2791bca1f2de4661ed88a30c99a7a9449aa84174" as const;
 const POLYGON_RPCS = [
@@ -245,6 +248,12 @@ export default async function HomePage() {
                     <span className="font-semibold text-slate-300">Rank</span>
                     <span className="font-mono text-lg font-bold text-white">
                       #{Number(account.rank).toLocaleString()}
+                    </span>
+                    <span className="text-slate-400">
+                      · Top {(() => {
+                        const pct = (Number(account.rank) / TOTAL_TRADERS) * 100;
+                        return pct < 0.01 ? pct.toFixed(4) : pct < 1 ? pct.toFixed(2) : pct.toFixed(1);
+                      })()}%
                     </span>
                   </div>
                 </div>

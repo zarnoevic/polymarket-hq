@@ -1,10 +1,24 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { RefreshCw, Filter, Calendar, BarChart3, ExternalLink, Loader2, Search, RotateCw, Sparkles, FileText, X, Brain, Star, Compass, HelpCircle, BadgeCheck, TrendingUp, ClipboardList, ChevronDown } from "lucide-react";
+import { RefreshCw, Filter, Calendar, BarChart3, ExternalLink, Loader2, Search, RotateCw, Sparkles, X, Brain, Star, Compass, HelpCircle, BadgeCheck, TrendingUp, ClipboardList, ChevronDown, AlertTriangle, StickyNote } from "lucide-react";
 import { toast } from "sonner";
 
-type LabelType = "vetted" | "unknowable" | "well_priced" | "traded" | "evaluating" | null;
+type LabelType = "vetted" | "unknowable" | "well_priced" | "traded" | "evaluating" | "disputed" | null;
+
+const VALID_LABELS: ReadonlySet<string> = new Set([
+  "vetted",
+  "unknowable",
+  "well_priced",
+  "traded",
+  "evaluating",
+  "disputed",
+]);
+
+function toLabelType(s: string | null | undefined): LabelType {
+  if (s == null) return null;
+  return VALID_LABELS.has(s) ? (s as LabelType) : null;
+}
 
 type ScreenerEvent = {
   id: string;
@@ -30,7 +44,13 @@ type ScreenerEvent = {
   nev: number | null;
   appraisalExplanation: string | null;
   label: LabelType;
+  note: string | null;
   syncedAt: Date;
+};
+
+type ScreenerEventInput = Omit<ScreenerEvent, "label" | "note"> & {
+  label?: string | null;
+  note?: string | null;
 };
 
 function formatUsd(value: number, decimals = 0): string {
@@ -57,52 +77,25 @@ function formatDate(d: Date | null): string {
   });
 }
 
-function ExplanationModal({
-  explanation,
-  title,
-  onClose,
-}: {
-  explanation: string;
-  title: string;
-  onClose: () => void;
-}) {
-  const parts = explanation.split(/(https?:\/\/[^\s]+)/g);
+function ExplanationText({ text }: { text: string }) {
+  const parts = text.split(/(https?:\/\/[^\s]+)/g);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <div className="relative max-h-[85vh] w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-700/80 bg-slate-900 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-700/60 px-6 py-4">
-          <h3 className="font-semibold text-white">{title}</h3>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-700/60 hover:text-white"
+    <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">
+      {parts.map((part, i) =>
+        part.match(/^https?:\/\//) ? (
+          <a
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-indigo-400 underline hover:text-indigo-300"
           >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="max-h-[60vh] overflow-y-auto px-6 py-5">
-          <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">
-            {parts.map((part, i) =>
-              part.match(/^https?:\/\//) ? (
-                <a
-                  key={i}
-                  href={part}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-indigo-400 underline hover:text-indigo-300"
-                >
-                  {part}
-                </a>
-              ) : (
-                <span key={i}>{part}</span>
-              )
-            )}
-          </div>
-        </div>
-      </div>
+            {part}
+          </a>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
     </div>
   );
 }
@@ -110,18 +103,22 @@ function ExplanationModal({
 export function ScreenerContent({
   initialEvents,
 }: {
-  initialEvents: ScreenerEvent[];
+  initialEvents: ScreenerEventInput[];
 }) {
   const [events, setEvents] = useState<ScreenerEvent[]>(
     initialEvents.map((e) => ({
       ...e,
-      label: (e as ScreenerEvent & { watchlisted?: boolean; label?: LabelType }).label
-        ?? ((e as ScreenerEvent & { watchlisted?: boolean }).watchlisted ? "vetted" : null),
+      label:
+        toLabelType(e.label) ??
+        ((e as ScreenerEventInput & { watchlisted?: boolean }).watchlisted ? "vetted" : null),
+      note: e.note ?? null,
     }))
   );
   const [refreshing, setRefreshing] = useState(false);
   const [appraisingIds, setAppraisingIds] = useState<Set<string>>(new Set());
-  const [explanationEventId, setExplanationEventId] = useState<string | null>(null);
+  const [noteEditingId, setNoteEditingId] = useState<string | null>(null);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [savingNoteId, setSavingNoteId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"discovery" | "evaluating" | "vetted" | "traded" | "unknowable" | "well_priced">("discovery");
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
@@ -178,11 +175,37 @@ export function ScreenerContent({
                 ? "Marked as well-priced"
                 : label === "traded"
                   ? "Marked as traded"
-                  : "Marked as evaluating";
+                  : label === "disputed"
+                    ? "Marked as disputed (hidden)"
+                    : "Marked as evaluating";
       toast.success(msg);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to update label";
       toast.error(msg);
+    }
+  }
+
+  async function handleSetNote(eventId: string, note: string | null) {
+    setSavingNoteId(eventId);
+    try {
+      const res = await fetch("/api/screener/note", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId, note: note || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Failed to update note");
+      setEvents((prev) =>
+        prev.map((e) => (e.id === eventId ? { ...e, note: note || null } : e))
+      );
+      setNoteEditingId(null);
+      setNoteDraft("");
+      toast.success(note ? "Note saved" : "Note cleared");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to update note";
+      toast.error(msg);
+    } finally {
+      setSavingNoteId(null);
     }
   }
 
@@ -489,12 +512,17 @@ export function ScreenerContent({
             </span>
           </div>
 
-          <div className="space-y-4">
-            {displayedEvents.map((e) => (
+          <div className={`space-y-4 ${activeTab === "discovery" ? "flex flex-col items-center" : ""}`}>
+            {displayedEvents.map((e) => {
+              const showExplanation = activeTab !== "discovery" && e.appraisalExplanation;
+              return (
               <div
                 key={e.id}
-                className="overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-700/60"
+                className={`flex gap-4 ${showExplanation ? "items-stretch w-full" : "justify-center"}`}
               >
+                <div
+                  className={`overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-700/60 ${showExplanation ? "w-[45%] min-w-0 shrink-0" : "w-full max-w-6xl"}`}
+                >
                 <div className="flex gap-4 p-5">
                   <div className="flex shrink-0 flex-col items-center gap-0.5 pt-1">
                     <button
@@ -556,6 +584,17 @@ export function ScreenerContent({
                     >
                       <BadgeCheck className="h-5 w-5" />
                     </button>
+                    <button
+                      onClick={() => handleSetLabel(e.id, "disputed")}
+                      className={`rounded p-0.5 transition-colors ${
+                        e.label === "disputed"
+                          ? "text-amber-500"
+                          : "text-slate-500 hover:text-amber-500/70"
+                      }`}
+                      title="Mark as disputed (hidden)"
+                    >
+                      <AlertTriangle className="h-5 w-5" />
+                    </button>
                     {e.label != null && (
                       <button
                         onClick={() => handleSetLabel(e.id, null)}
@@ -575,7 +614,7 @@ export function ScreenerContent({
                   )}
                   <div className="min-w-0 flex-1">
                     <h3 className="font-medium text-white">{e.title}</h3>
-                    <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
                       <span className="font-mono text-slate-500">{e.slug}</span>
                       {e.endDate && (
                         <span className="flex items-center gap-1 text-slate-500">
@@ -589,7 +628,58 @@ export function ScreenerContent({
                         </span>
                       )}
                     </div>
-                    <div className="mt-4 flex flex-wrap items-center gap-6">
+                    <div className="mt-3 rounded-lg border border-slate-700/50 bg-slate-800/40 p-3">
+                      <div className="mb-2 flex items-center gap-2">
+                        <StickyNote className={`h-4 w-4 shrink-0 ${e.note ? "text-amber-500/80" : "text-slate-500"}`} />
+                        <span className="text-xs font-medium text-slate-400">Note (included in appraisal)</span>
+                      </div>
+                      {noteEditingId === e.id ? (
+                        <div className="space-y-2">
+                          <textarea
+                            value={noteDraft}
+                            onChange={(ev) => setNoteDraft(ev.target.value)}
+                            placeholder="Add context, hypotheses, or reminders for the AI appraisal…"
+                            className="w-full rounded-lg border border-slate-600/60 bg-slate-800/80 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-indigo-500/60 focus:outline-none focus:ring-1 focus:ring-indigo-500/40"
+                            rows={3}
+                            autoFocus
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleSetNote(e.id, noteDraft.trim() || null)}
+                              disabled={savingNoteId === e.id}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-500/80 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+                            >
+                              {savingNoteId === e.id && <Loader2 className="h-3 w-3 animate-spin" />}
+                              Save
+                            </button>
+                            <button
+                              onClick={() => {
+                                setNoteEditingId(null);
+                                setNoteDraft("");
+                              }}
+                              className="rounded-lg border border-slate-600/60 px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-white"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setNoteEditingId(e.id);
+                            setNoteDraft(e.note ?? "");
+                          }}
+                          className="block w-full rounded bg-slate-800/60 px-3 py-2 text-left text-sm text-slate-400 transition-colors hover:bg-slate-700/50 hover:text-slate-300"
+                        >
+                          {e.note ? (
+                            <span className="text-slate-300">{e.note}</span>
+                          ) : (
+                            <span className="italic">Click to add a note…</span>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-4">
                       <div>
                         <p className="text-xs text-slate-500">Volume</p>
                         <p className="font-mono font-medium text-white">
@@ -603,7 +693,7 @@ export function ScreenerContent({
                         </p>
                       </div>
                       {(e.probabilityYes != null || e.probabilityNo != null) && (
-                        <div className="min-w-[160px] flex flex-col gap-3">
+                        <div className="min-w-[140px] flex flex-col gap-2">
                           <div>
                             <p className="text-[11px] text-slate-500 mb-1">Quoted</p>
                             <div className="flex justify-between gap-4 text-xs font-medium mb-1.5">
@@ -651,7 +741,8 @@ export function ScreenerContent({
                         </div>
                       )}
                     </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {activeTab !== "discovery" && (
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
                       <button
                         onClick={() => handleAppraise(e.id, "deep")}
                         disabled={appraisingIds.has(e.id)}
@@ -700,44 +791,35 @@ export function ScreenerContent({
                         )}
                         Reappraise
                       </button>
-                      {e.appraisalExplanation && (
-                        <button
-                          onClick={() => setExplanationEventId(e.id)}
-                          className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-slate-700/60"
-                        >
-                          <FileText className="h-3 w-3" />
-                          View explanation
-                        </button>
-                      )}
                     </div>
+                    )}
                     <a
                       href={`https://polymarket.com/event/${e.parentEventSlug ?? e.slug}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-3 inline-flex items-center gap-1.5 text-sm text-indigo-400 hover:text-indigo-300"
+                      className="mt-2 inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300"
                     >
                       View on Polymarket
-                      <ExternalLink className="h-3.5 w-3.5" />
+                      <ExternalLink className="h-3 w-3" />
                     </a>
                   </div>
                 </div>
+                </div>
+                {showExplanation && (
+                  <div className="min-w-0 flex-1 rounded-xl border border-slate-700/60 bg-slate-800/30 p-5">
+                    <p className="mb-3 text-sm font-medium text-slate-400">Appraisal explanation</p>
+                    <div className="max-h-80 overflow-y-auto pr-2 text-sm leading-relaxed">
+                      <ExplanationText text={e.appraisalExplanation} />
+                    </div>
+                  </div>
+                )}
               </div>
-            ))}
+            );
+            })}
           </div>
         </div>
       )}
 
-      {explanationEventId && (() => {
-        const ev = events.find((x) => x.id === explanationEventId);
-        if (!ev?.appraisalExplanation) return null;
-        return (
-          <ExplanationModal
-            explanation={ev.appraisalExplanation}
-            title={ev.title}
-            onClose={() => setExplanationEventId(null)}
-          />
-        );
-      })()}
     </>
   );
 }

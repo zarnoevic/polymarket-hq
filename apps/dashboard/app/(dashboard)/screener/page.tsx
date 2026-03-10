@@ -1,5 +1,5 @@
 import { prisma } from "@polymarket-hq/dashboard-prisma";
-import { ScreenerContent } from "../components/ScreenerContent";
+import { ScreenerContent } from "../../components/ScreenerContent";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +26,7 @@ export default async function ScreenerPage() {
         }}
       />
 
-      <div className="relative z-10 mx-auto max-w-6xl px-6 py-12">
+      <div className="relative z-10 mx-auto w-[90vw] max-w-[90vw] px-4 py-12">
         <ScreenerContent initialEvents={sorted} />
       </div>
     </div>
