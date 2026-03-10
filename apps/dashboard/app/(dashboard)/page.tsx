@@ -5,10 +5,10 @@ import {
   TrendingUp,
   Hash,
   Layers,
-  Calendar,
   CircleDollarSign,
   Coins,
   Briefcase,
+  ExternalLink,
 } from "lucide-react";
 
 type LeaderboardEntry = {
@@ -216,12 +216,25 @@ export default async function HomePage() {
 
       <div className="relative z-10 mx-auto max-w-5xl px-6 py-12">
         <header className="mb-10">
-          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            Dashboard
-          </h1>
-          <p className="mt-1 text-slate-400">
-            Account overview and current positions
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                Dashboard
+              </h1>
+              <p className="mt-1 text-slate-400">
+                Account overview and current positions
+              </p>
+            </div>
+            <a
+              href="https://polymarket.com/portfolio"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm text-indigo-400 hover:text-indigo-300"
+            >
+              Polymarket
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          </div>
         </header>
 
         {account ? (
@@ -351,72 +364,53 @@ export default async function HomePage() {
 
             {/* Positions */}
             {positions.length > 0 && (
-              <div className="space-y-4">
-                <h2 className="flex items-center gap-2 text-xl font-semibold text-white">
-                  <Layers className="h-5 w-5 text-indigo-400" />
-                  Current positions ({positions.length})
+              <div className="space-y-2">
+                <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
+                  <Layers className="h-4 w-4 text-indigo-400" />
+                  Positions ({positions.length})
                 </h2>
-                <div className="space-y-4">
+                <div className="space-y-2">
                   {positions.map((pos) => (
                     <div
                       key={pos.asset}
-                      className="overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-lg backdrop-blur-sm"
+                      className="flex items-center gap-3 overflow-hidden rounded-lg border border-slate-800/60 bg-slate-900/50 px-3 py-2"
                     >
-                      <div className="flex gap-4 p-5">
-                        <img
-                          src={pos.icon}
-                          alt=""
-                          className="h-14 w-14 shrink-0 rounded-lg object-cover"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-medium text-white">{pos.title}</h3>
-                          <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
-                            <span className="inline-flex items-center rounded-md bg-indigo-500/20 px-2 py-0.5 font-medium text-indigo-400">
-                              {pos.outcome}
-                            </span>
-                            {pos.endDate && (
-                              <span className="flex items-center gap-1 text-slate-500">
-                                <Calendar className="h-3.5 w-3.5" />
-                                {pos.endDate}
-                              </span>
-                            )}
-                          </div>
-                          <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                            <div>
-                              <p className="text-xs text-slate-500">Size</p>
-                              <p className="font-mono text-sm font-medium text-white">
-                                {pos.size.toLocaleString(undefined, {
-                                  maximumFractionDigits: 0,
-                                })}{" "}
-                                @ {pos.avgPrice.toFixed(2)}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-slate-500">Current</p>
-                              <p className="font-mono text-sm font-medium text-white">
-                                {formatUsd(pos.currentValue, 2)} ({pos.curPrice.toFixed(2)}¢)
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-slate-500">Cost</p>
-                              <p className="font-mono text-sm text-slate-300">
-                                {formatUsd(pos.initialValue, 2)}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-slate-500">PnL</p>
-                              <p
-                                className={`font-mono text-sm font-semibold ${
-                                  pos.cashPnl >= 0
-                                    ? "text-emerald-400"
-                                    : "text-red-400"
-                                }`}
-                              >
-                                {pos.cashPnl >= 0 ? "+" : ""}
-                                {formatUsd(pos.cashPnl, 2)} ({formatPercent(pos.percentPnl)})
-                              </p>
-                            </div>
-                          </div>
+                      <img
+                        src={pos.icon}
+                        alt=""
+                        className="h-9 w-9 shrink-0 rounded object-cover"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="truncate text-sm font-medium text-white">{pos.title}</h3>
+                          <span
+                            className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-medium ${
+                              pos.outcome.toLowerCase() === "yes"
+                                ? "bg-emerald-500/20 text-emerald-400"
+                                : "bg-red-500/20 text-red-400"
+                            }`}
+                          >
+                            {pos.outcome}
+                          </span>
+                          {pos.endDate && (
+                            <span className="text-xs text-slate-500">{pos.endDate}</span>
+                          )}
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-4 text-xs">
+                          <span className="text-slate-400">
+                            {pos.size.toLocaleString(undefined, { maximumFractionDigits: 0 })} @ {pos.avgPrice.toFixed(1)}¢
+                          </span>
+                          <span className="text-slate-300">
+                            {formatUsd(pos.currentValue, 2)}
+                          </span>
+                          <span
+                            className={`font-medium ${
+                              pos.cashPnl >= 0 ? "text-emerald-400" : "text-red-400"
+                            }`}
+                          >
+                            {pos.cashPnl >= 0 ? "+" : ""}
+                            {formatUsd(pos.cashPnl, 2)} ({formatPercent(pos.percentPnl)})
+                          </span>
                         </div>
                       </div>
                     </div>

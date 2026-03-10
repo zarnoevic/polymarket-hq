@@ -39,7 +39,10 @@ export async function POST(req: Request) {
     }
     await prisma.screenerEvent.update({
       where: { id: eventId },
-      data: { label: value },
+      data: {
+        label: value,
+        labelUpdatedAt: new Date(),
+      },
     });
 
     return NextResponse.json({ ok: true, label: value });

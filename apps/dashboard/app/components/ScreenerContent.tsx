@@ -46,6 +46,7 @@ type ScreenerEvent = {
   nev: number | null;
   appraisalExplanation: string | null;
   label: LabelType;
+  labelUpdatedAt?: Date | null;
   note: string | null;
   syncedAt: Date;
   raw?: unknown;
@@ -155,7 +156,13 @@ export function ScreenerContent({
   const displayedEvents =
     activeTab === "discovery"
       ? discoveryEvents
-      : events.filter((e) => e.label === tabToLabel[activeTab]);
+      : activeTab === "evaluating"
+        ? [...events.filter((e) => e.label === "evaluating")].sort((a, b) => {
+            const at = a.labelUpdatedAt ? new Date(a.labelUpdatedAt).getTime() : 0;
+            const bt = b.labelUpdatedAt ? new Date(b.labelUpdatedAt).getTime() : 0;
+            return bt - at; // most recent first
+          })
+        : events.filter((e) => e.label === tabToLabel[activeTab]);
 
   async function handleSetLabel(eventId: string, label: LabelType) {
     try {
@@ -167,7 +174,11 @@ export function ScreenerContent({
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Failed to update label");
       setEvents((prev) =>
-        prev.map((e) => (e.id === eventId ? { ...e, label } : e))
+        prev.map((e) =>
+          e.id === eventId
+            ? { ...e, label, labelUpdatedAt: label != null ? new Date() : e.labelUpdatedAt }
+            : e
+        )
       );
       const msg =
         label === null
@@ -606,7 +617,15 @@ export function ScreenerContent({
                   <div className="min-w-0 flex-1">
                     <h3 className="font-medium text-white">{e.title}</h3>
                     <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
-                      <span className="font-mono text-slate-500">{e.slug}</span>
+                      <a
+                        href={`https://polymarket.com/event/${e.parentEventSlug ?? e.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300"
+                      >
+                        Polymarket
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
                       {displayCreatedAt && !isNaN(new Date(displayCreatedAt).getTime()) && (
                         <span className="flex items-center gap-1 text-slate-500" title="Market creation (API)">
                           <CalendarPlus className="h-3.5 w-3.5" />
@@ -619,61 +638,7 @@ export function ScreenerContent({
                           {formatDate(e.endDate)}
                         </span>
                       )}
-                      {e.restricted && (
-                        <span className="rounded bg-amber-500/20 px-2 py-0.5 text-amber-400">
-                          Restricted
-                        </span>
-                      )}
                     </div>
-                    {activeTab !== "discovery" && (
-                    <div className="mt-2">
-                      {noteEditingId === e.id ? (
-                        <div className="flex flex-col gap-2">
-                          <textarea
-                            value={noteDraft}
-                            onChange={(ev) => setNoteDraft(ev.target.value)}
-                            placeholder="Note (included in appraisal)"
-                            className="w-full rounded border border-slate-600/60 bg-transparent px-0 py-1 text-sm text-slate-300 placeholder-slate-500 focus:border-slate-500 focus:outline-none"
-                            rows={2}
-                            autoFocus
-                          />
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleSetNote(e.id, noteDraft.trim() || null)}
-                              disabled={savingNoteId === e.id}
-                              className="text-xs text-indigo-400 hover:text-indigo-300 disabled:opacity-50"
-                            >
-                              {savingNoteId === e.id ? "Saving…" : "Save"}
-                            </button>
-                            <button
-                              onClick={() => {
-                                setNoteEditingId(null);
-                                setNoteDraft("");
-                              }}
-                              className="text-xs text-slate-500 hover:text-slate-400"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            setNoteEditingId(e.id);
-                            setNoteDraft(e.note ?? "");
-                          }}
-                          className="flex items-center gap-2 text-left text-sm text-slate-500 hover:text-slate-400"
-                        >
-                          <StickyNote className={`h-3.5 w-3.5 shrink-0 ${e.note ? "text-amber-500/70" : ""}`} />
-                          {e.note ? (
-                            <span className="text-slate-400">{e.note}</span>
-                          ) : (
-                            <span>Add note</span>
-                          )}
-                        </button>
-                      )}
-                    </div>
-                    )}
                     <div className="mt-3 flex flex-wrap items-center gap-4">
                       <div>
                         <p className="text-xs text-slate-500">Volume</p>
@@ -788,15 +753,55 @@ export function ScreenerContent({
                       </button>
                     </div>
                     )}
-                    <a
-                      href={`https://polymarket.com/event/${e.parentEventSlug ?? e.slug}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-2 inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300"
-                    >
-                      View on Polymarket
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
+                    {activeTab !== "discovery" && (
+                    <div className="mt-2">
+                      {noteEditingId === e.id ? (
+                        <div className="flex flex-col gap-2">
+                          <textarea
+                            value={noteDraft}
+                            onChange={(ev) => setNoteDraft(ev.target.value)}
+                            placeholder="Note (included in appraisal)"
+                            className="w-full rounded border border-slate-600/60 bg-transparent px-0 py-1 text-sm text-slate-300 placeholder-slate-500 focus:border-slate-500 focus:outline-none"
+                            rows={2}
+                            autoFocus
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleSetNote(e.id, noteDraft.trim() || null)}
+                              disabled={savingNoteId === e.id}
+                              className="text-xs text-indigo-400 hover:text-indigo-300 disabled:opacity-50"
+                            >
+                              {savingNoteId === e.id ? "Saving…" : "Save"}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setNoteEditingId(null);
+                                setNoteDraft("");
+                              }}
+                              className="text-xs text-slate-500 hover:text-slate-400"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setNoteEditingId(e.id);
+                            setNoteDraft(e.note ?? "");
+                          }}
+                          className="flex items-center gap-2 text-left text-sm text-slate-500 hover:text-slate-400"
+                        >
+                          <StickyNote className={`h-3.5 w-3.5 shrink-0 ${e.note ? "text-amber-500/70" : ""}`} />
+                          {e.note ? (
+                            <span className="text-slate-400">{e.note}</span>
+                          ) : (
+                            <span>Add note</span>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                    )}
                   </div>
                 </div>
                 </div>
