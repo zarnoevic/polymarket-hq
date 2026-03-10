@@ -1,6 +1,9 @@
 import type { RoundTrip } from "./round-trip";
 import type { BenchmarkData, MarketData } from "./benchmark";
 
+/** Crypto markets trade 365 days/year (no weekends/holidays) */
+export const TRADING_DAYS_PER_YEAR = 365;
+
 /** Daily equity and return series built from round-trips */
 export function buildEquityCurve(
   roundTrips: RoundTrip[],
@@ -122,13 +125,13 @@ export function computeRiskAdjustedMetrics(
   const excessRets = rets.map((r, i) => r - rf[i]!);
 
   const vol = std(rets);
-  const volAnn = vol * Math.sqrt(252);
+  const volAnn = vol * Math.sqrt(TRADING_DAYS_PER_YEAR);
 
-  const sharpe = vol > 0 ? (mean(excessRets) / vol) * Math.sqrt(252) : 0;
+  const sharpe = vol > 0 ? (mean(excessRets) / vol) * Math.sqrt(TRADING_DAYS_PER_YEAR) : 0;
 
   const negRets = rets.filter((r) => r < 0);
-  const downsideDev = negRets.length > 0 ? std(negRets) * Math.sqrt(252 / 365) : 0;
-  const sortino = downsideDev > 0 ? (mean(excessRets) / std(negRets)) * Math.sqrt(252) : 0;
+  const downsideDev = negRets.length > 0 ? std(negRets) * Math.sqrt(TRADING_DAYS_PER_YEAR) : 0;
+  const sortino = downsideDev > 0 ? (mean(excessRets) / std(negRets)) * Math.sqrt(TRADING_DAYS_PER_YEAR) : 0;
 
   const cspx = marketData.cspx;
   let infoRatio = 0;
@@ -141,17 +144,17 @@ export function computeRiskAdjustedMetrics(
     const { p, b } = alignReturns(equityCurve, cspx);
     if (p.length > 1 && b.length > 1) {
       const actRets = p.map((r, i) => r - b[i]!);
-      const te = std(actRets) * Math.sqrt(252);
-      infoRatio = te > 0 ? (mean(actRets) * 252) / te : 0;
+      const te = std(actRets) * Math.sqrt(TRADING_DAYS_PER_YEAR);
+      infoRatio = te > 0 ? (mean(actRets) * TRADING_DAYS_PER_YEAR) / te : 0;
       const cov = p.reduce((s, _, i) => s + (p[i]! - mean(p)) * (b[i]! - mean(b)), 0) / (p.length - 1);
       const varB = std(b) ** 2;
       beta = varB > 0 ? cov / varB : 1;
-      const rp = mean(p) * 252;
-      const rb = mean(b) * 252;
+      const rp = mean(p) * TRADING_DAYS_PER_YEAR;
+      const rb = mean(b) * TRADING_DAYS_PER_YEAR;
       treynor = beta !== 0 ? (rp - marketData.riskFreeRateAnnual) / beta : 0;
       alpha = rp - (marketData.riskFreeRateAnnual + beta * (rb - marketData.riskFreeRateAnnual));
       const sharpeB = std(b) > 0 ? (mean(b) - rfDaily) / std(b) : 0;
-      modigliani = volAnn > 0 ? sharpe * (volAnn / (std(b) * Math.sqrt(252) || 0.01)) : 0;
+      modigliani = volAnn > 0 ? sharpe * (volAnn / (std(b) * Math.sqrt(TRADING_DAYS_PER_YEAR) || 0.01)) : 0;
     }
   }
 
@@ -162,11 +165,11 @@ export function computeRiskAdjustedMetrics(
   const gainLossRatio = totalLoss > 0 ? totalWin / totalLoss : totalWin > 0 ? 999 : 0;
 
   const maxDD = computeDrawdownMetrics(equityCurve).maxDrawdown;
-  const calmar = maxDD < 0 ? (mean(rets) * 252) / Math.abs(maxDD) : 0;
+  const calmar = maxDD < 0 ? (mean(rets) * TRADING_DAYS_PER_YEAR) / Math.abs(maxDD) : 0;
 
   const avgGain = wins.length > 0 ? totalWin / wins.length : 0;
   const avgLoss = losses.length > 0 ? totalLoss / losses.length : 0;
-  const sterling = maxDD < 0 ? (mean(rets) * 252) / Math.abs(maxDD) : 0; // similar to Calmar
+  const sterling = maxDD < 0 ? (mean(rets) * TRADING_DAYS_PER_YEAR) / Math.abs(maxDD) : 0; // similar to Calmar
 
   const omegaThreshold = 0;
   const gainsAbove = rets.filter((r) => r > omegaThreshold).reduce((a, b) => a + b, 0);
@@ -174,7 +177,7 @@ export function computeRiskAdjustedMetrics(
   const omegaRatio = lossesBelow > 0 ? gainsAbove / lossesBelow : gainsAbove > 0 ? 999 : 0;
 
   const burkeDenom = volAnn || 0.01;
-  const burke = (mean(excessRets) * 252) / burkeDenom;
+  const burke = (mean(excessRets) * TRADING_DAYS_PER_YEAR) / burkeDenom;
 
   return {
     sharpeRatio: sharpe,
@@ -199,7 +202,7 @@ export function computeRiskMetrics(
 ) {
   const rets = equityCurve.returns;
   const vol = std(rets);
-  const volAnn = vol * Math.sqrt(252);
+  const volAnn = vol * Math.sqrt(TRADING_DAYS_PER_YEAR);
 
   const negRets = rets.filter((r) => r < 0);
   const downsideDev = negRets.length > 0 ? std(negRets) : 0;
@@ -247,7 +250,7 @@ export function computeRiskMetrics(
   return {
     volatility: volAnn,
     volatilityDaily: vol,
-    downsideDeviation: downsideDev * Math.sqrt(252),
+    downsideDeviation: downsideDev * Math.sqrt(TRADING_DAYS_PER_YEAR),
     semiVariance: semiVar,
     semiDeviation: semiDev,
     var95,
@@ -332,7 +335,7 @@ export function computePortfolioEfficiency(
   equityCurve: { returns: number[] },
   drawdownMetrics: { maxDrawdown: number }
 ) {
-  const ret = mean(equityCurve.returns) * 252;
+  const ret = mean(equityCurve.returns) * TRADING_DAYS_PER_YEAR;
   const romad = drawdownMetrics.maxDrawdown < 0
     ? ret / Math.abs(drawdownMetrics.maxDrawdown)
     : 0;
@@ -457,13 +460,13 @@ export function computeBenchmarkComparison(
   if (p.length < 2) return { trackingError: null, informationRatio: null, activeReturn: null, alpha: null, beta: null, relativeDrawdown: null };
 
   const actRets = p.map((r, i) => r - b[i]!);
-  const te = std(actRets) * Math.sqrt(252);
-  const ir = te > 0 ? (mean(actRets) * 252) / te : 0;
-  const actRet = mean(actRets) * 252;
+  const te = std(actRets) * Math.sqrt(TRADING_DAYS_PER_YEAR);
+  const ir = te > 0 ? (mean(actRets) * TRADING_DAYS_PER_YEAR) / te : 0;
+  const actRet = mean(actRets) * TRADING_DAYS_PER_YEAR;
   const cov = p.reduce((s, _, i) => s + (p[i]! - mean(p)) * (b[i]! - mean(b)), 0) / (p.length - 1);
   const beta = std(b) ** 2 > 0 ? cov / (std(b) ** 2) : 1;
-  const rp = mean(p) * 252;
-  const rb = mean(b) * 252;
+  const rp = mean(p) * TRADING_DAYS_PER_YEAR;
+  const rb = mean(b) * TRADING_DAYS_PER_YEAR;
   const alpha = rp - (marketData.riskFreeRateAnnual + beta * (rb - marketData.riskFreeRateAnnual));
 
   return {
@@ -510,8 +513,8 @@ export function computeCapitalEfficiency(
   const kelly = winRate - (1 - winRate) / payoff;
   const kellyFraction = Math.max(0, Math.min(1, kelly));
 
-  const ret = mean(equityCurve.returns) * 252;
-  const vol = std(equityCurve.returns) * Math.sqrt(252);
+  const ret = mean(equityCurve.returns) * TRADING_DAYS_PER_YEAR;
+  const vol = std(equityCurve.returns) * Math.sqrt(TRADING_DAYS_PER_YEAR);
   const riskOfRuin = vol > 0 ? Math.exp(-2 * ret * (initialEquity / (vol * initialEquity || 1))) : 0;
 
   return {
@@ -529,7 +532,7 @@ export function computeExcessReturn(
   years: number
 ): number {
   const benchReturn = marketData.cspx
-    ? (1 + mean(marketData.cspx.returns)) ** (252 * years) - 1
+    ? (1 + mean(marketData.cspx.returns)) ** (TRADING_DAYS_PER_YEAR * years) - 1
     : 0;
   return totalReturn - benchReturn;
 }

@@ -29,35 +29,35 @@ export const METRIC_TOOLTIPS: Record<string, string> = {
   "Cumulative Return":
     "What: Total gain from start to end: (final equity − initial) ÷ initial. The headline performance number. Unlike total return, this uses the equity curve so it reflects compounding over time.\n\nRanges: Low (<0%): underwater. Average (5–25%): positive outcome. High (>30%): strong cumulative result.\n\nCalculation: (finalEquity - initialEquity) / initialEquity",
   "Excess Return (vs CSPX)":
-    "What: How much you beat (or trailed) the S&P 500 (CSPX) over the same period. Positive = outperformance. The real test of skill vs passive indexing.\n\nRanges: Low (<−10%): lagging market. Average (−5% to +5%): roughly tracking. High (>+10%): clear outperformance.\n\nCalculation: totalReturn - benchReturn; benchReturn = (1 + mean(cspx.returns))^(252*years) - 1",
+    "What: How much you beat (or trailed) the S&P 500 (CSPX) over the same period. Positive = outperformance. The real test of skill vs passive indexing.\n\nRanges: Low (<−10%): lagging market. Average (−5% to +5%): roughly tracking. High (>+10%): clear outperformance.\n\nCalculation: totalReturn - benchReturn; benchReturn = (1 + mean(cspx.returns))^(365*years) - 1",
 
   // 2. Risk-Adjusted
   "Sharpe Ratio":
-    "What: Return per unit of volatility — how much excess return you earn for each unit of risk (std dev). >1 is good, >2 is strong. Penalizes both upside and downside volatility.\n\nRanges: Low (<0.5): poor risk-adjusted return. Average (0.5–1.5): decent. High (>2): excellent; uncommon.\n\nCalculation: (mean(excessRets) / std(rets)) * sqrt(252); excessRets = returns - rfDaily",
+    "What: Return per unit of volatility — how much excess return you earn for each unit of risk (std dev). >1 is good, >2 is strong. Penalizes both upside and downside volatility.\n\nRanges: Low (<0.5): poor risk-adjusted return. Average (0.5–1.5): decent. High (>2): excellent; uncommon.\n\nCalculation: (mean(excessRets) / std(rets)) * sqrt(365); excessRets = returns - rfDaily",
   "Sortino Ratio":
-    "What: Like Sharpe but only penalizes downside volatility (losses). Ignores upside volatility. Often higher than Sharpe for strategies with skewed returns. Better for asymmetric payoffs.\n\nRanges: Low (<1): downside risk outweighs return. Average (1–2): solid. High (>2.5): strong downside-adjusted performance.\n\nCalculation: (mean(excessRets) / std(negRets)) * sqrt(252)",
+    "What: Like Sharpe but only penalizes downside volatility (losses). Ignores upside volatility. Often higher than Sharpe for strategies with skewed returns. Better for asymmetric payoffs.\n\nRanges: Low (<1): downside risk outweighs return. Average (1–2): solid. High (>2.5): strong downside-adjusted performance.\n\nCalculation: (mean(excessRets) / std(negRets)) * sqrt(365)",
   "Information Ratio":
-    "What: Active return per unit of tracking error — how much you beat the benchmark per unit of divergence. Measures skill in generating alpha vs simply hugging the index.\n\nRanges: Low (<0.3): little alpha per unit of active risk. Average (0.3–0.8): reasonable active management. High (>1): strong consistent alpha.\n\nCalculation: (mean(portfolio - benchmark) * 252) / (std(activeRets) * sqrt(252))",
+    "What: Active return per unit of tracking error — how much you beat the benchmark per unit of divergence. Measures skill in generating alpha vs simply hugging the index.\n\nRanges: Low (<0.3): little alpha per unit of active risk. Average (0.3–0.8): reasonable active management. High (>1): strong consistent alpha.\n\nCalculation: (mean(portfolio - benchmark) * 365) / (std(activeRets) * sqrt(365))",
   "Treynor Ratio":
     "What: Return per unit of systematic (market) risk (beta). For diversified portfolios, focuses on non-diversifiable risk. Higher = better reward for market exposure taken.\n\nRanges: Low (<0.05): poor reward for beta. Average (0.05–0.15): adequate. High (>0.2): strong return per unit of market risk.\n\nCalculation: (rp - rf) / beta; beta = cov(p,b) / var(b)",
   "Calmar Ratio":
-    "What: Return divided by max drawdown — reward per unit of worst pain. Favors strategies with steady gains and shallow drawdowns. >1 is solid, >2 is excellent.\n\nRanges: Low (<0.5): big drawdowns vs return. Average (0.5–2): typical. High (>3): exceptional drawdown-adjusted return.\n\nCalculation: (mean(rets) * 252) / |maxDrawdown|",
+    "What: Return divided by max drawdown — reward per unit of worst pain. Favors strategies with steady gains and shallow drawdowns. >1 is solid, >2 is excellent.\n\nRanges: Low (<0.5): big drawdowns vs return. Average (0.5–2): typical. High (>3): exceptional drawdown-adjusted return.\n\nCalculation: (mean(rets) * 365) / |maxDrawdown|",
   "Sterling Ratio":
-    "What: Similar to Calmar — return over max drawdown. Emphasizes downside protection. Strategies with lower drawdowns score higher even with similar returns.\n\nRanges: Low (<0.5): painful for the return. Average (0.5–2): normal. High (>3): very efficient.\n\nCalculation: (mean(rets) * 252) / |maxDrawdown|",
+    "What: Similar to Calmar — return over max drawdown. Emphasizes downside protection. Strategies with lower drawdowns score higher even with similar returns.\n\nRanges: Low (<0.5): painful for the return. Average (0.5–2): normal. High (>3): very efficient.\n\nCalculation: (mean(rets) * 365) / |maxDrawdown|",
   "Omega Ratio":
     "What: Ratio of gains above a threshold to losses below it (threshold=0). >1 = more total gain than loss. Captures the full return distribution, not just mean and variance.\n\nRanges: Low (<1): total losses exceed gains. Average (1–2): profitable. High (>2.5): gains heavily outweigh losses.\n\nCalculation: sum(rets > 0) / |sum(rets < 0)|",
   "Burke Ratio":
-    "What: Excess return per unit of total volatility. Simpler than Sharpe; uses total return variance. Higher = better risk-adjusted excess return.\n\nRanges: Low (<0.3): weak. Average (0.3–1): decent. High (>1.5): strong volatility-adjusted excess return.\n\nCalculation: (mean(excessRets) * 252) / (std(rets) * sqrt(252))",
+    "What: Excess return per unit of total volatility. Simpler than Sharpe; uses total return variance. Higher = better risk-adjusted excess return.\n\nRanges: Low (<0.3): weak. Average (0.3–1): decent. High (>1.5): strong volatility-adjusted excess return.\n\nCalculation: (mean(excessRets) * 365) / (std(rets) * sqrt(365))",
   "Gain-Loss Ratio":
     "What: Total profit from winners ÷ total loss from losers. >1 means total gains exceed total losses. Independent of win rate — you can have 30% win rate but >1 if winners are much bigger.\n\nRanges: Low (<1): losses exceed gains. Average (1–3): profitable. High (>5): wins dwarf losses.\n\nCalculation: sum(wins.pnl) / |sum(losses.pnl)|",
   "Modigliani (M²)":
-    "What: M² — risk-adjusted return expressed at benchmark volatility. Answers: what return would I get if my strategy had the same volatility as the market? Lets you compare Sharpe across different risk levels.\n\nRanges: Low (<5%): poor at benchmark risk. Average (8–15%): solid. High (>18%): excellent risk-adjusted.\n\nCalculation: sharpe * (volAnn / (std(benchmark) * sqrt(252)))",
+    "What: M² — risk-adjusted return expressed at benchmark volatility. Answers: what return would I get if my strategy had the same volatility as the market? Lets you compare Sharpe across different risk levels.\n\nRanges: Low (<5%): poor at benchmark risk. Average (8–15%): solid. High (>18%): excellent risk-adjusted.\n\nCalculation: sharpe * (volAnn / (std(benchmark) * sqrt(365)))",
 
   // 3. Risk Metrics
   "Volatility (Ann.)":
-    "What: Annualized standard deviation of daily returns. Measures total fluctuation — both gains and losses. Higher = bumpier ride. The baseline risk metric; used in Sharpe, etc.\n\nRanges: Low (<10%): very stable. Average (15–30%): typical for active strategies. High (>40%): wild swings.\n\nCalculation: std(rets) * sqrt(252)",
+    "What: Annualized standard deviation of daily returns. Measures total fluctuation — both gains and losses. Higher = bumpier ride. The baseline risk metric; used in Sharpe, etc.\n\nRanges: Low (<10%): very stable. Average (15–30%): typical for active strategies. High (>40%): wild swings.\n\nCalculation: std(rets) * sqrt(365)",
   "Downside Deviation":
-    "What: Volatility of negative returns only. Ignores upside; focuses on how much you lose when you lose. Better for asymmetric strategies where big gains don't 'hurt' you.\n\nRanges: Low (<5%): small losses when you lose. Average (8–20%): typical. High (>30%): large downside swings.\n\nCalculation: std(negRets) * sqrt(252/365)",
+    "What: Volatility of negative returns only. Ignores upside; focuses on how much you lose when you lose. Better for asymmetric strategies where big gains don't 'hurt' you.\n\nRanges: Low (<5%): small losses when you lose. Average (8–20%): typical. High (>30%): large downside swings.\n\nCalculation: std(negRets) * sqrt(365)",
   "Semi-Variance":
     "What: Variance of losses only (squared negative returns). Emphasizes downside risk. Used in Sortino-like measures. Lower = more stable when things go wrong.\n\nRanges: Low (<0.0001): tiny loss variance. Average (0.0001–0.001): normal. High (>0.002): big loss dispersion.\n\nCalculation: sum(r² for r<0) / n",
   "VaR 95%":
@@ -93,13 +93,13 @@ export const METRIC_TOOLTIPS: Record<string, string> = {
   "Alpha (Jensen)":
     "What: Excess return after adjusting for beta — the part of return not explained by market movement. Positive alpha = skill; negative = underperformed given risk taken.\n\nRanges: Low (<−5%): underperformed. Average (−2% to +5%): mixed. High (>10%): strong skill-based alpha.\n\nCalculation: Jensen's alpha from CAPM",
   "Tracking Error":
-    "What: Volatility of the difference between your returns and the benchmark. High = you deviate a lot from the index; low = you track it closely. Active managers typically have higher tracking error.\n\nRanges: Low (<5%): closely tracks benchmark. Average (5–15%): moderate divergence. High (>20%): very different from benchmark.\n\nCalculation: std(portfolio - benchmark) * sqrt(252)",
+    "What: Volatility of the difference between your returns and the benchmark. High = you deviate a lot from the index; low = you track it closely. Active managers typically have higher tracking error.\n\nRanges: Low (<5%): closely tracks benchmark. Average (5–15%): moderate divergence. High (>20%): very different from benchmark.\n\nCalculation: std(portfolio - benchmark) * sqrt(365)",
   "Active Return":
     "What: Your return minus the benchmark return, annualized. Simple outperformance measure. Positive = you beat the market; negative = lagged.\n\nRanges: Low (<−5%): trailing. Average (−2% to +5%): roughly in line. High (>+10%): clear outperformance.\n\nCalculation: mean(portfolio - benchmark) * 252",
 
   // 6. Portfolio Efficiency
   "Return over Max DD (RoMaD)":
-    "What: Same as Calmar — return ÷ max drawdown. Answers: how much return do I get per unit of worst pain? Key metric for risk-conscious comparison.\n\nRanges: Low (<0.5): poor. Average (0.5–2): typical. High (>3): excellent.\n\nCalculation: (mean(rets) * 252) / |maxDrawdown|",
+    "What: Same as Calmar — return ÷ max drawdown. Answers: how much return do I get per unit of worst pain? Key metric for risk-conscious comparison.\n\nRanges: Low (<0.5): poor. Average (0.5–2): typical. High (>3): excellent.\n\nCalculation: (mean(rets) * 365) / |maxDrawdown|",
   "Kelly Fraction":
     "What: Optimal bet size from the Kelly criterion — the fraction of bankroll to risk per trade for maximum long-run growth. Capped 0–1. Betting more than Kelly increases risk of ruin.\n\nRanges: Low (0–5%): conservative, underbetting edge. Average (5–20%): moderate. High (>25%): aggressive; high edge or high risk.\n\nCalculation: max(0, min(1, winRate - (1-winRate)/payoffRatio))",
   "Risk of Ruin":
@@ -137,7 +137,7 @@ export const METRIC_TOOLTIPS: Record<string, string> = {
   Variance:
     "What: Squared standard deviation — spread of returns around the mean. Higher = more dispersion. Basis for volatility and risk measures.\n\nRanges: Low (<0.0001): very stable. Average (0.0001–0.001): normal. High (>0.002): high dispersion.\n\nCalculation: std(returns)²",
   "Std Deviation":
-    "What: Daily standard deviation of returns (not annualized). Raw measure of day-to-day swing. Multiply by √252 for annualized volatility.\n\nRanges: Low (<0.5%): low daily swing. Average (0.8–2%): typical. High (>3%): high daily volatility.\n\nCalculation: std(returns)",
+    "What: Daily standard deviation of returns (not annualized). Raw measure of day-to-day swing. Multiply by √365 for annualized volatility.\n\nRanges: Low (<0.5%): low daily swing. Average (0.8–2%): typical. High (>3%): high daily volatility.\n\nCalculation: std(returns)",
   P5: "What: 5th percentile — 5% of days had returns below this. A rough worst-case threshold. E.g. P5 = −3% means 1 in 20 days lost at least 3%.\n\nRanges: Low (>−1%): mild worst days. Average (−2% to −5%): typical. High (<−8%): severe worst days.\n\nCalculation: sorted[floor(0.05 * n)]",
   P25:
     "What: 25th percentile (first quartile) — 25% of returns were below this. Bottom quarter of outcomes. With P75, defines the interquartile range.\n\nRanges: Low (<−1%): weak bottom quartile. Average (−0.5% to 0%): typical. High (>0.5%): strong bottom quartile.\n\nCalculation: sorted[floor(0.25 * n)]",
