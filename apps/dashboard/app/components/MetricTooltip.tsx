@@ -33,7 +33,7 @@ export function MetricTooltip({ content }: { content: string }) {
   const tooltipContent = visible && typeof document !== "undefined" && (
     <div
       role="tooltip"
-      className="fixed z-[9999] w-72 -translate-x-1/2"
+      className="fixed z-[9999] w-80 max-w-[calc(100vw-2rem)] -translate-x-1/2"
       style={{
         left: coords.x,
         top: coords.placement === "top" ? "auto" : coords.y,
@@ -51,6 +51,14 @@ export function MetricTooltip({ content }: { content: string }) {
                 <p key={i} className="text-slate-200">
                   <span className="font-semibold text-indigo-400">What:</span>{" "}
                   {line.replace(/^What:\s*/, "").trim()}
+                </p>
+              );
+            }
+            if (line.startsWith("Ranges:")) {
+              return (
+                <p key={i} className="text-slate-300">
+                  <span className="font-semibold text-emerald-400/90">Ranges:</span>{" "}
+                  {line.replace(/^Ranges:\s*/, "").trim()}
                 </p>
               );
             }

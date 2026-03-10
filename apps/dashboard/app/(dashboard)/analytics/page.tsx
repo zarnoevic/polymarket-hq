@@ -25,6 +25,7 @@ import {
   ArrowUpRight,
   BarChart3,
   Calendar,
+  ExternalLink,
   Layers,
   TrendingUp,
   Zap,
@@ -36,6 +37,7 @@ import {
   Gauge,
 } from "lucide-react";
 import { METRIC_TOOLTIPS } from "../../../lib/metric-tooltips";
+import { METRIC_SOURCES } from "../../../lib/metric-sources";
 import { MetricTooltip } from "../../components/MetricTooltip";
 
 function formatUsd(value: number, decimals = 0): string {
@@ -77,6 +79,20 @@ function MetricCard({
         ? "bg-rose-500/20 text-rose-400"
         : "bg-indigo-500/20 text-indigo-400";
   const tooltip = tooltipKey ? METRIC_TOOLTIPS[tooltipKey] : undefined;
+  const sourceUrl = tooltipKey ? METRIC_SOURCES[tooltipKey] : undefined;
+  const titleEl = sourceUrl ? (
+    <a
+      href={sourceUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex min-w-0 items-center gap-1 truncate text-slate-500 transition-colors hover:text-indigo-400 hover:underline"
+    >
+      <span className="truncate">{title}</span>
+      <ExternalLink className="h-3 w-3 shrink-0 opacity-70" />
+    </a>
+  ) : (
+    <span className="truncate">{title}</span>
+  );
   return (
     <div className="rounded-xl border border-slate-800/60 bg-slate-900/50 p-4">
       <div className="flex items-center gap-3">
@@ -85,7 +101,7 @@ function MetricCard({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 truncate text-xs font-medium uppercase tracking-wider text-slate-500">
-            {title}
+            {titleEl}
             {tooltip && <MetricTooltip content={tooltip} />}
           </div>
           <p className="truncate font-semibold text-white">{value}</p>
