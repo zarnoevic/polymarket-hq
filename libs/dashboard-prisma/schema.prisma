@@ -23,6 +23,7 @@ model ScreenerEvent {
   volume       Float    @default(0) @map("volume")
   liquidity    Float    @default(0) @map("liquidity")
   endDate      DateTime? @map("end_date")
+  createdAt    DateTime? @map("created_at") // Gamma API: market creation date
   active       Boolean  @default(true) @map("active")
   closed       Boolean  @default(false) @map("closed")
   restricted   Boolean  @default(false) @map("restricted")

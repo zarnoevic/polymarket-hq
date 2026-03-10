@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { RefreshCw, Filter, Calendar, BarChart3, ExternalLink, Loader2, Search, RotateCw, Sparkles, X, Brain, Star, Compass, HelpCircle, BadgeCheck, TrendingUp, ClipboardList, ChevronDown, AlertTriangle, StickyNote } from "lucide-react";
+import { RefreshCw, Filter, Calendar, CalendarPlus, BarChart3, ExternalLink, Loader2, Search, RotateCw, Sparkles, X, Brain, Star, Compass, HelpCircle, BadgeCheck, TrendingUp, ClipboardList, ChevronDown, AlertTriangle, StickyNote, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 
-type LabelType = "vetted" | "unknowable" | "well_priced" | "traded" | "evaluating" | "disputed" | null;
+type LabelType = "vetted" | "unknowable" | "well_priced" | "traded" | "evaluating" | "disputed" | "uninformed" | null;
 
 const VALID_LABELS: ReadonlySet<string> = new Set([
   "vetted",
@@ -13,6 +13,7 @@ const VALID_LABELS: ReadonlySet<string> = new Set([
   "traded",
   "evaluating",
   "disputed",
+  "uninformed",
 ]);
 
 function toLabelType(s: string | null | undefined): LabelType {
@@ -32,6 +33,7 @@ type ScreenerEvent = {
   volume: number;
   liquidity: number;
   endDate: Date | null;
+  createdAt: Date | null;
   active: boolean;
   closed: boolean;
   restricted: boolean;
@@ -46,6 +48,7 @@ type ScreenerEvent = {
   label: LabelType;
   note: string | null;
   syncedAt: Date;
+  raw?: unknown;
 };
 
 type ScreenerEventInput = Omit<ScreenerEvent, "label" | "note"> & {
@@ -119,14 +122,14 @@ export function ScreenerContent({
   const [noteEditingId, setNoteEditingId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [savingNoteId, setSavingNoteId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"discovery" | "evaluating" | "vetted" | "traded" | "unknowable" | "well_priced">("discovery");
-  const [moreOpen, setMoreOpen] = useState(false);
-  const moreRef = useRef<HTMLDivElement>(null);
+  const [activeTab, setActiveTab] = useState<"discovery" | "evaluating" | "vetted" | "traded" | "unknowable" | "well_priced" | "disputed" | "uninformed">("discovery");
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const categoryRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
-        setMoreOpen(false);
+      if (categoryRef.current && !categoryRef.current.contains(e.target as Node)) {
+        setCategoryOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -146,6 +149,8 @@ export function ScreenerContent({
     traded: "traded",
     unknowable: "unknowable",
     well_priced: "well_priced",
+    disputed: "disputed",
+    uninformed: "uninformed",
   };
   const displayedEvents =
     activeTab === "discovery"
@@ -176,9 +181,14 @@ export function ScreenerContent({
                 : label === "traded"
                   ? "Marked as traded"
                   : label === "disputed"
-                    ? "Marked as disputed (hidden)"
-                    : "Marked as evaluating";
+                    ? "Marked as disputed"
+                    : label === "uninformed"
+                      ? "Marked as uninformed"
+                      : "Marked as evaluating";
       toast.success(msg);
+      if (label === "evaluating") {
+        handleAppraise(eventId, "think");
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to update label";
       toast.error(msg);
@@ -294,117 +304,72 @@ export function ScreenerContent({
           </div>
           <div className="flex items-center gap-2">
             <div className="flex flex-wrap items-center gap-1 rounded-lg border border-slate-700/60 bg-slate-800/40 p-0.5">
-              <button
-                onClick={() => setActiveTab("discovery")}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  activeTab === "discovery"
-                    ? "bg-slate-700/60 text-white"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                <Compass className="h-4 w-4" />
-                Discovery
-                {discoveryEvents.length > 0 && (
-                  <span className="rounded bg-slate-600/50 px-1.5 py-0.5 text-xs">
-                    {discoveryEvents.length}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => setActiveTab("evaluating")}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  activeTab === "evaluating"
-                    ? "bg-slate-700/60 text-white"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                <ClipboardList className="h-4 w-4" />
-                Evaluating
-                {events.filter((e) => e.label === "evaluating").length > 0 && (
-                  <span className="rounded bg-violet-500/30 px-1.5 py-0.5 text-xs">
-                    {events.filter((e) => e.label === "evaluating").length}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => setActiveTab("vetted")}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  activeTab === "vetted"
-                    ? "bg-slate-700/60 text-white"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                <Star className="h-4 w-4" />
-                Vetted
-                {events.filter((e) => e.label === "vetted").length > 0 && (
-                  <span className="rounded bg-amber-500/30 px-1.5 py-0.5 text-xs">
-                    {events.filter((e) => e.label === "vetted").length}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => setActiveTab("traded")}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  activeTab === "traded"
-                    ? "bg-slate-700/60 text-white"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                <TrendingUp className="h-4 w-4" />
-                Traded
-                {events.filter((e) => e.label === "traded").length > 0 && (
-                  <span className="rounded bg-indigo-500/30 px-1.5 py-0.5 text-xs">
-                    {events.filter((e) => e.label === "traded").length}
-                  </span>
-                )}
-              </button>
-              <div className="relative" ref={moreRef}>
+              {[
+                { tab: "discovery" as const, icon: Compass, label: "Discovery", count: discoveryEvents.length },
+                { tab: "evaluating" as const, icon: ClipboardList, label: "Evaluating", count: events.filter((e) => e.label === "evaluating").length },
+                { tab: "vetted" as const, icon: Star, label: "Vetted", count: events.filter((e) => e.label === "vetted").length },
+                { tab: "traded" as const, icon: TrendingUp, label: "Traded", count: events.filter((e) => e.label === "traded").length },
+              ].map(({ tab, icon: Icon, label, count }) => (
                 <button
-                  onClick={() => setMoreOpen(!moreOpen)}
-                  className={`flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
-                    activeTab === "unknowable" || activeTab === "well_priced"
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                    activeTab === tab
                       ? "bg-slate-700/60 text-white"
-                      : "text-slate-500 hover:text-slate-400"
+                      : "text-slate-400 hover:text-white"
                   }`}
-                  title="More categories"
                 >
-                  <ChevronDown className={`h-4 w-4 transition-transform ${moreOpen ? "rotate-180" : ""}`} />
+                  <Icon className="h-4 w-4" />
+                  {label}
+                  {count > 0 && (
+                    <span className="rounded bg-slate-600/50 px-1.5 py-0.5 text-xs">
+                      {count}
+                    </span>
+                  )}
                 </button>
-                {moreOpen && (
-                  <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-lg border border-slate-700/60 bg-slate-800 py-1 shadow-xl">
+              ))}
+            </div>
+            <div className="relative" ref={categoryRef}>
+              <button
+                onClick={() => setCategoryOpen(!categoryOpen)}
+                className={`flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
+                  activeTab === "unknowable" || activeTab === "well_priced" || activeTab === "disputed" || activeTab === "uninformed"
+                    ? "bg-slate-700/60 text-white"
+                    : "text-slate-500 hover:text-slate-400"
+                }`}
+                title="More categories"
+              >
+                <ChevronDown className={`h-4 w-4 transition-transform ${categoryOpen ? "rotate-180" : ""}`} />
+              </button>
+              {categoryOpen && (
+                <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-slate-700/60 bg-slate-800 py-1 shadow-xl">
+                  {[
+                    { tab: "unknowable" as const, icon: HelpCircle, label: "Unknowable", count: events.filter((e) => e.label === "unknowable").length },
+                    { tab: "well_priced" as const, icon: BadgeCheck, label: "Well-priced", count: events.filter((e) => e.label === "well_priced").length },
+                    { tab: "disputed" as const, icon: AlertTriangle, label: "Disputed", count: events.filter((e) => e.label === "disputed").length },
+                    { tab: "uninformed" as const, icon: BookOpen, label: "Uninformed", count: events.filter((e) => e.label === "uninformed").length },
+                  ].map(({ tab, icon: Icon, label, count }) => (
                     <button
+                      key={tab}
                       onClick={() => {
-                        setActiveTab("unknowable");
-                        setMoreOpen(false);
+                        setActiveTab(tab);
+                        setCategoryOpen(false);
                       }}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-slate-300 hover:bg-slate-700/60 hover:text-white"
+                      className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm ${
+                        activeTab === tab ? "bg-slate-700/60 text-white" : "text-slate-300 hover:bg-slate-700/60 hover:text-white"
+                      }`}
                     >
-                      <HelpCircle className="h-4 w-4" />
-                      Unknowable
-                      {events.filter((e) => e.label === "unknowable").length > 0 && (
+                      <Icon className="h-4 w-4" />
+                      {label}
+                      {count > 0 && (
                         <span className="ml-auto rounded bg-slate-600/50 px-1.5 py-0.5 text-xs">
-                          {events.filter((e) => e.label === "unknowable").length}
+                          {count}
                         </span>
                       )}
                     </button>
-                    <button
-                      onClick={() => {
-                        setActiveTab("well_priced");
-                        setMoreOpen(false);
-                      }}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-slate-300 hover:bg-slate-700/60 hover:text-white"
-                    >
-                      <BadgeCheck className="h-4 w-4" />
-                      Well-priced
-                      {events.filter((e) => e.label === "well_priced").length > 0 && (
-                        <span className="ml-auto rounded bg-emerald-500/30 px-1.5 py-0.5 text-xs">
-                          {events.filter((e) => e.label === "well_priced").length}
-                        </span>
-                      )}
-                    </button>
-                  </div>
-                )}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
             <button
               onClick={handleRefresh}
@@ -459,6 +424,10 @@ export function ScreenerContent({
               <TrendingUp className="h-8 w-8" />
             ) : activeTab === "unknowable" ? (
               <HelpCircle className="h-8 w-8" />
+            ) : activeTab === "disputed" ? (
+              <AlertTriangle className="h-8 w-8" />
+            ) : activeTab === "uninformed" ? (
+              <BookOpen className="h-8 w-8" />
             ) : (
               <BadgeCheck className="h-8 w-8" />
             )}
@@ -474,7 +443,11 @@ export function ScreenerContent({
                     ? "No traded markets"
                     : activeTab === "unknowable"
                       ? "No unknowable markets"
-                      : "No well-priced markets"}
+                      : activeTab === "disputed"
+                        ? "No disputed markets"
+                        : activeTab === "uninformed"
+                          ? "No uninformed markets"
+                          : "No well-priced markets"}
           </h3>
           <p className="mt-2 text-slate-400">
             {activeTab === "discovery"
@@ -487,7 +460,11 @@ export function ScreenerContent({
                     ? "Use the Traded button in Discovery to move markets here."
                     : activeTab === "unknowable"
                       ? "Use the Unknowable button in Discovery to move markets here."
-                      : "Use the Well-priced button in Discovery to move markets here."}
+                      : activeTab === "disputed"
+                        ? "Use the Disputed button to move markets here."
+                        : activeTab === "uninformed"
+                          ? "Use the Uninformed button to move markets here."
+                          : "Use the Well-priced button in Discovery to move markets here."}
           </p>
           <button
             onClick={() => setActiveTab("discovery")}
@@ -509,20 +486,23 @@ export function ScreenerContent({
               {activeTab === "traded" && " traded"}
               {activeTab === "unknowable" && " unknowable"}
               {activeTab === "well_priced" && " well-priced"}
+              {activeTab === "disputed" && " disputed"}
+              {activeTab === "uninformed" && " uninformed"}
             </span>
           </div>
 
-          <div className={`space-y-4 ${activeTab === "discovery" ? "flex flex-col items-center" : ""}`}>
+          <div className="space-y-4">
             {displayedEvents.map((e) => {
-              const showExplanation = activeTab !== "discovery" && e.appraisalExplanation;
+              const rightContent = e.appraisalExplanation
+                ? { title: "Appraisal explanation", text: e.appraisalExplanation }
+                : e.description
+                  ? { title: "Market description", text: e.description }
+                  : null;
+              const rawCreated = (e.raw as { createdAt?: string } | null)?.createdAt;
+              const displayCreatedAt = e.createdAt ?? (rawCreated || null);
               return (
-              <div
-                key={e.id}
-                className={`flex gap-4 ${showExplanation ? "items-stretch w-full" : "justify-center"}`}
-              >
-                <div
-                  className={`overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-700/60 ${showExplanation ? "w-[45%] min-w-0 shrink-0" : "w-full max-w-6xl"}`}
-                >
+              <div key={e.id} className="flex w-full gap-4 items-stretch">
+                <div className="w-1/2 min-w-0 shrink-0 overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-700/60">
                 <div className="flex gap-4 p-5">
                   <div className="flex shrink-0 flex-col items-center gap-0.5 pt-1">
                     <button
@@ -591,9 +571,20 @@ export function ScreenerContent({
                           ? "text-amber-500"
                           : "text-slate-500 hover:text-amber-500/70"
                       }`}
-                      title="Mark as disputed (hidden)"
+                      title="Mark as disputed"
                     >
                       <AlertTriangle className="h-5 w-5" />
+                    </button>
+                    <button
+                      onClick={() => handleSetLabel(e.id, "uninformed")}
+                      className={`rounded p-0.5 transition-colors ${
+                        e.label === "uninformed"
+                          ? "text-sky-400"
+                          : "text-slate-500 hover:text-sky-400/70"
+                      }`}
+                      title="Mark as uninformed"
+                    >
+                      <BookOpen className="h-5 w-5" />
                     </button>
                     {e.label != null && (
                       <button
@@ -616,6 +607,12 @@ export function ScreenerContent({
                     <h3 className="font-medium text-white">{e.title}</h3>
                     <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
                       <span className="font-mono text-slate-500">{e.slug}</span>
+                      {displayCreatedAt && !isNaN(new Date(displayCreatedAt).getTime()) && (
+                        <span className="flex items-center gap-1 text-slate-500" title="Market creation (API)">
+                          <CalendarPlus className="h-3.5 w-3.5" />
+                          {formatDate(new Date(displayCreatedAt))}
+                        </span>
+                      )}
                       {e.endDate && (
                         <span className="flex items-center gap-1 text-slate-500">
                           <Calendar className="h-3.5 w-3.5" />
@@ -628,36 +625,32 @@ export function ScreenerContent({
                         </span>
                       )}
                     </div>
-                    <div className="mt-3 rounded-lg border border-slate-700/50 bg-slate-800/40 p-3">
-                      <div className="mb-2 flex items-center gap-2">
-                        <StickyNote className={`h-4 w-4 shrink-0 ${e.note ? "text-amber-500/80" : "text-slate-500"}`} />
-                        <span className="text-xs font-medium text-slate-400">Note (included in appraisal)</span>
-                      </div>
+                    {activeTab !== "discovery" && (
+                    <div className="mt-2">
                       {noteEditingId === e.id ? (
-                        <div className="space-y-2">
+                        <div className="flex flex-col gap-2">
                           <textarea
                             value={noteDraft}
                             onChange={(ev) => setNoteDraft(ev.target.value)}
-                            placeholder="Add context, hypotheses, or reminders for the AI appraisal…"
-                            className="w-full rounded-lg border border-slate-600/60 bg-slate-800/80 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-indigo-500/60 focus:outline-none focus:ring-1 focus:ring-indigo-500/40"
-                            rows={3}
+                            placeholder="Note (included in appraisal)"
+                            className="w-full rounded border border-slate-600/60 bg-transparent px-0 py-1 text-sm text-slate-300 placeholder-slate-500 focus:border-slate-500 focus:outline-none"
+                            rows={2}
                             autoFocus
                           />
                           <div className="flex gap-2">
                             <button
                               onClick={() => handleSetNote(e.id, noteDraft.trim() || null)}
                               disabled={savingNoteId === e.id}
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-500/80 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+                              className="text-xs text-indigo-400 hover:text-indigo-300 disabled:opacity-50"
                             >
-                              {savingNoteId === e.id && <Loader2 className="h-3 w-3 animate-spin" />}
-                              Save
+                              {savingNoteId === e.id ? "Saving…" : "Save"}
                             </button>
                             <button
                               onClick={() => {
                                 setNoteEditingId(null);
                                 setNoteDraft("");
                               }}
-                              className="rounded-lg border border-slate-600/60 px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-white"
+                              className="text-xs text-slate-500 hover:text-slate-400"
                             >
                               Cancel
                             </button>
@@ -669,16 +662,18 @@ export function ScreenerContent({
                             setNoteEditingId(e.id);
                             setNoteDraft(e.note ?? "");
                           }}
-                          className="block w-full rounded bg-slate-800/60 px-3 py-2 text-left text-sm text-slate-400 transition-colors hover:bg-slate-700/50 hover:text-slate-300"
+                          className="flex items-center gap-2 text-left text-sm text-slate-500 hover:text-slate-400"
                         >
+                          <StickyNote className={`h-3.5 w-3.5 shrink-0 ${e.note ? "text-amber-500/70" : ""}`} />
                           {e.note ? (
-                            <span className="text-slate-300">{e.note}</span>
+                            <span className="text-slate-400">{e.note}</span>
                           ) : (
-                            <span className="italic">Click to add a note…</span>
+                            <span>Add note</span>
                           )}
                         </button>
                       )}
                     </div>
+                    )}
                     <div className="mt-3 flex flex-wrap items-center gap-4">
                       <div>
                         <p className="text-xs text-slate-500">Volume</p>
@@ -805,14 +800,16 @@ export function ScreenerContent({
                   </div>
                 </div>
                 </div>
-                {showExplanation && (
-                  <div className="min-w-0 flex-1 rounded-xl border border-slate-700/60 bg-slate-800/30 p-5">
-                    <p className="mb-3 text-sm font-medium text-slate-400">Appraisal explanation</p>
-                    <div className="max-h-80 overflow-y-auto pr-2 text-sm leading-relaxed">
-                      <ExplanationText text={e.appraisalExplanation} />
-                    </div>
+                <div className="w-1/2 min-w-0 shrink-0 rounded-xl border border-slate-700/60 bg-slate-800/30 p-5">
+                  <p className="mb-3 text-sm font-medium text-slate-400">{rightContent ? rightContent.title : "Market description"}</p>
+                  <div className="max-h-80 overflow-y-auto pr-2 text-sm leading-relaxed">
+                    {rightContent ? (
+                      <ExplanationText text={rightContent.text} />
+                    ) : (
+                      <span className="text-slate-500">No description available</span>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             );
             })}

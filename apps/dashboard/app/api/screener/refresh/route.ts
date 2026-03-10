@@ -20,6 +20,7 @@ type GammaMarket = {
   icon?: string;
   endDate?: string;
   end_date?: string;
+  createdAt?: string;
   volume?: number;
   volumeNum?: number;
   liquidity?: number;
@@ -107,6 +108,7 @@ export async function POST() {
     for (const m of filtered) {
       if (!m?.id) continue;
       const endDate = (m.endDate ?? m.end_date) ? new Date((m.endDate ?? m.end_date) as string) : null;
+      const createdAt = m.createdAt ? new Date(m.createdAt) : null;
       const { yes: probYes, no: probNo } = parseProbabilities(m);
       const parentEventSlug = m.events?.[0]?.slug ?? null;
       const base = {
@@ -120,6 +122,7 @@ export async function POST() {
         volume: typeof m.volume === "number" ? m.volume : parseFloat(String(m.volumeNum ?? m.volume ?? 0)) || 0,
         liquidity: typeof m.liquidity === "number" ? m.liquidity : parseFloat(String(m.liquidityNum ?? m.liquidity ?? 0)) || 0,
         endDate,
+        createdAt,
         active: m.active ?? true,
         closed: m.closed ?? false,
         restricted: m.restricted ?? false,
