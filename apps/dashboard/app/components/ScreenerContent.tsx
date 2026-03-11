@@ -68,8 +68,10 @@ function formatUsd(value: number, decimals = 0): string {
 }
 
 function formatCompact(value: number): string {
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "−" : "";
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1)}K`;
   return formatUsd(value);
 }
 
@@ -80,6 +82,52 @@ function formatDate(d: Date | null): string {
     month: "short",
     day: "numeric",
   });
+}
+
+/** ROI as "Xx" where 1x = 100% return; K/M/B/T for large values, capped to avoid overflow */
+function formatRoiAsX(roi: number): string {
+  if (roi < 0 || !Number.isFinite(roi)) return "—";
+  if (roi >= 1_000_000_000_000) {
+    const t = roi / 1_000_000_000_000;
+    return t >= 999.9 ? "999+Tx" : `${t.toFixed(1)}Tx`;
+  }
+  if (roi >= 1_000_000_000) return `${(roi / 1_000_000_000).toFixed(1)}Bx`;
+  if (roi >= 1_000_000) return `${(roi / 1_000_000).toFixed(1)}Mx`;
+  if (roi >= 1_000) return `${(roi / 1_000).toFixed(1)}Kx`;
+  if (roi >= 100) return `${roi.toFixed(1)}x`;
+  if (roi >= 10) return `${roi.toFixed(1)}x`;
+  if (roi >= 1) return `${roi.toFixed(2)}x`;
+  return `${roi.toFixed(2)}x`;
+}
+
+/** Days until resolution; null if endDate missing or in the past. Uses UTC date diff. */
+function daysToResolution(endDate: Date | string | null): number | null {
+  if (!endDate) return null;
+  const d = endDate instanceof Date ? endDate : new Date(endDate);
+  if (isNaN(d.getTime())) return null;
+  const now = new Date();
+  const resUtc = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.round((resUtc - todayUtc) / (24 * 60 * 60 * 1000));
+  return days > 0 ? Math.max(1, days) : null;
+}
+
+/** Linear annualized ROI: r = (P1-P0)/P0, annual_return = r * (365/T). P0=entry, P1=1. */
+function computeCAROI(entryPrice: number, days: number | null): string {
+  if (entryPrice <= 0 || entryPrice > 1 || !Number.isFinite(entryPrice)) return "—";
+  if (entryPrice < 1e-9) return "999+Tx";
+  const r = (1 - entryPrice) / entryPrice;
+  const roi = days == null || days <= 0 ? r : r * (365 / days);
+  return formatRoiAsX(roi);
+}
+
+/** Linear annualized return: r = (P1-P0)/P0, annual_return = r * (365/T). P0=current, P1=1. */
+function computePAROI(curPrice: number, days: number | null): string {
+  if (curPrice > 1 || !Number.isFinite(curPrice)) return "—";
+  if (curPrice <= 0 || curPrice < 1e-9) return "999+Tx"; // 0% or near-0% = effectively infinite
+  const r = (1 - curPrice) / curPrice;
+  const roi = days == null || days <= 0 ? r : r * (365 / days);
+  return formatRoiAsX(roi);
 }
 
 const URL_REGEX = /(https?:\/\/[^\s]+)/g;
@@ -761,51 +809,77 @@ export function ScreenerContent({
                         </p>
                       </div>
                       {(e.probabilityYes != null || e.probabilityNo != null) && (
-                        <div className="min-w-[140px] flex flex-col gap-2">
-                          <div>
-                            <p className="text-[11px] text-slate-500 mb-1">Quoted</p>
-                            <div className="flex justify-between gap-4 text-xs font-medium mb-1.5">
-                              <span className="text-emerald-600/90 tabular-nums">Yes {((e.probabilityYes ?? 0) * 100).toFixed(0)}%</span>
-                              <span className="text-red-600/90 tabular-nums">No {((e.probabilityNo ?? 0) * 100).toFixed(0)}%</span>
-                            </div>
-                            <div className="h-2.5 rounded-full overflow-hidden flex bg-slate-800/80 ring-1 ring-slate-700/80">
-                              <div
-                                className="rounded-l-full min-w-0 bg-emerald-600/70"
-                                style={{ width: `${(e.probabilityYes ?? 0) * 100}%` }}
-                              />
-                              <div
-                                className="rounded-r-full min-w-0 bg-red-600/70"
-                                style={{ width: `${(e.probabilityNo ?? 0) * 100}%` }}
-                              />
-                            </div>
-                          </div>
-                          {(e.appraisedYes != null || e.appraisedNo != null) && (
+                        <div className="flex items-center gap-3">
+                          <div className="min-w-[140px] flex flex-col gap-2">
                             <div>
+                              <p className="text-[11px] text-slate-500 mb-1">Quoted</p>
+                              <div className="flex justify-between gap-4 text-xs font-medium mb-1.5">
+                                <span className="text-emerald-600/90 tabular-nums">Yes {((e.probabilityYes ?? 0) * 100).toFixed(0)}%</span>
+                                <span className="text-red-600/90 tabular-nums">No {((e.probabilityNo ?? 0) * 100).toFixed(0)}%</span>
+                              </div>
                               <div className="h-2.5 rounded-full overflow-hidden flex bg-slate-800/80 ring-1 ring-slate-700/80">
                                 <div
                                   className="rounded-l-full min-w-0 bg-emerald-600/70"
-                                  style={{ width: `${(e.appraisedYes ?? 0) * 100}%` }}
+                                  style={{ width: `${(e.probabilityYes ?? 0) * 100}%` }}
                                 />
                                 <div
                                   className="rounded-r-full min-w-0 bg-red-600/70"
-                                  style={{ width: `${(e.appraisedNo ?? 0) * 100}%` }}
+                                  style={{ width: `${(e.probabilityNo ?? 0) * 100}%` }}
                                 />
                               </div>
-                              <div className="flex justify-between gap-4 text-xs font-medium mt-1.5">
-                                <span className="text-emerald-600/90 tabular-nums">Yes {((e.appraisedYes ?? 0) * 100).toFixed(1)}%</span>
-                                <span className="text-red-600/90 tabular-nums">No {((e.appraisedNo ?? 0) * 100).toFixed(1)}%</span>
-                              </div>
-                              <p className="text-[11px] text-slate-500 mt-1">Appraised</p>
                             </div>
-                          )}
-                        </div>
-                      )}
-                      {(e.yev != null || e.nev != null) && (
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs text-slate-500">YEV</span>
-                          <span className="font-mono text-sm text-emerald-500/90">{(e.yev ?? 0).toFixed(2)}</span>
-                          <span className="text-xs text-slate-500">NEV</span>
-                          <span className="font-mono text-sm text-red-500/90">{(e.nev ?? 0).toFixed(2)}</span>
+                            {(e.appraisedYes != null || e.appraisedNo != null) && (
+                              <div>
+                                <div className="h-2.5 rounded-full overflow-hidden flex bg-slate-800/80 ring-1 ring-slate-700/80">
+                                  <div
+                                    className="rounded-l-full min-w-0 bg-emerald-600/70"
+                                    style={{ width: `${(e.appraisedYes ?? 0) * 100}%` }}
+                                  />
+                                  <div
+                                    className="rounded-r-full min-w-0 bg-red-600/70"
+                                    style={{ width: `${(e.appraisedNo ?? 0) * 100}%` }}
+                                  />
+                                </div>
+                                <div className="flex justify-between gap-4 text-xs font-medium mt-1.5">
+                                  <span className="text-emerald-600/90 tabular-nums">Yes {((e.appraisedYes ?? 0) * 100).toFixed(1)}%</span>
+                                  <span className="text-red-600/90 tabular-nums">No {((e.appraisedNo ?? 0) * 100).toFixed(1)}%</span>
+                                </div>
+                                <p className="text-[11px] text-slate-500 mt-1">Appraised</p>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-1 shrink-0">
+                            {(e.yev != null || e.nev != null) && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-slate-500">YEV</span>
+                                <span className="font-mono text-sm text-emerald-500/90">{(e.yev ?? 0).toFixed(2)}</span>
+                                <span className="text-xs text-slate-500">NEV</span>
+                                <span className="font-mono text-sm text-red-500/90">{(e.nev ?? 0).toFixed(2)}</span>
+                              </div>
+                            )}
+                            {(e.appraisedYes != null || e.appraisedNo != null) && (
+                              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                                <span className="text-xs text-slate-500">Yes CAROI</span>
+                                <span className="font-mono text-sm text-emerald-500/90">
+                                  {computeCAROI(e.appraisedYes ?? (e.probabilityYes ?? 0), daysToResolution(e.endDate))}
+                                </span>
+                                <span className="text-xs text-slate-500">No CAROI</span>
+                                <span className="font-mono text-sm text-red-500/90">
+                                  {computeCAROI(e.appraisedNo ?? (e.probabilityNo ?? 0), daysToResolution(e.endDate))}
+                                </span>
+                              </div>
+                            )}
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                              <span className="text-xs text-slate-500">Yes PAROI</span>
+                              <span className="font-mono text-sm text-emerald-500/90">
+                                {computePAROI(e.probabilityYes ?? (e.probabilityNo != null ? 1 - e.probabilityNo : 0), daysToResolution(e.endDate))}
+                              </span>
+                              <span className="text-xs text-slate-500">No PAROI</span>
+                              <span className="font-mono text-sm text-red-500/90">
+                                {computePAROI(e.probabilityNo ?? (e.probabilityYes != null ? 1 - e.probabilityYes : 0), daysToResolution(e.endDate))}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>

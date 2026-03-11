@@ -49,6 +49,19 @@ function formatUsd(value: number, decimals = 0): string {
   }).format(value);
 }
 
+/** Compact format for USD: $1K, $100K, $1M for large values */
+function formatCompactUsd(value: number, decimals = 0): string {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "−" : "";
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1)}K`;
+  return formatUsd(value, decimals);
+}
+
+function formatUsdOrCompact(value: number, decimals = 0): string {
+  return Math.abs(value) >= 1_000 ? formatCompactUsd(value, 0) : formatUsd(value, decimals);
+}
+
 function formatPct(value: number, decimals = 1): string {
   return `${(value * 100).toFixed(decimals)}%`;
 }
@@ -204,14 +217,14 @@ export default async function AnalyticsPage() {
               />
               <MetricCard
                 title="Buy Volume"
-                value={formatUsd(trades.filter((t) => t.side === "BUY").reduce((s, t) => s + t.usdcSize, 0))}
+                value={formatUsdOrCompact(trades.filter((t) => t.side === "BUY").reduce((s, t) => s + t.usdcSize, 0))}
                 icon={ArrowDownLeft}
                 variant="positive"
                 tooltipKey="Buy Volume"
               />
               <MetricCard
                 title="Sell Volume"
-                value={formatUsd(trades.filter((t) => t.side === "SELL").reduce((s, t) => s + t.usdcSize, 0))}
+                value={formatUsdOrCompact(trades.filter((t) => t.side === "SELL").reduce((s, t) => s + t.usdcSize, 0))}
                 icon={ArrowUpRight}
                 variant="negative"
                 tooltipKey="Sell Volume"
@@ -229,7 +242,7 @@ export default async function AnalyticsPage() {
             {/* 1. Return Metrics */}
             <MetricSection title="1. Return Metrics" icon={TrendingUp}>
               <MetricsGrid>
-                <MetricCard title="Total Return" value={formatPct(returnMetrics.totalReturn)} sub={`${formatUsd(returnMetrics.totalPnl)} PnL`} icon={Percent} variant={returnMetrics.totalReturn >= 0 ? "positive" : "negative"} tooltipKey="Total Return" />
+                <MetricCard title="Total Return" value={formatPct(returnMetrics.totalReturn)} sub={`${formatUsdOrCompact(returnMetrics.totalPnl)} PnL`} icon={Percent} variant={returnMetrics.totalReturn >= 0 ? "positive" : "negative"} tooltipKey="Total Return" />
                 <MetricCard title="Annualized Return" value={formatPct(returnMetrics.annualizedReturn)} icon={TrendingUp} variant={returnMetrics.annualizedReturn >= 0 ? "positive" : "negative"} tooltipKey="Annualized Return" />
                 <MetricCard title="CAGR" value={formatPct(returnMetrics.cagr)} sub="Compound Annual Growth Rate" icon={Percent} tooltipKey="CAGR" />
                 <MetricCard title="Geometric Return" value={formatPct(returnMetrics.geometricReturn)} icon={Percent} tooltipKey="Geometric Return" />
@@ -308,12 +321,12 @@ export default async function AnalyticsPage() {
               <MetricsGrid>
                 <MetricCard title="Win Rate" value={formatPct(tradeMetrics.winRate)} icon={Target} tooltipKey="Win Rate" />
                 <MetricCard title="Loss Rate" value={formatPct(tradeMetrics.lossRate)} icon={Target} tooltipKey="Loss Rate" />
-                <MetricCard title="Average Win" value={formatUsd(tradeMetrics.averageWin, 2)} icon={TrendingUp} variant="positive" tooltipKey="Average Win" />
-                <MetricCard title="Average Loss" value={formatUsd(tradeMetrics.averageLoss, 2)} icon={AlertTriangle} variant="negative" tooltipKey="Average Loss" />
-                <MetricCard title="Largest Win" value={formatUsd(tradeMetrics.largestWin, 2)} icon={TrendingUp} variant="positive" tooltipKey="Largest Win" />
-                <MetricCard title="Largest Loss" value={formatUsd(tradeMetrics.largestLoss, 2)} icon={AlertTriangle} variant="negative" tooltipKey="Largest Loss" />
+                <MetricCard title="Average Win" value={formatUsdOrCompact(tradeMetrics.averageWin, 2)} icon={TrendingUp} variant="positive" tooltipKey="Average Win" />
+                <MetricCard title="Average Loss" value={formatUsdOrCompact(tradeMetrics.averageLoss, 2)} icon={AlertTriangle} variant="negative" tooltipKey="Average Loss" />
+                <MetricCard title="Largest Win" value={formatUsdOrCompact(tradeMetrics.largestWin, 2)} icon={TrendingUp} variant="positive" tooltipKey="Largest Win" />
+                <MetricCard title="Largest Loss" value={formatUsdOrCompact(tradeMetrics.largestLoss, 2)} icon={AlertTriangle} variant="negative" tooltipKey="Largest Loss" />
                 <MetricCard title="Profit Factor" value={formatNum(tradeMetrics.profitFactor)} icon={Target} tooltipKey="Profit Factor" />
-                <MetricCard title="Expectancy" value={formatUsd(tradeMetrics.expectancy, 2)} icon={Target} variant={tradeMetrics.expectancy >= 0 ? "positive" : "negative"} tooltipKey="Expectancy" />
+                <MetricCard title="Expectancy" value={formatUsdOrCompact(tradeMetrics.expectancy, 2)} icon={Target} variant={tradeMetrics.expectancy >= 0 ? "positive" : "negative"} tooltipKey="Expectancy" />
                 <MetricCard title="Payoff Ratio" value={formatNum(tradeMetrics.payoffRatio)} icon={Target} tooltipKey="Payoff Ratio" />
                 <MetricCard title="Avg Holding Time" value={`${tradeMetrics.averageHoldingTime.toFixed(1)} days`} icon={Calendar} tooltipKey="Avg Holding Time" />
                 <MetricCard title="Trade Frequency" value={`${tradeMetrics.tradeFrequency.toFixed(3)}/day`} icon={Activity} tooltipKey="Trade Frequency" />
@@ -375,7 +388,7 @@ export default async function AnalyticsPage() {
                   .map((m, i) => (
                     <div key={m.title} className="flex items-center justify-between px-6 py-3">
                       <span className="font-medium text-white">{m.title}</span>
-                      <span className="font-mono text-slate-400">{formatUsd(m.vol, 0)}</span>
+                      <span className="font-mono text-slate-400">{formatUsdOrCompact(m.vol, 0)}</span>
                     </div>
                   ))}
               </div>

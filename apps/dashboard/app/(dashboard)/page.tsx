@@ -181,8 +181,10 @@ function formatUsd(value: number, decimals = 0): string {
 }
 
 function formatCompact(value: number): string {
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "−" : "";
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1)}K`;
   return formatUsd(value);
 }
 
@@ -277,9 +279,8 @@ export default async function HomePage() {
                   <div>
                     <p className="text-sm font-medium text-slate-400">Portfolio Value</p>
                     <p className="text-2xl font-bold text-white">
-                      {formatUsd(
-                        (deployableCapital ?? 0) + (totalValue ?? 0),
-                        2
+                      {formatCompact(
+                        (deployableCapital ?? 0) + (totalValue ?? 0)
                       )}
                     </p>
                     <p className="text-xs text-slate-500">USDC.e + positions</p>
@@ -295,7 +296,7 @@ export default async function HomePage() {
                     <p className="text-sm font-medium text-slate-400">Deployable Capital</p>
                     <p className="text-2xl font-bold text-white">
                       {deployableCapital != null
-                        ? formatUsd(deployableCapital, 2)
+                        ? formatCompact(deployableCapital)
                         : "—"}
                     </p>
                     <p className="text-xs text-slate-500">Polygon USDC.e</p>
@@ -311,7 +312,7 @@ export default async function HomePage() {
                     <p className="text-sm font-medium text-slate-400">Total Position Value</p>
                     <p className="text-2xl font-bold text-white">
                       {totalValue != null
-                        ? formatUsd(totalValue, 2)
+                        ? formatCompact(totalValue)
                         : "—"}
                     </p>
                   </div>
@@ -330,7 +331,7 @@ export default async function HomePage() {
                       }`}
                     >
                       {account.pnl >= 0 ? "+" : ""}
-                      {formatUsd(account.pnl)}
+                      {formatCompact(account.pnl)}
                     </p>
                   </div>
                 </div>

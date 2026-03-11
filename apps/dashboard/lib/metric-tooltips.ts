@@ -157,10 +157,10 @@ export const METRIC_TOOLTIPS: Record<string, string> = {
     "What: Your worst historical daily return. Single-point stress scenario. What happened in practice; doesn't predict future extremes.\n\nRanges: Low (>−5%): survived well. Average (−5% to −15%): one bad day. High (<−25%): severe historical stress.\n\nCalculation: min(returns)",
 
   // Position-level ROI (dashboard)
-  TAROI:
-    "What: Total Annualized ROI — the return if you win (1 ÷ entry price − 1), scaled to a yearly rate based on days until resolution. Buying at 50¢ gives 100% raw return; annualizing makes it comparable across different time horizons.\n\nRanges: Low (<20%): low implied edge. Average (30–80%): typical prediction market entry. High (>100%): high conviction position.\n\nFormula: (1 / avgPrice) ^ (365 / daysToResolution) − 1",
   CAROI:
-    "What: Current Annualized ROI — the annualized return from the current market price to payoff (1) if you hold to resolution. Reflects what the market is currently implying for that outcome. Higher than TAROI means price moved in your favor.\n\nRanges: Low (<20%): market disagrees. Average (30–80%): in line. High (>100%): market strongly agrees with your position.\n\nFormula: (1 / curPrice) ^ (365 / daysToResolution) − 1",
+    "What: Cumulative Annualized ROI — linear annualized return from entry price to payoff (1). Displayed as Xx where 1x = 100% return.\n\nRanges: Low (<0.2x): low implied edge. Average (0.3–0.8x): typical prediction market entry. High (>1x): high conviction position.\n\nFormula: r = (1 − avgPrice) / avgPrice; annual_return = r × (365 / daysToResolution)",
+  PAROI:
+    "What: Present Annualized ROI — linear annualized return from current market price to payoff (1). Displayed as Xx where 1x = 100% return.\n\nRanges: Low (<0.2x): market disagrees. Average (0.3–0.8x): in line. High (>1x): market strongly agrees with your position.\n\nFormula: r = (1 − curPrice) / curPrice; annual_return = r × (365 / daysToResolution)",
 
   // 12. Portfolio Construction
   "Diversification Ratio":
