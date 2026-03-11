@@ -155,42 +155,49 @@ function parseProbabilities(m: GammaMarket): { yes: number | null; no: number | 
   }
 }
 
+const SCREENER_TAG_IDS = ["100265", "1628"];
+
+/** Fetch all markets for a given tag_id (paginated). */
+async function fetchMarketsForTag(tagId: string): Promise<GammaMarket[]> {
+  const out: GammaMarket[] = [];
+  let offset = 0;
+  const MAX_PAGES = 200;
+  const params = `tag_id=${tagId}&closed=false`;
+
+  for (let pageNum = 0; pageNum < MAX_PAGES; pageNum++) {
+    const url = `${GAMMA_BASE}?${params}&limit=${PAGE_LIMIT}&offset=${offset}`;
+    const res = await fetch(url, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`Gamma API returned ${res.status}`);
+    const markets: GammaMarket[] = await res.json();
+    if (!Array.isArray(markets)) throw new Error("Invalid API response: expected array");
+    out.push(...markets);
+    if (markets.length < PAGE_LIMIT) break;
+    offset += PAGE_LIMIT;
+  }
+  return out;
+}
+
 export async function POST() {
   const startedAt = new Date();
 
   try {
-    const allMarkets: GammaMarket[] = [];
-    let offset = 0;
-    let hasMore = true;
-    const MAX_PAGES = 200; // safety: max 20k markets
-    let pageNum = 0;
+    const tagResults = await Promise.all(
+      SCREENER_TAG_IDS.map((tagId) => fetchMarketsForTag(tagId))
+    );
+    const byId = new Map<string, GammaMarket>();
+    for (const markets of tagResults) {
+      for (const m of markets) {
+        if (m?.id && !byId.has(m.id)) byId.set(m.id, m);
+      }
+    }
+    const allMarkets = Array.from(byId.values());
 
     const endDateMax = getEndDateMax();
     const endDateMin = new Date();
     endDateMin.setUTCHours(0, 0, 0, 0);
-    const gammaParams = `tag_id=100265&closed=false`;
-
-    while (hasMore && pageNum < MAX_PAGES) {
-      pageNum++;
-      const url = `${GAMMA_BASE}?${gammaParams}&limit=${PAGE_LIMIT}&offset=${offset}`;
-      const res = await fetch(url, {
-        headers: { Accept: "application/json" },
-        cache: "no-store",
-      });
-
-      if (!res.ok) {
-        throw new Error(`Gamma API returned ${res.status}`);
-      }
-
-      const markets: GammaMarket[] = await res.json();
-      if (!Array.isArray(markets)) {
-        throw new Error("Invalid API response: expected array");
-      }
-
-      allMarkets.push(...markets);
-      hasMore = markets.length >= PAGE_LIMIT;
-      offset += PAGE_LIMIT;
-    }
 
     // Delete past events from DB so they don't linger
     await prisma.screenerEvent.deleteMany({

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { RefreshCw, Filter, Calendar, CalendarPlus, BarChart3, ExternalLink, Loader2, RotateCw, X, Brain, Star, Compass, HelpCircle, BadgeCheck, TrendingUp, ClipboardList, ChevronDown, AlertTriangle, StickyNote, BookOpen, Percent, Copy, ScrollText } from "lucide-react";
+import { RefreshCw, Filter, Calendar, CalendarPlus, BarChart3, ExternalLink, Loader2, RotateCw, X, Brain, Star, Compass, HelpCircle, BadgeCheck, TrendingUp, ClipboardList, ChevronDown, AlertTriangle, StickyNote, BookOpen, Percent, Copy, ScrollText, Clock } from "lucide-react";
 
 /** Icon: one circle with smaller circles sprouting (tree/siblings) */
 function SiblingsIcon({ className }: { className?: string }) {
@@ -224,6 +224,8 @@ export function ScreenerContent({
   );
   const [refreshing, setRefreshing] = useState(false);
   const [appraisingIds, setAppraisingIds] = useState<Set<string>>(new Set());
+  const [appraiseStartTimes, setAppraiseStartTimes] = useState<Map<string, number>>(new Map());
+  const [, setElapsedTick] = useState(0);
   const [noteEditingId, setNoteEditingId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [savingNoteId, setSavingNoteId] = useState<string | null>(null);
@@ -242,6 +244,13 @@ export function ScreenerContent({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Timer tick for appraise elapsed time
+  useEffect(() => {
+    if (appraisingIds.size === 0) return;
+    const id = setInterval(() => setElapsedTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [appraisingIds.size]);
 
   const discoveryEvents = events
     .filter((e) => e.label === null)
@@ -403,6 +412,7 @@ export function ScreenerContent({
     }
 
     setAppraisingIds((prev) => new Set(prev).add(eventId));
+    setAppraiseStartTimes((prev) => new Map(prev).set(eventId, Date.now()));
     const labels = {
       deep: "Running deep research…",
       mini: "Running mini research…",
@@ -437,7 +447,22 @@ export function ScreenerContent({
         next.delete(eventId);
         return next;
       });
+      setAppraiseStartTimes((prev) => {
+        const next = new Map(prev);
+        next.delete(eventId);
+        return next;
+      });
     }
+  }
+
+  function formatElapsed(eventId: string): string {
+    const start = appraiseStartTimes.get(eventId);
+    if (start == null) return "";
+    const s = Math.floor((Date.now() - start) / 1000);
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return r > 0 ? `${m}m ${r}s` : `${m}m`;
   }
 
   async function handleRefresh() {
@@ -472,7 +497,7 @@ export function ScreenerContent({
               Screener
             </h1>
             <p className="mt-1 text-slate-400">
-              Events from Gamma API (tag_id=100265) · closed=false · end_date within today–3 months
+              Events from Gamma API (tag_id=100265, 1628) · closed=false · end_date within today–3 months
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -1030,6 +1055,12 @@ export function ScreenerContent({
                         )}
                         Reappraise
                       </button>
+                      {appraisingIds.has(e.id) && (
+                        <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/40 px-2.5 py-1.5 text-xs text-slate-400 tabular-nums">
+                          <Clock className="h-3 w-3 shrink-0" />
+                          {formatElapsed(e.id)}
+                        </span>
+                      )}
                       {(e.appraisedYes != null || e.appraisedNo != null) && e.appraisalExplanation && (
                         <button
                           onClick={() => setRulesPopupEventId(e.id)}

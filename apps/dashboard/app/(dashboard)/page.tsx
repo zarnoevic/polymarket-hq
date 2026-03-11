@@ -1,6 +1,7 @@
 import { fetchActivity } from "@/lib/polymarket";
 import {
   computePositionAverages,
+  computeTotalWinChances,
   formatRoi,
 } from "@/lib/position-metrics";
 import {
@@ -250,13 +251,15 @@ export default async function HomePage() {
     yesId: yesIds[i],
   }));
 
-  const { avgParoi, avgRoi, avgPositionSize, avgProfit } = computePositionAverages(
-    positions
-  );
+  const { avgParoi, avgRoi, avgPositionSize, avgProfit, avgBettedChance, avgCurrentChance } =
+    computePositionAverages(positions);
 
   // If all positions resolve in our favor: each pays $1 per share; plus cash
   const totalWinValue =
     (deployableCapital ?? 0) + positions.reduce((s, p) => s + p.size, 0);
+
+  const { chanceTotalWin, initialChanceTotalWin } =
+    computeTotalWinChances(positions);
 
   return (
     <div className="bg-[rgb(var(--background-rgb))]">
@@ -279,14 +282,43 @@ export default async function HomePage() {
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Total Win
                 </h3>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400">
-                    <Trophy className="h-4 w-4" strokeWidth={1.75} />
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400">
+                      <Trophy className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs text-slate-400">Value</p>
+                      <p className="font-semibold text-emerald-400">
+                        {formatCompact(totalWinValue)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="font-semibold text-emerald-400">
-                      {formatCompact(totalWinValue)}
-                    </p>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-500/15 text-slate-400">
+                      <BarChart3 className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Chance of Total Win</p>
+                      <p className="font-semibold text-white">
+                        {chanceTotalWin != null
+                          ? `${(chanceTotalWin * 100).toFixed(2)}%`
+                          : "—"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-500/15 text-slate-400">
+                      <BarChart3 className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Initial Chance of Total Win</p>
+                      <p className="font-semibold text-white">
+                        {initialChanceTotalWin != null
+                          ? `${(initialChanceTotalWin * 100).toFixed(2)}%`
+                          : "—"}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -303,6 +335,32 @@ export default async function HomePage() {
                       <p className="text-xs text-slate-400">Avg PAROI</p>
                       <p className="font-semibold text-white">
                         {avgParoi != null ? formatRoi(avgParoi) : "—"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-500/15 text-slate-400">
+                      <BarChart3 className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Avg Betted Chance</p>
+                      <p className="font-semibold text-white">
+                        {avgBettedChance != null
+                          ? `${(avgBettedChance * 100).toFixed(1)}%`
+                          : "—"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-500/15 text-slate-400">
+                      <BarChart3 className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Avg Current Chance</p>
+                      <p className="font-semibold text-white">
+                        {avgCurrentChance != null
+                          ? `${(avgCurrentChance * 100).toFixed(1)}%`
+                          : "—"}
                       </p>
                     </div>
                   </div>

@@ -102,13 +102,17 @@ export function computePositionAverages(positions: PositionForMetrics[]): {
   avgRoi: number | null;
   avgPositionSize: number;
   avgProfit: number;
+  avgBettedChance: number | null;
+  avgCurrentChance: number | null;
 } {
   if (positions.length === 0) {
-    return { avgParoi: null, avgRoi: null, avgPositionSize: 0, avgProfit: 0 };
+    return { avgParoi: null, avgRoi: null, avgPositionSize: 0, avgProfit: 0, avgBettedChance: null, avgCurrentChance: null };
   }
 
   const paroiValues: number[] = [];
   const roiValues: number[] = [];
+  const bettedChanceValues: number[] = [];
+  const currentChanceValues: number[] = [];
   let sumSize = 0;
   let sumProfit = 0;
 
@@ -121,6 +125,12 @@ export function computePositionAverages(positions: PositionForMetrics[]): {
     const roi = computeROINumeric(pos.avgPrice);
     if (roi != null) {
       roiValues.push(roi);
+    }
+    if (pos.avgPrice > 0 && pos.avgPrice < 1 && Number.isFinite(pos.avgPrice)) {
+      bettedChanceValues.push(pos.avgPrice);
+    }
+    if (pos.curPrice > 0 && pos.curPrice < 1 && Number.isFinite(pos.curPrice)) {
+      currentChanceValues.push(pos.curPrice);
     }
     sumSize += Math.abs(pos.currentValue);
     sumProfit += pos.cashPnl;
@@ -136,6 +146,42 @@ export function computePositionAverages(positions: PositionForMetrics[]): {
       : null;
   const avgPositionSize = positions.length > 0 ? sumSize / positions.length : 0;
   const avgProfit = positions.length > 0 ? sumProfit / positions.length : 0;
+  const avgBettedChance =
+    bettedChanceValues.length > 0
+      ? bettedChanceValues.reduce((a, b) => a + b, 0) / bettedChanceValues.length
+      : null;
+  const avgCurrentChance =
+    currentChanceValues.length > 0
+      ? currentChanceValues.reduce((a, b) => a + b, 0) / currentChanceValues.length
+      : null;
 
-  return { avgParoi, avgRoi, avgPositionSize, avgProfit };
+  return { avgParoi, avgRoi, avgPositionSize, avgProfit, avgBettedChance, avgCurrentChance };
+}
+
+/** Product of probabilities: chance that all positions win (assuming independence). */
+export function computeTotalWinChances(positions: PositionForMetrics[]): {
+  chanceTotalWin: number | null;
+  initialChanceTotalWin: number | null;
+} {
+  if (positions.length === 0) {
+    return { chanceTotalWin: null, initialChanceTotalWin: null };
+  }
+  let current = 1;
+  let initial = 1;
+  let hasCurrent = false;
+  let hasInitial = false;
+  for (const pos of positions) {
+    if (pos.curPrice >= 0 && pos.curPrice <= 1 && Number.isFinite(pos.curPrice)) {
+      current *= pos.curPrice;
+      hasCurrent = true;
+    }
+    if (pos.avgPrice >= 0 && pos.avgPrice <= 1 && Number.isFinite(pos.avgPrice)) {
+      initial *= pos.avgPrice;
+      hasInitial = true;
+    }
+  }
+  return {
+    chanceTotalWin: hasCurrent ? current : null,
+    initialChanceTotalWin: hasInitial ? initial : null,
+  };
 }
