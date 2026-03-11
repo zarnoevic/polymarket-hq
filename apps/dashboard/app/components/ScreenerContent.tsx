@@ -1,7 +1,25 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { RefreshCw, Filter, Calendar, CalendarPlus, BarChart3, ExternalLink, Loader2, Search, RotateCw, Sparkles, X, Brain, Star, Compass, HelpCircle, BadgeCheck, TrendingUp, ClipboardList, ChevronDown, AlertTriangle, StickyNote, BookOpen, Percent } from "lucide-react";
+import { RefreshCw, Filter, Calendar, CalendarPlus, BarChart3, ExternalLink, Loader2, Search, RotateCw, Sparkles, X, Brain, Star, Compass, HelpCircle, BadgeCheck, TrendingUp, ClipboardList, ChevronDown, AlertTriangle, StickyNote, BookOpen, Percent, Copy } from "lucide-react";
+
+/** Icon: one circle with smaller circles sprouting (tree/siblings) */
+function SiblingsIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      {/* Central circle (parent) */}
+      <circle cx="12" cy="10" r="4" />
+      {/* Sprouting circles (siblings) */}
+      <circle cx="6" cy="18" r="2.5" />
+      <circle cx="12" cy="20" r="2.5" />
+      <circle cx="18" cy="18" r="2.5" />
+      {/* Branches connecting center to sprouting nodes */}
+      <path d="M9.2 12.8 L6.8 15.5" />
+      <path d="M12 14 L12 17.5" />
+      <path d="M14.8 12.8 L17.2 15.5" />
+    </svg>
+  );
+}
 import { toast } from "sonner";
 
 type LabelType = "vetted" | "unknowable" | "well_priced" | "traded" | "evaluating" | "disputed" | "uninformed" | "under_5" | null;
@@ -51,6 +69,7 @@ type ScreenerEvent = {
   note: string | null;
   syncedAt: Date;
   raw?: unknown;
+  tags?: unknown; // Gamma API tags: JsonValue from DB
 };
 
 type ScreenerEventInput = Omit<ScreenerEvent, "label" | "note"> & {
@@ -110,15 +129,6 @@ function daysToResolution(endDate: Date | string | null): number | null {
   const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
   const days = Math.round((resUtc - todayUtc) / (24 * 60 * 60 * 1000));
   return days > 0 ? Math.max(1, days) : null;
-}
-
-/** Linear annualized ROI: r = (P1-P0)/P0, annual_return = r * (365/T). P0=entry, P1=1. */
-function computeCAROI(entryPrice: number, days: number | null): string {
-  if (entryPrice <= 0 || entryPrice > 1 || !Number.isFinite(entryPrice)) return "—";
-  if (entryPrice < 1e-9) return "999+Tx";
-  const r = (1 - entryPrice) / entryPrice;
-  const roi = days == null || days <= 0 ? r : r * (365 / days);
-  return formatRoiAsX(roi);
 }
 
 /** Linear annualized return: r = (P1-P0)/P0, annual_return = r * (365/T). P0=current, P1=1. */
@@ -615,11 +625,20 @@ export function ScreenerContent({
                             : "Use the Well-priced button in Discovery to move markets here."}
           </p>
           <button
-            onClick={() => setActiveTab("discovery")}
-            className="mt-6 inline-flex items-center gap-2 rounded-xl border border-slate-600/60 bg-slate-800/60 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-700/60"
+            onClick={activeTab === "discovery" ? handleRefresh : () => setActiveTab("discovery")}
+            disabled={activeTab === "discovery" && refreshing}
+            className="mt-6 inline-flex items-center gap-2 rounded-xl border border-slate-600/60 bg-slate-800/60 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-700/60 disabled:opacity-50"
           >
-            <Compass className="h-4 w-4" />
-            View discovery
+            {activeTab === "discovery" ? (
+              refreshing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )
+            ) : (
+              <Compass className="h-4 w-4" />
+            )}
+            {activeTab === "discovery" ? "Refresh" : "View discovery"}
           </button>
         </div>
       ) : (
@@ -744,6 +763,31 @@ export function ScreenerContent({
                         <X className="h-5 w-5" />
                       </button>
                     )}
+                    {e.parentEventSlug && (
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={alsoClassifySiblingsIds.has(e.id)}
+                        aria-label="Also classify sibling markets"
+                        title="Also classify sibling markets"
+                        onClick={() => {
+                          setAlsoClassifySiblingsIds((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(e.id)) next.delete(e.id);
+                            else next.add(e.id);
+                            return next;
+                          });
+                        }}
+                        className={`mt-2 flex flex-col items-center gap-1 rounded-lg px-2 py-1.5 transition-all duration-200 ${
+                          alsoClassifySiblingsIds.has(e.id)
+                            ? "bg-indigo-500/20 text-indigo-400 shadow-sm ring-1 ring-indigo-500/30 hover:bg-indigo-500/30"
+                            : "bg-slate-800/40 text-slate-500 ring-1 ring-slate-700/50 hover:bg-slate-700/50 hover:text-slate-400 hover:ring-slate-600/60"
+                        }`}
+                      >
+                        <SiblingsIcon className="h-4 w-4" />
+                        <span className="text-[10px] font-medium leading-tight">Siblings</span>
+                      </button>
+                    )}
                   </div>
                   {(e.image ?? e.icon) && (
                     <img
@@ -754,6 +798,18 @@ export function ScreenerContent({
                   )}
                   <div className="min-w-0 flex-1">
                     <h3 className="font-medium text-white">{e.title}</h3>
+                    {e.tags && Array.isArray(e.tags) && e.tags.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {(e.tags as Array<{ id?: string; label?: string; slug?: string }>).map((t, i) => (
+                          <span
+                            key={t.id ?? t.slug ?? `tag-${i}`}
+                            className="inline-flex rounded-md bg-slate-700/60 px-2 py-0.5 text-xs text-slate-300"
+                          >
+                            {t.label ?? t.slug ?? t.id ?? "—"}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
                       <a
                         href={`https://polymarket.com/event/${e.parentEventSlug ?? e.slug}`}
@@ -764,24 +820,18 @@ export function ScreenerContent({
                         Polymarket
                         <ExternalLink className="h-3 w-3" />
                       </a>
-                      {e.parentEventSlug && (
-                        <label className="flex cursor-pointer items-center gap-1.5 text-slate-500 hover:text-slate-400">
-                          <input
-                            type="checkbox"
-                            checked={alsoClassifySiblingsIds.has(e.id)}
-                            onChange={() => {
-                              setAlsoClassifySiblingsIds((prev) => {
-                                const next = new Set(prev);
-                                if (next.has(e.id)) next.delete(e.id);
-                                else next.add(e.id);
-                                return next;
-                              });
-                            }}
-                            className="rounded border-slate-600 bg-slate-800/60 text-indigo-500 focus:ring-indigo-500"
-                          />
-                          <span>Also classify sibling markets</span>
-                        </label>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(e.externalId);
+                          toast.success("Market ID copied");
+                        }}
+                        className="inline-flex items-center gap-1 rounded p-0.5 text-slate-500 transition-colors hover:bg-slate-700/60 hover:text-slate-300"
+                        title="Copy market ID"
+                        aria-label="Copy market ID"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
                       {displayCreatedAt && !isNaN(new Date(displayCreatedAt).getTime()) && (
                         <span className="flex items-center gap-1 text-slate-500" title="Market creation (API)">
                           <CalendarPlus className="h-3.5 w-3.5" />
@@ -855,18 +905,6 @@ export function ScreenerContent({
                                 <span className="font-mono text-sm text-emerald-500/90">{(e.yev ?? 0).toFixed(2)}</span>
                                 <span className="text-xs text-slate-500">NEV</span>
                                 <span className="font-mono text-sm text-red-500/90">{(e.nev ?? 0).toFixed(2)}</span>
-                              </div>
-                            )}
-                            {(e.appraisedYes != null || e.appraisedNo != null) && (
-                              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                                <span className="text-xs text-slate-500">Yes CAROI</span>
-                                <span className="font-mono text-sm text-emerald-500/90">
-                                  {computeCAROI(e.appraisedYes ?? (e.probabilityYes ?? 0), daysToResolution(e.endDate))}
-                                </span>
-                                <span className="text-xs text-slate-500">No CAROI</span>
-                                <span className="font-mono text-sm text-red-500/90">
-                                  {computeCAROI(e.appraisedNo ?? (e.probabilityNo ?? 0), daysToResolution(e.endDate))}
-                                </span>
                               </div>
                             )}
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-1">

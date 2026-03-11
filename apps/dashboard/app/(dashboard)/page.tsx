@@ -11,6 +11,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { PositionsList } from "@/app/components/PositionsList";
+import { CopyAddress } from "@/app/components/CopyAddress";
 
 type LeaderboardEntry = {
   rank: string;
@@ -188,10 +189,6 @@ function formatCompact(value: number): string {
   return formatUsd(value);
 }
 
-function shortAddress(addr: string): string {
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
-}
-
 export default async function HomePage() {
   const [account, positions, totalValue, deployableCapital] = await Promise.all([
     fetchAccountData(),
@@ -249,8 +246,8 @@ export default async function HomePage() {
                       <h2 className="text-xl font-semibold text-white">
                         {account.userName || "Anonymous"}
                       </h2>
-                      <p className="mt-0.5 font-mono text-sm text-slate-500">
-                        {shortAddress(account.proxyWallet)}
+                      <p className="mt-0.5 text-sm">
+                        <CopyAddress address={account.proxyWallet} />
                       </p>
                     </div>
                   </div>

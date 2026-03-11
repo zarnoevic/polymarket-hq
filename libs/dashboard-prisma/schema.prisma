@@ -34,6 +34,8 @@ model ScreenerEvent {
   lastAppraised DateTime? @map("last_appraised")
   yev                Float? @map("yev") // Yes Expected Value = appraisedYes / quotedYes
   nev                Float? @map("nev") // No Expected Value = appraisedNo / quotedNo
+  yesParoi           Float? @map("yes_paroi") // Stored during ingest; UI always calculates fresh
+  noParoi            Float? @map("no_paroi") // Stored during ingest; UI always calculates fresh
   appraisalExplanation String? @db.Text @map("appraisal_explanation") // Explanation with sources
   appraisalRaw       Json?    @map("appraisal_raw") // Full OpenAI appraisal API response
   raw           Json?    @map("raw") // Full Gamma API payload
@@ -41,6 +43,7 @@ model ScreenerEvent {
   label         String?  @map("label") // "opportunity" | "unknowable" | "well_priced" | null (null = discovery)
   labelUpdatedAt DateTime? @map("label_updated_at") // When label was last set (for sorting evaluating by recency)
   note          String?  @db.Text @map("note") // User note; included in appraisal prompts
+  tags          Json?    @map("tags") // Gamma API /markets/{id}/tags (array of {id, label, slug, ...})
 
   @@index([syncedAt])
   @@index([label])

@@ -162,6 +162,7 @@ export default async function AnalyticsPage() {
   ]);
 
   const roundTrips = matchRoundTrips(trades);
+  const totalPositionsHeld = new Set(trades.map((t) => t.asset)).size;
   const totalBuyVolume = roundTrips.reduce((s, r) => s + r.buyUsdc, 0);
   const initialEquity = Math.max(10_000, totalBuyVolume * 0.3);
 
@@ -214,6 +215,13 @@ export default async function AnalyticsPage() {
                 sub={`${roundTrips.length} round-trips`}
                 icon={Activity}
                 tooltipKey="Total Trades"
+              />
+              <MetricCard
+                title="Positions Held"
+                value={totalPositionsHeld.toString()}
+                sub="Unique markets traded"
+                icon={Layers}
+                tooltipKey="Positions Held"
               />
               <MetricCard
                 title="Buy Volume"

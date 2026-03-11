@@ -6,6 +6,8 @@ export const METRIC_TOOLTIPS: Record<string, string> = {
   // Overview
   "Total Trades":
     "What: Raw count of every buy and sell executed. Indicates trading activity level — more trades can mean more opportunities or overtrading. Round-trips are completed buy→sell pairs.\n\nRanges: Low (<20): very selective, few positions. Average (50–200): moderate activity. High (>500): active trader, many markets.\n\nCalculation: trades.length",
+  "Positions Held":
+    "What: Total number of unique markets you have ever traded (bought or sold). A position is one market; trading the same market multiple times counts as one. Indicates portfolio breadth and diversification.\n\nRanges: Low (<10): concentrated, few markets. Average (20–80): moderate diversification. High (>100): broad exposure across many markets.\n\nCalculation: new Set(trades.map(t => t.asset)).size",
   "Buy Volume":
     "What: Total capital deployed into positions. Shows how much USD you've committed to the market. Compare with sell volume to see if you're net accumulating or reducing exposure.\n\nRanges: Low (<$1k): small account or very conservative. Average ($5k–$50k): typical retail. High (>$100k): significant capital at work.\n\nCalculation: trades.filter(t => t.side === 'BUY').reduce((s, t) => s + t.usdcSize, 0)",
   "Sell Volume":

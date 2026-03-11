@@ -3,6 +3,93 @@ import { prisma } from "@polymarket-hq/dashboard-prisma";
 
 const GAMMA_BASE = "https://gamma-api.polymarket.com/markets";
 const PAGE_LIMIT = 100;
+const TAGS_CONCURRENCY = 5;
+const TAGS_RETRIES = 3;
+const TAGS_RETRY_DELAY_MS = 500;
+
+type GammaTag = {
+  id?: string;
+  label?: string;
+  slug?: string;
+  [k: string]: unknown;
+};
+
+async function fetchTagsForMarket(marketId: string): Promise<GammaTag[]> {
+  for (let attempt = 1; attempt <= TAGS_RETRIES; attempt++) {
+    try {
+      const res = await fetch(`${GAMMA_BASE}/${marketId}/tags`, {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      }
+      // Retry on rate limit or server errors
+      if ((res.status === 429 || res.status >= 500) && attempt < TAGS_RETRIES) {
+        await new Promise((r) => setTimeout(r, TAGS_RETRY_DELAY_MS * attempt));
+        continue;
+      }
+      return [];
+    } catch {
+      if (attempt < TAGS_RETRIES) {
+        await new Promise((r) => setTimeout(r, TAGS_RETRY_DELAY_MS * attempt));
+      } else {
+        return [];
+      }
+    }
+  }
+  return [];
+}
+
+/** Fetch tags for multiple markets in parallel with concurrency limit */
+async function fetchTagsBatch(
+  marketIds: string[],
+  concurrency: number
+): Promise<Map<string, GammaTag[]>> {
+  const result = new Map<string, GammaTag[]>();
+  const uniqueIds = [...new Set(marketIds.filter(Boolean))];
+
+  for (let i = 0; i < uniqueIds.length; i += concurrency) {
+    const batch = uniqueIds.slice(i, i + concurrency);
+    const settled = await Promise.allSettled(
+      batch.map(async (id) => {
+        const tags = await fetchTagsForMarket(id);
+        return { id, tags };
+      })
+    );
+    for (const s of settled) {
+      if (s.status === "fulfilled") {
+        result.set(s.value.id, s.value.tags);
+      }
+    }
+    // Small delay between batches to reduce rate-limit risk
+    if (i + concurrency < uniqueIds.length) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  }
+  return result;
+}
+
+/** Days until resolution; null if endDate missing or in the past. */
+function daysToResolution(endDate: Date | null): number | null {
+  if (!endDate) return null;
+  const d = endDate instanceof Date ? endDate : new Date(endDate);
+  if (isNaN(d.getTime())) return null;
+  const now = new Date();
+  const resUtc = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.round((resUtc - todayUtc) / (24 * 60 * 60 * 1000));
+  return days > 0 ? Math.max(1, days) : null;
+}
+
+/** Numeric PAROI: r = (1-P)/P, annualized = r * (365/days). Returns null if invalid. */
+function computeParoiNumeric(curPrice: number | null, days: number | null): number | null {
+  if (curPrice == null || curPrice > 1 || curPrice <= 0 || curPrice < 1e-9 || !Number.isFinite(curPrice))
+    return null;
+  const r = (1 - curPrice) / curPrice;
+  return days == null || days <= 0 ? r : r * (365 / days);
+}
 
 function getEndDateMax(): Date {
   const d = new Date();
@@ -116,6 +203,12 @@ export async function POST() {
       existingEvents.map((e) => [e.externalId, e.label])
     );
 
+    // Fetch tags for all filtered markets (parallel with concurrency limit)
+    const tagsByMarketId = await fetchTagsBatch(
+      filtered.map((m) => m.id).filter(Boolean),
+      TAGS_CONCURRENCY
+    );
+
     for (const m of filtered) {
       if (!m?.id) continue;
       const endDate = (m.endDate ?? m.end_date) ? new Date((m.endDate ?? m.end_date) as string) : null;
@@ -124,6 +217,10 @@ export async function POST() {
       const parentEventSlug = m.events?.[0]?.slug ?? null;
       // Category status: under_5 if yes or no < 5% (low priority), else discovery (null)
       const isUnder5 = (probYes != null && probYes < 0.05) || (probNo != null && probNo < 0.05);
+      const tags = tagsByMarketId.get(m.id) ?? [];
+      const days = daysToResolution(endDate);
+      const yesParoi = computeParoiNumeric(probYes ?? (probNo != null ? 1 - probNo : null), days);
+      const noParoi = computeParoiNumeric(probNo ?? (probYes != null ? 1 - probYes : null), days);
       const base = {
         externalId: m.id,
         slug: m.slug ?? m.id,
@@ -143,6 +240,9 @@ export async function POST() {
         probabilityNo: probNo,
         raw: m as unknown as object,
         label: isUnder5 ? "under_5" : null,
+        tags: tags.length > 0 ? (tags as object) : null,
+        yesParoi,
+        noParoi,
       };
       const currentLabel = existingLabelByExternalId.get(m.id);
       const isStatusCategory = currentLabel === null || currentLabel === "under_5";
@@ -155,6 +255,9 @@ export async function POST() {
           probabilityYes: probYes,
           probabilityNo: probNo,
           syncedAt: new Date(),
+          tags: tags.length > 0 ? (tags as object) : null,
+          yesParoi,
+          noParoi,
           ...(isStatusCategory && { label: isUnder5 ? "under_5" : null }),
         },
       });
