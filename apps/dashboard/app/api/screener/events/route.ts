@@ -9,7 +9,8 @@ export async function GET() {
       where: {
         endDate: { gte: now },
       },
-      orderBy: [{ endDate: "asc" }, { volume: "desc" }, { syncedAt: "desc" }],
+      // Prioritize recently synced so newly ingested events are included in the 500
+      orderBy: [{ syncedAt: "desc" }, { endDate: "asc" }, { volume: "desc" }],
       take: 500,
     });
     // Appraised events first; among those, sort by quoted probability closest to 50%, then max(YEV, NEV)

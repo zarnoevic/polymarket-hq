@@ -2,6 +2,18 @@ import { NextResponse } from "next/server";
 import { prisma } from "@polymarket-hq/dashboard-prisma";
 import OpenAI from "openai";
 
+const EXPLANATION_FORMAT = `Structure your explanation using these sections (use clear headers or bullets). Cite sources with inline links or [1], [2] style:
+
+1. **Context**: What is the larger relevant context in which the question is being posed?
+2. **Previous events**: What are the previous events relevant to the market?
+3. **Recent changes**: What's changed recently in the world or specifically relevant to this market?
+4. **Arguments for YES**: What are the general arguments for YES?
+5. **YES preconditions and indicators**: What would need to happen as a precondition for YES to be likely? What are the advance indicators of a YES resolution? Are we seeing preconditions or indicators in the media coverage? How likely are they?
+6. **Arguments for NO**: What are the general arguments for NO?
+7. **NO preconditions and indicators**: What would need to happen as a precondition for NO to be likely? What are the advance indicators of a NO resolution? Are we seeing preconditions or indicators in the media coverage? How likely are they?
+8. **Comparison**: What is the most informative comparison of opposing arguments and their likelihoods in order to substantiate the final verdict?
+9. **Final verdict and summary**: What is the final verdict and summary?`;
+
 const DEEP_APPRAISE_PROMPT = `You are an expert market analyst for prediction markets on Polymarket.
 
 Given a prediction market event, perform DEEP RESEARCH using web search. Investigate:
@@ -12,8 +24,10 @@ Given a prediction market event, perform DEEP RESEARCH using web search. Investi
 
 Based on your thorough research, output your APPRAISED probabilities and a detailed explanation.
 
+${EXPLANATION_FORMAT}
+
 Respond ONLY with valid JSON in this exact format, no other text:
-{"appraised_yes": <number 0-100>, "appraised_no": <number 0-100>, "explanation": "<string: detailed reasoning and analysis, cite sources with inline links or [1], [2] style>"}
+{"appraised_yes": <number 0-100>, "appraised_no": <number 0-100>, "explanation": "<string: detailed reasoning following the structure above, cite sources with inline links or [1], [2] style>"}
 The two numbers should sum to approximately 100. The explanation must include all relevant sources as URLs.`;
 
 const MINI_APPRAISE_PROMPT = `You are an expert market analyst for prediction markets on Polymarket.
@@ -25,8 +39,10 @@ Given a prediction market event, perform research using web search. Investigate:
 
 Based on your research, output your APPRAISED probabilities and a concise explanation.
 
-Respond ONLY with valid JSON in this exact format, no other text:
-{"appraised_yes": <number 0-100>, "appraised_no": <number 0-100>, "explanation": "<string: concise reasoning and analysis, cite sources with inline links or [1], [2] style>"}
+${EXPLANATION_FORMAT}
+
+For MINI mode, keep each section brief but still cover all nine sections. Respond ONLY with valid JSON in this exact format, no other text:
+{"appraised_yes": <number 0-100>, "appraised_no": <number 0-100>, "explanation": "<string: concise reasoning following the structure above, cite sources with inline links or [1], [2] style>"}
 The two numbers should sum to approximately 100. The explanation must include relevant sources as URLs.`;
 
 const REAPPRAISE_PROMPT = `You are checking if RECENT NEWS (since the last appraisal) would change an existing probability assessment of a Polymarket prediction market.
@@ -41,8 +57,10 @@ Use web search to find any NEW news, events, or developments since the last appr
 If you find significant new information that would change the probabilities, output your UPDATED appraisal and explanation.
 If nothing material has changed, output the SAME probabilities with a brief explanation stating no material changes.
 
-Respond ONLY with valid JSON in this exact format, no other text:
-{"appraised_yes": <number 0-100>, "appraised_no": <number 0-100>, "explanation": "<string: reasoning, cite any new sources as URLs>"}
+${EXPLANATION_FORMAT}
+
+For REAPPRAISE mode, focus on sections 3 (Recent changes), 5 (YES preconditions), 7 (NO preconditions), 8 (Comparison), and 9 (Final verdict). Respond ONLY with valid JSON in this exact format, no other text:
+{"appraised_yes": <number 0-100>, "appraised_no": <number 0-100>, "explanation": "<string: reasoning following the structure above, cite any new sources as URLs>"}
 The two numbers should sum to approximately 100.`;
 
 function parseAppraisalJson(
@@ -182,7 +200,7 @@ async function appraiseOne(
       ...(isThink && { reasoning: { effort: "high" } }),
       input: userMessage,
       instructions:
-        "You are a precise market analyst. Output ONLY valid JSON with appraised_yes, appraised_no (0-100), and explanation (string with sources). No other text.",
+        "You are a precise market analyst. Output ONLY valid JSON with appraised_yes, appraised_no (0-100), and explanation (string). The explanation must follow the prescribed format: Context, Previous events, Recent changes, Arguments for YES, YES preconditions and indicators, Arguments for NO, NO preconditions and indicators, Comparison, Final verdict and summary. Cite sources with URLs. No other text.",
       tools:
         isReappraise
           ? [{ type: "web_search" as const, search_context_size: "low" as const }]

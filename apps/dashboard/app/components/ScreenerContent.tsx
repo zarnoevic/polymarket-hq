@@ -81,8 +81,14 @@ function formatDate(d: Date | null): string {
   });
 }
 
+/**
+ * Match URLs but exclude trailing punctuation that wraps them.
+ * E.g. (https://example.com) -> match "https://example.com" not "https://example.com)"
+ */
+const URL_REGEX = /(https?:\/\/[^\s)\]]+)/g;
+
 function ExplanationText({ text }: { text: string }) {
-  const parts = text.split(/(https?:\/\/[^\s]+)/g);
+  const parts = text.split(URL_REGEX);
   return (
     <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">
       {parts.map((part, i) =>
@@ -140,6 +146,10 @@ export function ScreenerContent({
   const discoveryEvents = events
     .filter((e) => e.label == null)
     .sort((a, b) => {
+      // New/recently synced events first so they're visible
+      const syncedA = a.syncedAt ? new Date(a.syncedAt).getTime() : 0;
+      const syncedB = b.syncedAt ? new Date(b.syncedAt).getTime() : 0;
+      if (syncedA !== syncedB) return syncedB - syncedA;
       const distA = a.probabilityYes != null ? Math.abs(a.probabilityYes - 0.5) : Infinity;
       const distB = b.probabilityYes != null ? Math.abs(b.probabilityYes - 0.5) : Infinity;
       return distA - distB;

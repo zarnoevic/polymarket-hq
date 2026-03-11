@@ -133,7 +133,12 @@ export async function POST() {
       await prisma.screenerEvent.upsert({
         where: { externalId: m.id },
         create: base,
-        update: { ...base, syncedAt: new Date() },
+        // For existing events: only update quoted probabilities (preserve label, note, appraisals, etc.)
+        update: {
+          probabilityYes: probYes,
+          probabilityNo: probNo,
+          syncedAt: new Date(),
+        },
       });
       upserted++;
     }
