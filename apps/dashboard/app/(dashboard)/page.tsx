@@ -2,6 +2,7 @@ import { fetchActivity } from "@/lib/polymarket";
 import {
   computePositionAverages,
   formatRoiAsX,
+  buildPositionValueOverTime,
 } from "@/lib/position-metrics";
 import {
   BarChart3,
@@ -21,6 +22,7 @@ import {
 import { PositionsList } from "@/app/components/PositionsList";
 import { CopyAddress } from "@/app/components/CopyAddress";
 import { AttributionPieChart } from "@/app/components/AttributionPieChart";
+import { PositionValueChart } from "@/app/components/PositionValueChart";
 
 type LeaderboardEntry = {
   rank: string;
@@ -253,6 +255,7 @@ export default async function HomePage() {
   const { avgParoi, avgPositionSize, avgProfit } = computePositionAverages(
     positions
   );
+  const positionValueOverTime = buildPositionValueOverTime(activity, totalValue);
 
   return (
     <div className="bg-[rgb(var(--background-rgb))]">
@@ -267,9 +270,10 @@ export default async function HomePage() {
       />
 
       <div className="relative z-10 flex w-full pt-4 pb-2">
-        {/* Left margin: averages centered in space between screen edge and content */}
-        <div className="flex flex-1 items-center justify-center min-w-0">
+        {/* Left margin: averages and position value chart */}
+        <div className="flex flex-1 flex-col items-center justify-start gap-4 min-w-0">
           {positions.length > 0 && (
+            <>
             <div className="overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 p-4 shadow-lg shadow-black/10">
               <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Averages
@@ -319,6 +323,10 @@ export default async function HomePage() {
                 </div>
               </div>
             </div>
+            {positionValueOverTime.length >= 2 && (
+              <PositionValueChart data={positionValueOverTime} />
+            )}
+            </>
           )}
         </div>
         {/* Center: content exactly as before (max-w-5xl centered) */}
@@ -362,20 +370,21 @@ export default async function HomePage() {
                         Polymarket
                         <ExternalLink className="h-4 w-4" />
                       </a>
-                      <div className="flex items-center gap-2 rounded-lg bg-slate-800/80 px-4 py-2">
-                    <Trophy className="h-5 w-5 text-amber-400" />
-                    <span className="font-semibold text-slate-300">Rank</span>
-                    <span className="font-mono text-lg font-bold text-white">
-                      #{Number(account.rank).toLocaleString()}
-                    </span>
-                    <span className="flex items-center gap-1.5 text-slate-400">
-                    · 
+                      <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 rounded-lg bg-slate-800/80 px-4 py-2">
+                      <Trophy className="h-5 w-5 text-amber-400" />
+                      <span className="font-semibold text-slate-300">Rank</span>
+                      <span className="font-mono text-lg font-bold text-white">
+                        #{Number(account.rank).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 rounded-lg bg-slate-800/80 px-4 py-2 text-slate-400">
                       <Brain className="h-4 w-4 text-indigo-400" />
                       Top {(() => {
                         const pct = (Number(account.rank) / TOTAL_TRADERS) * 100;
                         return pct < 0.01 ? pct.toFixed(4) : pct < 1 ? pct.toFixed(2) : pct.toFixed(1);
                       })()}%
-                    </span>
+                    </div>
                   </div>
                     </div>
                   </div>

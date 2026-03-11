@@ -114,3 +114,75 @@ export function computePositionAverages(positions: PositionForMetrics[]): {
 
   return { avgParoi, avgPositionSize, avgProfit };
 }
+
+/** Activity entry for position value computation */
+export type ActivityEntryForValue = {
+  timestamp: number;
+  asset: string;
+  side: "BUY" | "SELL";
+  size: number;
+  usdcSize: number;
+};
+
+export type PositionValuePoint = { date: string; value: number; timestamp: number };
+
+/**
+ * Build position value (cost basis) over time from trade activity.
+ * Uses FIFO cost basis. Optionally scales to match current totalValue for consistency.
+ */
+export function buildPositionValueOverTime(
+  activity: ActivityEntryForValue[],
+  totalValue: number | null
+): PositionValuePoint[] {
+  const sorted = [...activity].sort((a, b) => a.timestamp - b.timestamp);
+  const inventory = new Map<
+    string,
+    Array<{ size: number; cost: number }>
+  >();
+
+  const points: PositionValuePoint[] = [];
+
+  for (const t of sorted) {
+    const key = t.asset;
+    if (!inventory.has(key)) inventory.set(key, []);
+    const queue = inventory.get(key)!;
+
+    if (t.side === "BUY") {
+      queue.push({ size: t.size, cost: t.usdcSize });
+    } else {
+      let remaining = t.size;
+      while (remaining > 0 && queue.length > 0) {
+        const first = queue[0]!;
+        const match = Math.min(first.size, remaining);
+        const costPerUnit = first.size > 0 ? first.cost / first.size : 0;
+        const costDeducted = costPerUnit * match;
+        first.size -= match;
+        first.cost -= costDeducted;
+        remaining -= match;
+        if (first.size <= 0) queue.shift();
+      }
+    }
+
+    const totalCost = [...inventory.values()].reduce(
+      (sum, q) => sum + q.reduce((s, x) => s + x.cost, 0),
+      0
+    );
+    const date = new Date(t.timestamp * 1000).toISOString().slice(0, 10);
+    points.push({ date, value: totalCost, timestamp: t.timestamp });
+  }
+
+  if (points.length === 0) return [];
+
+  // Scale to match current totalValue if available (keeps shape, aligns endpoint)
+  const lastCost = points[points.length - 1]!.value;
+  if (
+    totalValue != null &&
+    totalValue > 0 &&
+    lastCost > 0
+  ) {
+    const scale = totalValue / lastCost;
+    return points.map((p) => ({ ...p, value: p.value * scale }));
+  }
+
+  return points;
+}
