@@ -7,7 +7,13 @@ function shortAddress(addr: string): string {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
 
-export function CopyAddress({ address }: { address: string }) {
+export function CopyAddress({
+  address,
+  href,
+}: {
+  address: string;
+  href?: string;
+}) {
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
@@ -20,9 +26,24 @@ export function CopyAddress({ address }: { address: string }) {
     }
   }
 
+  const addressEl = (
+    <span className="font-mono text-sm text-slate-500">{shortAddress(address)}</span>
+  );
+
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span className="font-mono text-sm text-slate-500">{shortAddress(address)}</span>
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-slate-500 hover:text-indigo-400 transition-colors"
+        >
+          {addressEl}
+        </a>
+      ) : (
+        addressEl
+      )}
       <button
         type="button"
         onClick={handleCopy}

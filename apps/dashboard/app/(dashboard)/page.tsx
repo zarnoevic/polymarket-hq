@@ -305,7 +305,7 @@ export default async function HomePage() {
                     <Percent className="h-4 w-4" strokeWidth={1.75} />
                   </div>
                   <div>
-                    <p className="text-xs text-slate-400">Avg Profit</p>
+                    <p className="text-xs text-slate-400">Avg P&L</p>
                     <p
                       className={`font-semibold ${
                         avgProfit >= 0 ? "text-emerald-400" : "text-red-400"
@@ -334,10 +334,20 @@ export default async function HomePage() {
                       </div>
                       <div>
                         <h2 className="text-xl font-semibold text-white">
-                          {account.userName || "Anonymous"}
+                          <a
+                            href={`https://polymarketanalytics.com/traders/${account.proxyWallet}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-white hover:text-indigo-300 transition-colors"
+                          >
+                            {account.userName || "Anonymous"}
+                          </a>
                         </h2>
                         <p className="mt-0.5 text-sm">
-                          <CopyAddress address={account.proxyWallet} />
+                          <CopyAddress
+                            address={account.proxyWallet}
+                            href={`https://polygonscan.com/address/${account.proxyWallet}`}
+                          />
                         </p>
                       </div>
                     </div>
