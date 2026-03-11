@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { RefreshCw, Filter, Calendar, CalendarPlus, BarChart3, ExternalLink, Loader2, Search, RotateCw, Sparkles, X, Brain, Star, Compass, HelpCircle, BadgeCheck, TrendingUp, ClipboardList, ChevronDown, AlertTriangle, StickyNote, BookOpen, Percent, Copy } from "lucide-react";
+import { RefreshCw, Filter, Calendar, CalendarPlus, BarChart3, ExternalLink, Loader2, RotateCw, X, Brain, Star, Compass, HelpCircle, BadgeCheck, TrendingUp, ClipboardList, ChevronDown, AlertTriangle, StickyNote, BookOpen, Percent, Copy, ScrollText } from "lucide-react";
 
 /** Icon: one circle with smaller circles sprouting (tree/siblings) */
 function SiblingsIcon({ className }: { className?: string }) {
@@ -106,7 +106,7 @@ function formatDate(d: Date | null): string {
   });
 }
 
-/** ROI as "Xx" where 1x = 100% return; K/M/B/T for large values, capped to avoid overflow */
+/** ROI as "Xx" for large values; K/M/B/T for very large. */
 function formatRoiAsX(roi: number): string {
   if (roi < 0 || !Number.isFinite(roi)) return "—";
   if (roi >= 1_000_000_000_000) {
@@ -120,6 +120,16 @@ function formatRoiAsX(roi: number): string {
   if (roi >= 10) return `${roi.toFixed(1)}x`;
   if (roi >= 1) return `${roi.toFixed(2)}x`;
   return `${roi.toFixed(2)}x`;
+}
+
+/** Format roi: r < 1 → %, r >= 1 → x (e.g. 0.99 → 99%, 4 → 4x). */
+function formatRoi(roi: number): string {
+  if (roi < 0 || !Number.isFinite(roi)) return "—";
+  if (roi >= 1) return formatRoiAsX(roi);
+  const pct = roi * 100;
+  if (pct >= 10) return `${pct.toFixed(1)}%`;
+  if (pct >= 1) return `${pct.toFixed(1)}%`;
+  return `${pct.toFixed(1)}%`;
 }
 
 /** Days until resolution; null if endDate missing or in the past. Uses UTC date diff. */
@@ -137,10 +147,18 @@ function daysToResolution(endDate: Date | string | null): number | null {
 /** Linear annualized return: r = (P1-P0)/P0, annual_return = r * (365/T). P0=current, P1=1. */
 function computePAROI(curPrice: number, days: number | null): string {
   if (curPrice > 1 || !Number.isFinite(curPrice)) return "—";
-  if (curPrice <= 0 || curPrice < 1e-9) return "999+Tx"; // 0% or near-0% = effectively infinite
+  if (curPrice <= 0 || curPrice < 1e-9) return "999+x";
   const r = (1 - curPrice) / curPrice;
   const roi = days == null || days <= 0 ? r : r * (365 / days);
-  return formatRoiAsX(roi);
+  return formatRoi(roi);
+}
+
+/** Simple (non-annualized) ROI: r < 1 → %, r >= 1 → x format (e.g. 0.57 → 57%, 4 → 4x). */
+function computeROI(curPrice: number): string {
+  if (curPrice > 1 || !Number.isFinite(curPrice)) return "—";
+  if (curPrice <= 0 || curPrice < 1e-9) return "999+x";
+  const r = (1 - curPrice) / curPrice;
+  return formatRoi(r);
 }
 
 const URL_REGEX = /(https?:\/\/[^\s]+)/g;
@@ -213,6 +231,7 @@ export function ScreenerContent({
   const [categoryOpen, setCategoryOpen] = useState(false);
   const categoryRef = useRef<HTMLDivElement>(null);
   const [alsoClassifySiblingsIds, setAlsoClassifySiblingsIds] = useState<Set<string>>(new Set());
+  const [rulesPopupEventId, setRulesPopupEventId] = useState<string | null>(null);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -803,14 +822,35 @@ export function ScreenerContent({
                     <h3 className="font-medium text-white">{e.title}</h3>
                     {e.tags && Array.isArray(e.tags) && e.tags.length > 0 && (
                       <div className="mt-1 flex flex-wrap gap-1.5">
-                        {(e.tags as Array<{ id?: string; label?: string; slug?: string }>).map((t, i) => (
-                          <span
-                            key={t.id ?? t.slug ?? `tag-${i}`}
-                            className="inline-flex rounded-md bg-slate-700/60 px-2 py-0.5 text-xs text-slate-300"
-                          >
-                            {t.label ?? t.slug ?? t.id ?? "—"}
-                          </span>
-                        ))}
+                        {(e.tags as Array<{ id?: string; label?: string; slug?: string }>).map((t, i) => {
+                          const tagId = t.id ?? t.slug ?? null;
+                          return (
+                            <span
+                              key={t.id ?? t.slug ?? `tag-${i}`}
+                              className="group/tag relative inline-flex rounded-md bg-slate-700/60 px-2 py-0.5 text-xs text-slate-300"
+                            >
+                              {t.label ?? t.slug ?? t.id ?? "—"}
+                              {tagId && (
+                                <span className="absolute bottom-full left-1/2 z-10 mb-1 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-md bg-slate-800 px-2 py-1.5 text-xs text-slate-300 shadow-lg ring-1 ring-slate-700 opacity-0 transition-opacity group-hover/tag:opacity-100">
+                                  <span className="font-mono">{tagId}</span>
+                                  <button
+                                    type="button"
+                                    onClick={(ev) => {
+                                      ev.stopPropagation();
+                                      ev.preventDefault();
+                                      navigator.clipboard.writeText(tagId);
+                                      toast.success("Tag ID copied");
+                                    }}
+                                    className="inline-flex rounded p-0.5 text-slate-400 hover:bg-slate-600 hover:text-white"
+                                    title="Copy ID"
+                                  >
+                                    <Copy className="h-3 w-3" />
+                                  </button>
+                                </span>
+                              )}
+                            </span>
+                          );
+                        })}
                       </div>
                     )}
                     <div className="mt-1.5 flex w-full items-center gap-2 text-xs">
@@ -853,18 +893,31 @@ export function ScreenerContent({
                         <PriceHistorySparkline tokenId={e.yesId ?? null} tint="yes" fill />
                       </div>
                     </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-4">
-                      <div>
-                        <p className="text-xs text-slate-500">Volume</p>
-                        <p className="font-mono font-medium text-white">
-                          {formatCompact(e.volume)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-500">Liquidity</p>
-                        <p className="font-mono font-medium text-slate-300">
-                          {formatCompact(e.liquidity)}
-                        </p>
+                    <div className="mt-3 flex flex-col gap-3">
+                      <div className="flex flex-wrap items-center gap-4">
+                        {(() => {
+                          const days = daysToResolution(e.endDate);
+                          return days != null ? (
+                            <div>
+                              <p className="text-xs text-slate-500">Days left</p>
+                              <p className="font-mono font-medium text-slate-300">
+                                {days} {days === 1 ? "day" : "days"}
+                              </p>
+                            </div>
+                          ) : null;
+                        })()}
+                        <div>
+                          <p className="text-xs text-slate-500">Volume</p>
+                          <p className="font-mono font-medium text-white">
+                            {formatCompact(e.volume)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500">Liquidity</p>
+                          <p className="font-mono font-medium text-slate-300">
+                            {formatCompact(e.liquidity)}
+                          </p>
+                        </div>
                       </div>
                       {(e.probabilityYes != null || e.probabilityNo != null) && (
                         <div className="flex items-center gap-3">
@@ -920,6 +973,12 @@ export function ScreenerContent({
                                   {computePAROI(e.probabilityYes ?? (e.probabilityNo != null ? 1 - e.probabilityNo : 0), daysToResolution(e.endDate))}
                                 </span>
                               </div>
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-xs text-slate-500 w-[4.5rem]">Yes ROI</span>
+                                <span className="font-mono text-sm text-emerald-500/90 tabular-nums min-w-[2.5rem] text-right">
+                                  {computeROI(e.probabilityYes ?? (e.probabilityNo != null ? 1 - e.probabilityNo : 0))}
+                                </span>
+                              </div>
                             </div>
                             <div className="flex flex-col gap-0.5">
                               {(e.yev != null || e.nev != null) && (
@@ -934,6 +993,12 @@ export function ScreenerContent({
                                   {computePAROI(e.probabilityNo ?? (e.probabilityYes != null ? 1 - e.probabilityYes : 0), daysToResolution(e.endDate))}
                                 </span>
                               </div>
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-xs text-slate-500 w-[4.5rem]">No ROI</span>
+                                <span className="font-mono text-sm text-red-500/90 tabular-nums min-w-[2.5rem] text-right">
+                                  {computeROI(e.probabilityNo ?? (e.probabilityYes != null ? 1 - e.probabilityYes : 0))}
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -941,18 +1006,6 @@ export function ScreenerContent({
                     </div>
                     {activeTab !== "discovery" && (
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                      <button
-                        onClick={() => handleAppraise(e.id, "deep")}
-                        disabled={appraisingIds.has(e.id)}
-                        className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-slate-700/60 disabled:opacity-50"
-                      >
-                        {appraisingIds.has(e.id) ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <Search className="h-3 w-3" />
-                        )}
-                        Deep Appraise
-                      </button>
                       <button
                         onClick={() => handleAppraise(e.id, "think")}
                         disabled={appraisingIds.has(e.id)}
@@ -966,18 +1019,6 @@ export function ScreenerContent({
                         Think Appraise
                       </button>
                       <button
-                        onClick={() => handleAppraise(e.id, "mini")}
-                        disabled={appraisingIds.has(e.id)}
-                        className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-slate-700/60 disabled:opacity-50"
-                      >
-                        {appraisingIds.has(e.id) ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <Sparkles className="h-3 w-3" />
-                        )}
-                        Mini Appraise
-                      </button>
-                      <button
                         onClick={() => handleAppraise(e.id, "reappraise")}
                         disabled={appraisingIds.has(e.id) || e.lastAppraised == null}
                         className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-slate-700/60 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -989,6 +1030,15 @@ export function ScreenerContent({
                         )}
                         Reappraise
                       </button>
+                      {(e.appraisedYes != null || e.appraisedNo != null) && e.appraisalExplanation && (
+                        <button
+                          onClick={() => setRulesPopupEventId(e.id)}
+                          className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-700/60"
+                        >
+                          <ScrollText className="h-3 w-3" />
+                          Show rules
+                        </button>
+                      )}
                     </div>
                     )}
                     {activeTab !== "discovery" && (
@@ -1059,6 +1109,36 @@ export function ScreenerContent({
           </div>
         </div>
       )}
+
+      {rulesPopupEventId && (() => {
+        const ev = events.find((e) => e.id === rulesPopupEventId);
+        if (!ev?.appraisalExplanation) return null;
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+            onClick={() => setRulesPopupEventId(null)}
+          >
+            <div
+              className="max-h-[85vh] w-full max-w-2xl overflow-hidden rounded-xl border border-slate-700/60 bg-slate-900 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-slate-700/60 px-5 py-3">
+                <h3 className="truncate font-medium text-white">{ev.title}</h3>
+                <button
+                  onClick={() => setRulesPopupEventId(null)}
+                  className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-700/60 hover:text-white"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="max-h-[calc(85vh-4rem)] overflow-y-auto p-5">
+                <ExplanationText text={ev.appraisalExplanation} />
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
     </>
   );

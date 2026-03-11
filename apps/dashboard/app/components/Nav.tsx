@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { LayoutDashboard, BarChart3, Filter } from "lucide-react";
 
@@ -18,8 +19,9 @@ export function Nav() {
       <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
         <Link
           href="/"
-          className="text-lg font-semibold tracking-tight text-white transition-opacity hover:opacity-90"
+          className="flex items-center gap-2 text-lg font-semibold tracking-tight text-white transition-opacity hover:opacity-90"
         >
+          <Image src="/logo.svg" alt="" width={28} height={28} className="rounded-lg" />
           Polymarket HQ
         </Link>
         <div className="flex gap-1">

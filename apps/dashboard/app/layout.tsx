@@ -11,6 +11,9 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "Polymarket HQ",
   description: "Private dashboard for Polymarket market analysis and insights",
+  icons: {
+    icon: "/logo.svg",
+  },
 };
 
 export default function RootLayout({

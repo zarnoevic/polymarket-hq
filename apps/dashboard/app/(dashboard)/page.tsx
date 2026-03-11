@@ -9,6 +9,7 @@ import {
   Coins,
   Briefcase,
   ExternalLink,
+  Brain,
 } from "lucide-react";
 import { PositionsList } from "@/app/components/PositionsList";
 import { CopyAddress } from "@/app/components/CopyAddress";
@@ -289,11 +290,12 @@ export default async function HomePage() {
                     <span className="font-mono text-lg font-bold text-white">
                       #{Number(account.rank).toLocaleString()}
                     </span>
-                    <span className="text-slate-400">
+                    <span className="flex items-center gap-1.5 text-slate-400">
                       · Top {(() => {
                         const pct = (Number(account.rank) / TOTAL_TRADERS) * 100;
                         return pct < 0.01 ? pct.toFixed(4) : pct < 1 ? pct.toFixed(2) : pct.toFixed(1);
-                      })()}%
+                      })()}th
+                      <Brain className="h-4 w-4 text-indigo-400" />
                     </span>
                   </div>
                     </div>
