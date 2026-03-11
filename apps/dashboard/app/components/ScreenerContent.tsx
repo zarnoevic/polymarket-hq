@@ -65,6 +65,10 @@ type ScreenerEvent = {
   appraisedYes: number | null;
   appraisedNo: number | null;
   lastAppraised: Date | null;
+  lastThinkAppraisedAt?: Date | null;
+  lastThinkAppraisalDurationSeconds?: number | null;
+  lastReappraisedAt?: Date | null;
+  lastReappraisalDurationSeconds?: number | null;
   yev: number | null;
   nev: number | null;
   appraisalExplanation: string | null;
@@ -107,6 +111,14 @@ function formatDate(d: Date | null): string {
     month: "short",
     day: "numeric",
   });
+}
+
+function formatDurationSeconds(seconds: number | null | undefined): string {
+  if (seconds == null || seconds < 0) return "";
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const r = seconds % 60;
+  return r > 0 ? `${m}m ${r}s` : `${m}m`;
 }
 
 /** ROI as "Xx" for large values; K/M/B/T for very large. */
@@ -372,7 +384,10 @@ export function ScreenerContent({
       toast.success(msg);
       if (label === "evaluating") {
         setActiveTab("evaluating");
-        handleAppraise(eventId, "think");
+        const ev = events.find((x) => x.id === eventId);
+        if (ev && ev.lastThinkAppraisedAt == null) {
+          handleAppraise(eventId, "think");
+        }
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to update label";
@@ -1046,6 +1061,11 @@ export function ScreenerContent({
                         )}
                         Think Appraise
                       </button>
+                      {e.lastThinkAppraisalDurationSeconds != null && !appraisingIds.has(e.id) && (
+                        <span className="text-xs text-slate-500 tabular-nums" title="Last think appraisal">
+                          Think: {formatDurationSeconds(e.lastThinkAppraisalDurationSeconds)}
+                        </span>
+                      )}
                       <button
                         onClick={() => handleAppraise(e.id, "reappraise")}
                         disabled={appraisingIds.has(e.id) || e.lastAppraised == null}
@@ -1058,13 +1078,18 @@ export function ScreenerContent({
                         )}
                         Reappraise
                       </button>
+                      {e.lastReappraisalDurationSeconds != null && !appraisingIds.has(e.id) && (
+                        <span className="text-xs text-slate-500 tabular-nums" title="Last reappraisal">
+                          Reappraise: {formatDurationSeconds(e.lastReappraisalDurationSeconds)}
+                        </span>
+                      )}
                       {appraisingIds.has(e.id) && (
                         <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/40 px-2.5 py-1.5 text-xs text-slate-400 tabular-nums">
                           <Clock className="h-3 w-3 shrink-0" />
                           {formatElapsed(e.id)}
                         </span>
                       )}
-                      {(e.appraisedYes != null || e.appraisedNo != null) && e.appraisalExplanation && (
+                      {e.description && (
                         <button
                           onClick={() => setRulesPopupEventId(e.id)}
                           className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-700/60"
@@ -1146,7 +1171,7 @@ export function ScreenerContent({
 
       {rulesPopupEventId && (() => {
         const ev = events.find((e) => e.id === rulesPopupEventId);
-        if (!ev?.appraisalExplanation) return null;
+        if (!ev?.description) return null;
         return (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
@@ -1167,7 +1192,7 @@ export function ScreenerContent({
                 </button>
               </div>
               <div className="max-h-[calc(85vh-4rem)] overflow-y-auto p-5">
-                <ExplanationText text={ev.appraisalExplanation} />
+                <ExplanationText text={ev.description} />
               </div>
             </div>
           </div>

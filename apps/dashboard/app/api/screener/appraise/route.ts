@@ -125,6 +125,7 @@ async function appraiseOne(
 ): Promise<{ ok: true; appraisedYes: number; appraisedNo: number; yev: number | null; nev: number | null } | { ok: false; error: string }> {
   if (!event) return { ok: false, error: "Event not found" };
   const eventId = event.id;
+  const startMs = Date.now();
 
   if (mode === "reappraise") {
     if (
@@ -239,17 +240,30 @@ async function appraiseOne(
       })
     );
 
+    const durationSeconds = Math.round((Date.now() - startMs) / 1000);
+    const now = new Date();
+
+    const updateData: Parameters<typeof prisma.screenerEvent.update>[0]["data"] = {
+      appraisedYes: parsed.appraised_yes,
+      appraisedNo: parsed.appraised_no,
+      lastAppraised: now,
+      yev,
+      nev,
+      appraisalExplanation: explanation,
+      appraisalRaw,
+    };
+
+    if (mode === "think") {
+      updateData.lastThinkAppraisedAt = now;
+      updateData.lastThinkAppraisalDurationSeconds = durationSeconds;
+    } else if (mode === "reappraise") {
+      updateData.lastReappraisedAt = now;
+      updateData.lastReappraisalDurationSeconds = durationSeconds;
+    }
+
     await prisma.screenerEvent.update({
       where: { id: eventId },
-      data: {
-        appraisedYes: parsed.appraised_yes,
-        appraisedNo: parsed.appraised_no,
-        lastAppraised: new Date(),
-        yev,
-        nev,
-        appraisalExplanation: explanation,
-        appraisalRaw,
-      },
+      data: updateData,
     });
 
     return {

@@ -9,6 +9,11 @@ type Position = {
   title: string;
   size: number;
   curPrice: number;
+  avgPrice?: number;
+  /** Current value from API - use when available for accuracy */
+  currentValue?: number;
+  /** Unix timestamp (seconds) of first BUY - when entry was < 24h ago, use entry price as baseline */
+  entryTimestamp?: number;
   outcome: string;
   yesId?: string;
   icon?: string;
@@ -63,6 +68,9 @@ type Slice = {
   color: string;
   priceThen: number | null;
   priceNow: number;
+  /** Amount invested (size × avgPrice) */
+  investedAmount: number | null;
+  /** Position value - uses currentValue from API when available */
   positionValue: number;
   icon?: string;
 };
@@ -82,24 +90,57 @@ export function AttributionPieChart({ positions }: { positions: Position[] }) {
     let cancelled = false;
     setLoading(true);
     const run = async () => {
+      const now = Math.floor(Date.now() / 1000);
+      const SECONDS_24H = 24 * 60 * 60;
+
       const promises = positions.map(async (pos) => {
         const tokenId = pos.yesId ?? pos.asset;
         const isYes = pos.outcome.toLowerCase() === "yes";
-        const price24h = await fetchPrice24hAgo(tokenId);
-        // curPrice from API is always the price of outcome held (Yes or No, 0–1)
-        // CLOB returns Yes price; for No we use 1 - price24h
-        const priceNow = pos.curPrice;
-        const priceThen = price24h != null ? (isYes ? price24h : 1 - price24h) : null;
+        const entryPrice =
+          pos.avgPrice != null &&
+          Number.isFinite(pos.avgPrice) &&
+          pos.avgPrice > 0 &&
+          pos.avgPrice < 1
+            ? pos.avgPrice
+            : null;
+        const entryRecently =
+          pos.entryTimestamp != null &&
+          (now - pos.entryTimestamp) < SECONDS_24H;
+
+        // When entry was < 24h ago, use entry price as baseline (you didn't hold 24h ago)
+        let priceThen: number | null;
+        if (entryRecently && entryPrice != null) {
+          priceThen = entryPrice;
+        } else {
+          const price24h = await fetchPrice24hAgo(tokenId);
+          priceThen = price24h != null ? (isYes ? price24h : 1 - price24h) : null;
+        }
+
+        // Prefer price derived from API currentValue when available for consistency
+        const priceNow =
+          pos.currentValue != null &&
+          Number.isFinite(pos.currentValue) &&
+          pos.size > 0
+            ? pos.currentValue / pos.size
+            : pos.curPrice;
+
         let pnl24h = 0;
         if (priceThen != null) {
           pnl24h = pos.size * (priceNow - priceThen); // value change = size × price change
         }
-        const positionValue = pos.size * priceNow;
+        const positionValue =
+          pos.currentValue != null && Number.isFinite(pos.currentValue)
+            ? pos.currentValue
+            : pos.size * priceNow;
+        const investedAmount =
+          entryPrice != null ? pos.size * entryPrice : null;
+
         return {
           title: pos.title,
           pnl24h,
           priceThen,
           priceNow,
+          investedAmount,
           positionValue,
           icon: pos.icon,
         };
@@ -116,22 +157,28 @@ export function AttributionPieChart({ positions }: { positions: Position[] }) {
           color: r.pnl24h >= 0 ? "#34D399" : "#F87171",
           priceThen: r.priceThen,
           priceNow: r.priceNow,
+          investedAmount: r.investedAmount,
           positionValue: r.positionValue,
           icon: r.icon,
         }))
-        .filter((r) => r.absShare > 0.001);
+        .filter((r) => r.absShare > 0.001)
+        // Sort so winners (green) are contiguous, then losers (red)
+        .sort((a, b) => (b.pnl24h >= 0 ? 1 : -1) - (a.pnl24h >= 0 ? 1 : -1));
       setSlices(
         withShares.length > 0
           ? withShares
-          : results.map((r) => ({
-              ...r,
-              absShare: 0,
-              color: "#64748b",
-              priceThen: r.priceThen,
-              priceNow: r.priceNow,
-              positionValue: r.positionValue,
-              icon: r.icon,
-            }))
+          : results
+              .map((r) => ({
+                ...r,
+                absShare: 0,
+                color: "#64748b",
+                priceThen: r.priceThen,
+                priceNow: r.priceNow,
+                investedAmount: r.investedAmount,
+                positionValue: r.positionValue,
+                icon: r.icon,
+              }))
+              .sort((a, b) => (b.pnl24h >= 0 ? 1 : -1) - (a.pnl24h >= 0 ? 1 : -1))
       );
       setLoading(false);
     };
@@ -285,14 +332,17 @@ function PieChartInner({
               <p className="text-sm font-medium text-slate-200 leading-snug">
                 {activeSlice.title}
               </p>
-              <div className="mt-2 text-sm">
-                {activeSlice.priceThen != null ? (
+              <div className="mt-2 space-y-1 text-sm">
+                {activeSlice.investedAmount != null && (
                   <p className="font-mono text-slate-300">
-                    {formatPositionValue(activeSlice.positionValue)} @ {formatPrice(activeSlice.priceThen)} → {formatPrice(activeSlice.priceNow)}
+                    {formatPositionValue(activeSlice.investedAmount)} invested
                   </p>
-                ) : (
-                  <p className="text-slate-500">No 24h price data</p>
                 )}
+                <p className="font-mono text-slate-400">
+                  {activeSlice.priceThen != null
+                    ? `${formatPrice(activeSlice.priceThen)} → ${formatPrice(activeSlice.priceNow)}`
+                    : `${formatPrice(activeSlice.priceNow)} now`}
+                </p>
               </div>
               <p
                 className={`mt-2 text-base font-semibold ${

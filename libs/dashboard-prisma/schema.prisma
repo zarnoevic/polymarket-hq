@@ -32,6 +32,10 @@ model ScreenerEvent {
   appraisedYes   Float? @map("appraised_yes") // AI appraisal
   appraisedNo    Float? @map("appraised_no")
   lastAppraised DateTime? @map("last_appraised")
+  lastThinkAppraisedAt         DateTime? @map("last_think_appraised_at") // When think appraisal was last performed
+  lastThinkAppraisalDurationSeconds Int?  @map("last_think_appraisal_duration_seconds")
+  lastReappraisedAt            DateTime? @map("last_reappraised_at") // When reappraisal was last performed
+  lastReappraisalDurationSeconds Int?    @map("last_reappraisal_duration_seconds")
   yev                Float? @map("yev") // Yes Expected Value = appraisedYes / quotedYes
   nev                Float? @map("nev") // No Expected Value = appraisedNo / quotedNo
   yesParoi           Float? @map("yes_paroi") // Stored during ingest; UI always calculates fresh
