@@ -105,12 +105,25 @@ export async function POST() {
       const d = new Date(raw);
       return !isNaN(d.getTime()) && d >= endDateMin && d <= endDateMax;
     });
+
+    // Fetch existing labels so we can reclassify under_5/discovery when updating probabilities
+    const existingExternalIds = filtered.map((m) => m.id).filter(Boolean);
+    const existingEvents = await prisma.screenerEvent.findMany({
+      where: { externalId: { in: existingExternalIds } },
+      select: { externalId: true, label: true },
+    });
+    const existingLabelByExternalId = new Map(
+      existingEvents.map((e) => [e.externalId, e.label])
+    );
+
     for (const m of filtered) {
       if (!m?.id) continue;
       const endDate = (m.endDate ?? m.end_date) ? new Date((m.endDate ?? m.end_date) as string) : null;
       const createdAt = m.createdAt ? new Date(m.createdAt) : null;
       const { yes: probYes, no: probNo } = parseProbabilities(m);
       const parentEventSlug = m.events?.[0]?.slug ?? null;
+      // Category status: under_5 if yes or no < 5% (low priority), else discovery (null)
+      const isUnder5 = (probYes != null && probYes < 0.05) || (probNo != null && probNo < 0.05);
       const base = {
         externalId: m.id,
         slug: m.slug ?? m.id,
@@ -129,15 +142,20 @@ export async function POST() {
         probabilityYes: probYes,
         probabilityNo: probNo,
         raw: m as unknown as object,
+        label: isUnder5 ? "under_5" : null,
       };
+      const currentLabel = existingLabelByExternalId.get(m.id);
+      const isStatusCategory = currentLabel === null || currentLabel === "under_5";
+
       await prisma.screenerEvent.upsert({
         where: { externalId: m.id },
         create: base,
-        // For existing events: only update quoted probabilities (preserve label, note, appraisals, etc.)
+        // For existing: update probabilities + reclassify under_5/discovery when new prob < 5%
         update: {
           probabilityYes: probYes,
           probabilityNo: probNo,
           syncedAt: new Date(),
+          ...(isStatusCategory && { label: isUnder5 ? "under_5" : null }),
         },
       });
       upserted++;

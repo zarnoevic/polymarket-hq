@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { RefreshCw, Filter, Calendar, CalendarPlus, BarChart3, ExternalLink, Loader2, Search, RotateCw, Sparkles, X, Brain, Star, Compass, HelpCircle, BadgeCheck, TrendingUp, ClipboardList, ChevronDown, AlertTriangle, StickyNote, BookOpen } from "lucide-react";
+import { RefreshCw, Filter, Calendar, CalendarPlus, BarChart3, ExternalLink, Loader2, Search, RotateCw, Sparkles, X, Brain, Star, Compass, HelpCircle, BadgeCheck, TrendingUp, ClipboardList, ChevronDown, AlertTriangle, StickyNote, BookOpen, Percent } from "lucide-react";
 import { toast } from "sonner";
 
-type LabelType = "vetted" | "unknowable" | "well_priced" | "traded" | "evaluating" | "disputed" | "uninformed" | null;
+type LabelType = "vetted" | "unknowable" | "well_priced" | "traded" | "evaluating" | "disputed" | "uninformed" | "under_5" | null;
 
 const VALID_LABELS: ReadonlySet<string> = new Set([
   "vetted",
@@ -14,6 +14,7 @@ const VALID_LABELS: ReadonlySet<string> = new Set([
   "evaluating",
   "disputed",
   "uninformed",
+  "under_5",
 ]);
 
 function toLabelType(s: string | null | undefined): LabelType {
@@ -81,29 +82,47 @@ function formatDate(d: Date | null): string {
   });
 }
 
-/**
- * Match URLs but exclude trailing punctuation that wraps them.
- * E.g. (https://example.com) -> match "https://example.com" not "https://example.com)"
- */
-const URL_REGEX = /(https?:\/\/[^\s)\]]+)/g;
+const URL_REGEX = /(https?:\/\/[^\s]+)/g;
+
+/** Trim trailing punctuation that wraps URLs, e.g. ) or ). from (https://example.com). */
+function trimUrlTrailingPunct(url: string): string {
+  return url.replace(/[)\]\.,;!?]+$/, "");
+}
 
 function ExplanationText({ text }: { text: string }) {
-  const parts = text.split(URL_REGEX);
+  const segments: Array<{ type: "text" | "link"; content: string }> = [];
+  let lastEnd = 0;
+  for (const m of text.matchAll(URL_REGEX)) {
+    const full = m[0];
+    const url = trimUrlTrailingPunct(full);
+    const trailing = full.slice(url.length);
+    if (m.index! > lastEnd) {
+      segments.push({ type: "text", content: text.slice(lastEnd, m.index) });
+    }
+    segments.push({ type: "link", content: url });
+    if (trailing) {
+      segments.push({ type: "text", content: trailing });
+    }
+    lastEnd = m.index! + full.length;
+  }
+  if (lastEnd < text.length) {
+    segments.push({ type: "text", content: text.slice(lastEnd) });
+  }
   return (
     <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">
-      {parts.map((part, i) =>
-        part.match(/^https?:\/\//) ? (
+      {segments.map((seg, i) =>
+        seg.type === "link" ? (
           <a
             key={i}
-            href={part}
+            href={seg.content}
             target="_blank"
             rel="noopener noreferrer"
             className="text-indigo-400 underline hover:text-indigo-300"
           >
-            {part}
+            {seg.content}
           </a>
         ) : (
-          <span key={i}>{part}</span>
+          <span key={i}>{seg.content}</span>
         )
       )}
     </div>
@@ -129,9 +148,10 @@ export function ScreenerContent({
   const [noteEditingId, setNoteEditingId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [savingNoteId, setSavingNoteId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"discovery" | "evaluating" | "vetted" | "traded" | "unknowable" | "well_priced" | "disputed" | "uninformed">("discovery");
+  const [activeTab, setActiveTab] = useState<"discovery" | "evaluating" | "vetted" | "traded" | "unknowable" | "well_priced" | "disputed" | "uninformed" | "under_5">("discovery");
   const [categoryOpen, setCategoryOpen] = useState(false);
   const categoryRef = useRef<HTMLDivElement>(null);
+  const [alsoClassifySiblingsIds, setAlsoClassifySiblingsIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -144,9 +164,15 @@ export function ScreenerContent({
   }, []);
 
   const discoveryEvents = events
-    .filter((e) => e.label == null)
+    .filter((e) => e.label === null)
     .sort((a, b) => {
-      // New/recently synced events first so they're visible
+      const distA = a.probabilityYes != null ? Math.abs(a.probabilityYes - 0.5) : Infinity;
+      const distB = b.probabilityYes != null ? Math.abs(b.probabilityYes - 0.5) : Infinity;
+      return distA - distB;
+    });
+  const under5Events = events
+    .filter((e) => e.label === "under_5")
+    .sort((a, b) => {
       const syncedA = a.syncedAt ? new Date(a.syncedAt).getTime() : 0;
       const syncedB = b.syncedAt ? new Date(b.syncedAt).getTime() : 0;
       if (syncedA !== syncedB) return syncedB - syncedA;
@@ -154,7 +180,7 @@ export function ScreenerContent({
       const distB = b.probabilityYes != null ? Math.abs(b.probabilityYes - 0.5) : Infinity;
       return distA - distB;
     });
-  const tabToLabel: Record<Exclude<typeof activeTab, "discovery">, LabelType> = {
+  const tabToLabel: Record<Exclude<typeof activeTab, "discovery" | "under_5">, LabelType> = {
     evaluating: "evaluating",
     vetted: "vetted",
     traded: "traded",
@@ -166,7 +192,9 @@ export function ScreenerContent({
   const displayedEvents =
     activeTab === "discovery"
       ? discoveryEvents
-      : activeTab === "evaluating"
+      : activeTab === "under_5"
+        ? under5Events
+        : activeTab === "evaluating"
         ? [...events.filter((e) => e.label === "evaluating")].sort((a, b) => {
             const at = a.labelUpdatedAt ? new Date(a.labelUpdatedAt).getTime() : 0;
             const bt = b.labelUpdatedAt ? new Date(b.labelUpdatedAt).getTime() : 0;
@@ -174,40 +202,84 @@ export function ScreenerContent({
           })
         : events.filter((e) => e.label === tabToLabel[activeTab]);
 
+  function getSiblingIds(eventId: string): string[] {
+    const ev = events.find((x) => x.id === eventId);
+    if (!ev?.parentEventSlug) return [eventId];
+    // Include parent (if in DB) + all children of that parent
+    const parentSlug = ev.parentEventSlug;
+    return events
+      .filter(
+        (e) =>
+          e.parentEventSlug === parentSlug ||
+          (e.slug === parentSlug && !e.parentEventSlug)
+      )
+      .map((e) => e.id);
+  }
+
   async function handleSetLabel(eventId: string, label: LabelType) {
+    const idsToUpdate = alsoClassifySiblingsIds.has(eventId)
+      ? getSiblingIds(eventId)
+      : [eventId];
     try {
-      const res = await fetch("/api/screener/watchlist", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventId, label }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error ?? "Failed to update label");
+      const results = await Promise.all(
+        idsToUpdate.map((id) =>
+          fetch("/api/screener/watchlist", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ eventId: id, label }),
+          }).then((r) => r.json().then((d) => ({ ok: r.ok, data: d })))
+        )
+      );
+      const failed = results.filter((r) => !r.ok);
+      if (failed.length > 0) {
+        throw new Error(failed[0].data?.error ?? "Failed to update label");
+      }
       setEvents((prev) =>
         prev.map((e) =>
-          e.id === eventId
+          idsToUpdate.includes(e.id)
             ? { ...e, label, labelUpdatedAt: label != null ? new Date() : e.labelUpdatedAt }
             : e
         )
       );
       const msg =
         label === null
-          ? "Moved back to discovery"
+          ? idsToUpdate.length > 1
+            ? `Moved ${idsToUpdate.length} markets back to discovery`
+            : "Moved back to discovery"
           : label === "vetted"
-            ? "Added to vetted"
+            ? idsToUpdate.length > 1
+              ? `Added ${idsToUpdate.length} markets to vetted`
+              : "Added to vetted"
             : label === "unknowable"
-              ? "Marked as unknowable"
+              ? idsToUpdate.length > 1
+                ? `Marked ${idsToUpdate.length} markets as unknowable`
+                : "Marked as unknowable"
               : label === "well_priced"
-                ? "Marked as well-priced"
+                ? idsToUpdate.length > 1
+                  ? `Marked ${idsToUpdate.length} markets as well-priced`
+                  : "Marked as well-priced"
                 : label === "traded"
-                  ? "Marked as traded"
+                  ? idsToUpdate.length > 1
+                    ? `Marked ${idsToUpdate.length} markets as traded`
+                    : "Marked as traded"
                   : label === "disputed"
-                    ? "Marked as disputed"
+                    ? idsToUpdate.length > 1
+                      ? `Marked ${idsToUpdate.length} markets as disputed`
+                      : "Marked as disputed"
                     : label === "uninformed"
-                      ? "Marked as uninformed"
-                      : "Marked as evaluating";
+                      ? idsToUpdate.length > 1
+                        ? `Marked ${idsToUpdate.length} markets as uninformed`
+                        : "Marked as uninformed"
+                      : label === "under_5"
+                        ? idsToUpdate.length > 1
+                          ? `Moved ${idsToUpdate.length} markets to <5%`
+                          : "Moved to <5%"
+                        : idsToUpdate.length > 1
+                          ? `Marked ${idsToUpdate.length} markets as evaluating`
+                          : "Marked as evaluating";
       toast.success(msg);
       if (label === "evaluating") {
+        setActiveTab("evaluating");
         handleAppraise(eventId, "think");
       }
     } catch (e) {
@@ -354,7 +426,7 @@ export function ScreenerContent({
               <button
                 onClick={() => setCategoryOpen(!categoryOpen)}
                 className={`flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
-                  activeTab === "unknowable" || activeTab === "well_priced" || activeTab === "disputed" || activeTab === "uninformed"
+                  activeTab === "unknowable" || activeTab === "well_priced" || activeTab === "disputed" || activeTab === "uninformed" || activeTab === "under_5"
                     ? "bg-slate-700/60 text-white"
                     : "text-slate-500 hover:text-slate-400"
                 }`}
@@ -365,6 +437,7 @@ export function ScreenerContent({
               {categoryOpen && (
                 <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-slate-700/60 bg-slate-800 py-1 shadow-xl">
                   {[
+                    { tab: "under_5" as const, icon: Percent, label: "<5%", count: events.filter((e) => e.label === "under_5").length },
                     { tab: "unknowable" as const, icon: HelpCircle, label: "Unknowable", count: events.filter((e) => e.label === "unknowable").length },
                     { tab: "well_priced" as const, icon: BadgeCheck, label: "Well-priced", count: events.filter((e) => e.label === "well_priced").length },
                     { tab: "disputed" as const, icon: AlertTriangle, label: "Disputed", count: events.filter((e) => e.label === "disputed").length },
@@ -443,6 +516,8 @@ export function ScreenerContent({
               <Star className="h-8 w-8" />
             ) : activeTab === "traded" ? (
               <TrendingUp className="h-8 w-8" />
+            ) : activeTab === "under_5" ? (
+              <Percent className="h-8 w-8" />
             ) : activeTab === "unknowable" ? (
               <HelpCircle className="h-8 w-8" />
             ) : activeTab === "disputed" ? (
@@ -456,36 +531,40 @@ export function ScreenerContent({
           <h3 className="mt-4 text-lg font-semibold text-white">
             {activeTab === "discovery"
               ? "No events in discovery"
-              : activeTab === "evaluating"
-                ? "No evaluating markets"
-                : activeTab === "vetted"
-                  ? "No vetted markets yet"
-                  : activeTab === "traded"
-                    ? "No traded markets"
-                    : activeTab === "unknowable"
-                      ? "No unknowable markets"
-                      : activeTab === "disputed"
-                        ? "No disputed markets"
-                        : activeTab === "uninformed"
-                          ? "No uninformed markets"
-                          : "No well-priced markets"}
+              : activeTab === "under_5"
+                ? "No <5% markets"
+                : activeTab === "evaluating"
+                  ? "No evaluating markets"
+                  : activeTab === "vetted"
+                    ? "No vetted markets yet"
+                    : activeTab === "traded"
+                      ? "No traded markets"
+                      : activeTab === "unknowable"
+                        ? "No unknowable markets"
+                        : activeTab === "disputed"
+                          ? "No disputed markets"
+                          : activeTab === "uninformed"
+                            ? "No uninformed markets"
+                            : "No well-priced markets"}
           </h3>
           <p className="mt-2 text-slate-400">
             {activeTab === "discovery"
               ? "All events are labeled. Clear labels to add events to discovery."
-              : activeTab === "evaluating"
-                ? "Use the Evaluating button in Discovery to move markets here."
-                : activeTab === "vetted"
-                  ? "Click the star on any market in Discovery to add it to vetted."
-                  : activeTab === "traded"
-                    ? "Use the Traded button in Discovery to move markets here."
-                    : activeTab === "unknowable"
-                      ? "Use the Unknowable button in Discovery to move markets here."
-                      : activeTab === "disputed"
-                        ? "Use the Disputed button to move markets here."
-                        : activeTab === "uninformed"
-                          ? "Use the Uninformed button to move markets here."
-                          : "Use the Well-priced button in Discovery to move markets here."}
+              : activeTab === "under_5"
+                ? "Markets with Yes or No probability <5%. Low priority (limited upside). Use Refresh to ingest new events."
+                : activeTab === "evaluating"
+                  ? "Use the Evaluating button in Discovery to move markets here."
+                  : activeTab === "vetted"
+                    ? "Click the star on any market in Discovery to add it to vetted."
+                    : activeTab === "traded"
+                      ? "Use the Traded button in Discovery to move markets here."
+                      : activeTab === "unknowable"
+                        ? "Use the Unknowable button in Discovery to move markets here."
+                        : activeTab === "disputed"
+                          ? "Use the Disputed button to move markets here."
+                          : activeTab === "uninformed"
+                            ? "Use the Uninformed button to move markets here."
+                            : "Use the Well-priced button in Discovery to move markets here."}
           </p>
           <button
             onClick={() => setActiveTab("discovery")}
@@ -502,6 +581,7 @@ export function ScreenerContent({
             <span>
               {displayedEvents.length} markets
               {activeTab === "discovery" && " · sorted by probability closest to 50%"}
+              {activeTab === "under_5" && " <5% (low priority)"}
               {activeTab === "evaluating" && " evaluating"}
               {activeTab === "vetted" && " vetted"}
               {activeTab === "traded" && " traded"}
@@ -636,6 +716,24 @@ export function ScreenerContent({
                         Polymarket
                         <ExternalLink className="h-3 w-3" />
                       </a>
+                      {e.parentEventSlug && (
+                        <label className="flex cursor-pointer items-center gap-1.5 text-slate-500 hover:text-slate-400">
+                          <input
+                            type="checkbox"
+                            checked={alsoClassifySiblingsIds.has(e.id)}
+                            onChange={() => {
+                              setAlsoClassifySiblingsIds((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(e.id)) next.delete(e.id);
+                                else next.add(e.id);
+                                return next;
+                              });
+                            }}
+                            className="rounded border-slate-600 bg-slate-800/60 text-indigo-500 focus:ring-indigo-500"
+                          />
+                          <span>Also classify sibling markets</span>
+                        </label>
+                      )}
                       {displayCreatedAt && !isNaN(new Date(displayCreatedAt).getTime()) && (
                         <span className="flex items-center gap-1 text-slate-500" title="Market creation (API)">
                           <CalendarPlus className="h-3.5 w-3.5" />

@@ -156,6 +156,12 @@ export const METRIC_TOOLTIPS: Record<string, string> = {
   "Historical Stress Test":
     "What: Your worst historical daily return. Single-point stress scenario. What happened in practice; doesn't predict future extremes.\n\nRanges: Low (>−5%): survived well. Average (−5% to −15%): one bad day. High (<−25%): severe historical stress.\n\nCalculation: min(returns)",
 
+  // Position-level ROI (dashboard)
+  TAROI:
+    "What: Total Annualized ROI — the return if you win (1 ÷ entry price − 1), scaled to a yearly rate based on days until resolution. Buying at 50¢ gives 100% raw return; annualizing makes it comparable across different time horizons.\n\nRanges: Low (<20%): low implied edge. Average (30–80%): typical prediction market entry. High (>100%): high conviction position.\n\nFormula: (1 / avgPrice) ^ (365 / daysToResolution) − 1",
+  CAROI:
+    "What: Current Annualized ROI — the annualized return from the current market price to payoff (1) if you hold to resolution. Reflects what the market is currently implying for that outcome. Higher than TAROI means price moved in your favor.\n\nRanges: Low (<20%): market disagrees. Average (30–80%): in line. High (>100%): market strongly agrees with your position.\n\nFormula: (1 / curPrice) ^ (365 / daysToResolution) − 1",
+
   // 12. Portfolio Construction
   "Diversification Ratio":
     "What: 1 ÷ √(HHI). Higher = more diversified across markets. Diversification can reduce risk without sacrificing return. Low = concentrated in few positions.\n\nRanges: Low (<3): concentrated. Average (3–8): moderate diversification. High (>10): well diversified.\n\nCalculation: 1 / sqrt(sum(weight²))",

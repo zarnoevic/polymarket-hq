@@ -10,6 +10,7 @@ import {
   Briefcase,
   ExternalLink,
 } from "lucide-react";
+import { PositionsList } from "@/app/components/PositionsList";
 
 type LeaderboardEntry = {
   rank: string;
@@ -177,11 +178,6 @@ function formatUsd(value: number, decimals = 0): string {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   }).format(value);
-}
-
-function formatPercent(value: number): string {
-  const sign = value >= 0 ? "+" : "";
-  return `${sign}${value.toFixed(1)}%`;
 }
 
 function formatCompact(value: number): string {
@@ -369,53 +365,7 @@ export default async function HomePage() {
                   <Layers className="h-4 w-4 text-indigo-400" />
                   Positions ({positions.length})
                 </h2>
-                <div className="space-y-2">
-                  {positions.map((pos) => (
-                    <div
-                      key={pos.asset}
-                      className="flex items-center gap-3 overflow-hidden rounded-lg border border-slate-800/60 bg-slate-900/50 px-3 py-2"
-                    >
-                      <img
-                        src={pos.icon}
-                        alt=""
-                        className="h-9 w-9 shrink-0 rounded object-cover"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="truncate text-sm font-medium text-white">{pos.title}</h3>
-                          <span
-                            className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-medium ${
-                              pos.outcome.toLowerCase() === "yes"
-                                ? "bg-emerald-500/20 text-emerald-400"
-                                : "bg-red-500/20 text-red-400"
-                            }`}
-                          >
-                            {pos.outcome}
-                          </span>
-                          {pos.endDate && (
-                            <span className="text-xs text-slate-500">{pos.endDate}</span>
-                          )}
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-4 text-xs">
-                          <span className="text-slate-400">
-                            {pos.size.toLocaleString(undefined, { maximumFractionDigits: 0 })} @ {(pos.avgPrice * 100).toFixed(2)}¢
-                          </span>
-                          <span className="text-slate-300">
-                            {formatUsd(pos.currentValue, 2)}
-                          </span>
-                          <span
-                            className={`font-medium ${
-                              pos.cashPnl >= 0 ? "text-emerald-400" : "text-red-400"
-                            }`}
-                          >
-                            {pos.cashPnl >= 0 ? "+" : ""}
-                            {formatUsd(pos.cashPnl, 2)} ({formatPercent(pos.percentPnl)})
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <PositionsList positions={positions} />
               </div>
             )}
 
