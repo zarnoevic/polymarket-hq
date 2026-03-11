@@ -1,5 +1,9 @@
 import { fetchActivity } from "@/lib/polymarket";
 import {
+  computePositionAverages,
+  formatRoiAsX,
+} from "@/lib/position-metrics";
+import {
   BarChart3,
   Trophy,
   Wallet,
@@ -10,6 +14,9 @@ import {
   Briefcase,
   ExternalLink,
   Brain,
+  Target,
+  PiggyBank,
+  Percent,
 } from "lucide-react";
 import { PositionsList } from "@/app/components/PositionsList";
 import { CopyAddress } from "@/app/components/CopyAddress";
@@ -242,8 +249,12 @@ export default async function HomePage() {
     yesId: yesIds[i],
   }));
 
+  const { avgParoi, avgPositionSize, avgProfit } = computePositionAverages(
+    positions
+  );
+
   return (
-    <div className="min-h-screen bg-[rgb(var(--background-rgb))]">
+    <div className="bg-[rgb(var(--background-rgb))]">
       {/* Subtle grid background */}
       <div
         className="pointer-events-none fixed inset-0 opacity-[0.03]"
@@ -254,7 +265,63 @@ export default async function HomePage() {
         }}
       />
 
-      <div className="relative z-10 mx-auto max-w-5xl px-6 pt-4 pb-12">
+      <div className="relative z-10 flex w-full pt-4 pb-2">
+        {/* Left margin: averages centered in space between screen edge and content */}
+        <div className="flex flex-1 items-center justify-center min-w-0">
+          {positions.length > 0 && (
+            <div className="overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 p-4 shadow-lg shadow-black/10">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Averages
+              </h3>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 text-violet-400">
+                    <Target className="h-4 w-4" strokeWidth={1.75} />
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">Avg PAROI</p>
+                    <p className="font-semibold text-white">
+                      {avgParoi != null ? formatRoiAsX(avgParoi) : "—"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-cyan-500/15 text-cyan-400">
+                    <PiggyBank className="h-4 w-4" strokeWidth={1.75} />
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">Avg Position Size</p>
+                    <p className="font-semibold text-white">
+                      {formatCompact(avgPositionSize)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                      avgProfit >= 0 ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"
+                    }`}
+                  >
+                    <Percent className="h-4 w-4" strokeWidth={1.75} />
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">Avg Profit</p>
+                    <p
+                      className={`font-semibold ${
+                        avgProfit >= 0 ? "text-emerald-400" : "text-red-400"
+                      }`}
+                    >
+                      {avgProfit >= 0 ? "+" : ""}
+                      {formatCompact(avgProfit)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+        {/* Center: content exactly as before (max-w-5xl centered) */}
+        <div className="w-full max-w-5xl shrink-0 px-6">
         {account ? (
           <div className="space-y-6">
             {/* Main account card */}
@@ -291,11 +358,12 @@ export default async function HomePage() {
                       #{Number(account.rank).toLocaleString()}
                     </span>
                     <span className="flex items-center gap-1.5 text-slate-400">
-                      · Top {(() => {
+                    · 
+                      <Brain className="h-4 w-4 text-indigo-400" />
+                      Top {(() => {
                         const pct = (Number(account.rank) / TOTAL_TRADERS) * 100;
                         return pct < 0.01 ? pct.toFixed(4) : pct < 1 ? pct.toFixed(2) : pct.toFixed(1);
-                      })()}th
-                      <Brain className="h-4 w-4 text-indigo-400" />
+                      })()}%
                     </span>
                   </div>
                     </div>
@@ -407,6 +475,9 @@ export default async function HomePage() {
             </p>
           </div>
         )}
+        </div>
+        {/* Right margin: balances left so content stays centered */}
+        <div className="flex-1 min-w-0" />
       </div>
     </div>
   );
