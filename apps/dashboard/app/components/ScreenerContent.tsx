@@ -22,6 +22,9 @@ function SiblingsIcon({ className }: { className?: string }) {
 }
 import { toast } from "sonner";
 import { PriceHistorySparkline } from "./PriceHistorySparkline";
+import { OrderBookLabel } from "./OrderBookLabel";
+import { MarketFees } from "./MarketFees";
+import { SpreadLabel } from "./SpreadLabel";
 
 type LabelType = "vetted" | "unknowable" | "well_priced" | "traded" | "evaluating" | "disputed" | "uninformed" | "under_5" | null;
 
@@ -943,27 +946,27 @@ export function ScreenerContent({
                             {formatCompact(e.liquidity)}
                           </p>
                         </div>
+                        {e.yesId && (
+                          <div>
+                            <p className="text-xs text-slate-500">Spread</p>
+                            <SpreadLabel tokenId={e.yesId} />
+                          </div>
+                        )}
+                        {(e.yesId || e.noId) && (
+                          <div>
+                            <p className="text-xs text-slate-500">Fees</p>
+                            <MarketFees yesId={e.yesId ?? null} noId={e.noId ?? null} />
+                          </div>
+                        )}
                       </div>
                       {(e.probabilityYes != null || e.probabilityNo != null) && (
                         <div className="flex items-center gap-3">
                           <div className="min-w-[140px] flex flex-col gap-2">
-                            <div>
-                              <p className="text-[11px] text-slate-500 mb-1">Quoted</p>
-                              <div className="flex justify-between gap-4 text-xs font-medium mb-1.5">
-                                <span className="text-emerald-600/90 tabular-nums">Yes {((e.probabilityYes ?? 0) * 100).toFixed(0)}%</span>
-                                <span className="text-red-600/90 tabular-nums">No {((e.probabilityNo ?? 0) * 100).toFixed(0)}%</span>
-                              </div>
-                              <div className="h-2.5 rounded-full overflow-hidden flex bg-slate-800/80 ring-1 ring-slate-700/80">
-                                <div
-                                  className="rounded-l-full min-w-0 bg-emerald-600/70"
-                                  style={{ width: `${(e.probabilityYes ?? 0) * 100}%` }}
-                                />
-                                <div
-                                  className="rounded-r-full min-w-0 bg-red-600/70"
-                                  style={{ width: `${(e.probabilityNo ?? 0) * 100}%` }}
-                                />
-                              </div>
-                            </div>
+                            <OrderBookLabel
+                              tokenId={e.yesId ?? null}
+                              probabilityYes={e.probabilityYes ?? null}
+                              probabilityNo={e.probabilityNo ?? null}
+                            />
                             {(e.appraisedYes != null || e.appraisedNo != null) && (
                               <div>
                                 <div className="h-2.5 rounded-full overflow-hidden flex bg-slate-800/80 ring-1 ring-slate-700/80">
