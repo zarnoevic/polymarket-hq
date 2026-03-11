@@ -86,11 +86,11 @@ export function computeReturnMetrics(
   const years = daysActive / 365;
 
   const arithmeticMeanReturn = mean(rets);
-  const geoReturn = finalEquity > 0 && initialEquity > 0
-    ? (finalEquity / initialEquity) ** (1 / Math.max(years, 0.001)) - 1
-    : 0;
-  const cagr = geoReturn;
-  const annualizedReturn = years > 0 ? (1 + cumulativeReturn) ** (1 / years) - 1 : cumulativeReturn;
+  // Linear annualization: return / years (not geometric/CAGR)
+  const linearAnnualized = years > 0 ? cumulativeReturn / years : cumulativeReturn;
+  const annualizedReturn = linearAnnualized;
+  const cagr = linearAnnualized;
+  const geoReturn = linearAnnualized;
 
   // Rolling 30-day (approx) - use last 30 returns
   const rollWindow = Math.min(30, rets.length);
@@ -126,12 +126,13 @@ export function computeRiskAdjustedMetrics(
 
   const vol = std(rets);
   const volAnn = vol * Math.sqrt(TRADING_DAYS_PER_YEAR);
-
-  const sharpe = vol > 0 ? (mean(excessRets) / vol) * Math.sqrt(TRADING_DAYS_PER_YEAR) : 0;
+  // Linear annualization: mean * 365 for returns, std * sqrt(365) for volatility
+  const excessRetAnn = mean(excessRets) * TRADING_DAYS_PER_YEAR;
+  const sharpe = volAnn > 0 ? excessRetAnn / volAnn : 0;
 
   const negRets = rets.filter((r) => r < 0);
-  const downsideDev = negRets.length > 0 ? std(negRets) * Math.sqrt(TRADING_DAYS_PER_YEAR) : 0;
-  const sortino = downsideDev > 0 ? (mean(excessRets) / std(negRets)) * Math.sqrt(TRADING_DAYS_PER_YEAR) : 0;
+  const downsideDevAnn = negRets.length > 0 ? std(negRets) * Math.sqrt(TRADING_DAYS_PER_YEAR) : 0;
+  const sortino = downsideDevAnn > 0 ? excessRetAnn / downsideDevAnn : 0;
 
   const cspx = marketData.cspx;
   let infoRatio = 0;
@@ -177,7 +178,7 @@ export function computeRiskAdjustedMetrics(
   const omegaRatio = lossesBelow > 0 ? gainsAbove / lossesBelow : gainsAbove > 0 ? 999 : 0;
 
   const burkeDenom = volAnn || 0.01;
-  const burke = (mean(excessRets) * TRADING_DAYS_PER_YEAR) / burkeDenom;
+  const burke = excessRetAnn / burkeDenom;
 
   return {
     sharpeRatio: sharpe,
@@ -531,8 +532,9 @@ export function computeExcessReturn(
   marketData: MarketData,
   years: number
 ): number {
-  const benchReturn = marketData.cspx
-    ? (1 + mean(marketData.cspx.returns)) ** (TRADING_DAYS_PER_YEAR * years) - 1
+  // Linear annualization: mean daily * 365 * years = cumulative return equivalent
+  const benchReturn = marketData.cspx && years > 0
+    ? mean(marketData.cspx.returns) * TRADING_DAYS_PER_YEAR * years
     : 0;
   return totalReturn - benchReturn;
 }

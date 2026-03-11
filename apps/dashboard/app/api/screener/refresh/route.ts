@@ -119,8 +119,23 @@ type GammaMarket = {
   outcomePrices?: string | string[];
   outcomes?: string | string[];
   events?: Array<{ slug?: string }>;
+  clobTokenIds?: string | string[];
   [k: string]: unknown;
 };
+
+function parseClobTokenIds(m: GammaMarket): { yesId: string | null; noId: string | null } {
+  try {
+    const raw = m.clobTokenIds;
+    if (!raw) return { yesId: null, noId: null };
+    const ids = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!Array.isArray(ids) || ids.length < 2) return { yesId: null, noId: null };
+    const y = String(ids[0]).trim();
+    const n = String(ids[1]).trim();
+    return { yesId: y || null, noId: n || null };
+  } catch {
+    return { yesId: null, noId: null };
+  }
+}
 
 function parseProbabilities(m: GammaMarket): { yes: number | null; no: number | null } {
   try {
@@ -214,6 +229,7 @@ export async function POST() {
       const endDate = (m.endDate ?? m.end_date) ? new Date((m.endDate ?? m.end_date) as string) : null;
       const createdAt = m.createdAt ? new Date(m.createdAt) : null;
       const { yes: probYes, no: probNo } = parseProbabilities(m);
+      const { yesId, noId } = parseClobTokenIds(m);
       const parentEventSlug = m.events?.[0]?.slug ?? null;
       // Category status: under_5 if yes or no < 5% (low priority), else discovery (null)
       const isUnder5 = (probYes != null && probYes < 0.05) || (probNo != null && probNo < 0.05);
@@ -243,6 +259,8 @@ export async function POST() {
         tags: tags.length > 0 ? (tags as object) : null,
         yesParoi,
         noParoi,
+        yesId,
+        noId,
       };
       const currentLabel = existingLabelByExternalId.get(m.id);
       const isStatusCategory = currentLabel === null || currentLabel === "under_5";
@@ -258,6 +276,8 @@ export async function POST() {
           tags: tags.length > 0 ? (tags as object) : null,
           yesParoi,
           noParoi,
+          yesId,
+          noId,
           ...(isStatusCategory && { label: isUnder5 ? "under_5" : null }),
         },
       });

@@ -66,6 +66,12 @@ function formatPct(value: number, decimals = 1): string {
   return `${(value * 100).toFixed(decimals)}%`;
 }
 
+/** Return as multiplier: 0.5 -> 1.5x, -0.25 -> 0.75x */
+function formatReturnAsX(value: number, decimals = 2): string {
+  const x = 1 + value;
+  return `${x.toFixed(decimals)}x`;
+}
+
 function formatNum(value: number, decimals = 2): string {
   return value.toFixed(decimals);
 }
@@ -195,16 +201,7 @@ export default async function AnalyticsPage() {
         }}
       />
 
-      <div className="relative z-10 mx-auto max-w-6xl px-6 py-12">
-        <header className="mb-10">
-          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            Analytics
-          </h1>
-          <p className="mt-1 text-slate-400">
-            Quantitative metrics · Benchmark: CSPX · Risk-free: {riskFreePct.toFixed(2)}% (Fed)
-          </p>
-        </header>
-
+      <div className="relative z-10 mx-auto max-w-6xl px-6 pt-4 pb-12">
         {trades.length > 0 ? (
           <div className="space-y-8">
             {/* Overview */}
@@ -250,14 +247,14 @@ export default async function AnalyticsPage() {
             {/* 1. Return Metrics */}
             <MetricSection title="1. Return Metrics" icon={TrendingUp}>
               <MetricsGrid>
-                <MetricCard title="Total Return" value={formatPct(returnMetrics.totalReturn)} sub={`${formatUsdOrCompact(returnMetrics.totalPnl)} PnL`} icon={Percent} variant={returnMetrics.totalReturn >= 0 ? "positive" : "negative"} tooltipKey="Total Return" />
-                <MetricCard title="Annualized Return" value={formatPct(returnMetrics.annualizedReturn)} icon={TrendingUp} variant={returnMetrics.annualizedReturn >= 0 ? "positive" : "negative"} tooltipKey="Annualized Return" />
-                <MetricCard title="CAGR" value={formatPct(returnMetrics.cagr)} sub="Compound Annual Growth Rate" icon={Percent} tooltipKey="CAGR" />
-                <MetricCard title="Geometric Return" value={formatPct(returnMetrics.geometricReturn)} icon={Percent} tooltipKey="Geometric Return" />
-                <MetricCard title="Arithmetic Mean Return" value={formatPct(returnMetrics.arithmeticMeanReturn)} icon={Percent} tooltipKey="Arithmetic Mean Return" />
-                <MetricCard title="Rolling Return (30d)" value={formatPct(returnMetrics.rollingReturn)} icon={Calendar} tooltipKey="Rolling Return (30d)" />
-                <MetricCard title="Cumulative Return" value={formatPct(returnMetrics.cumulativeReturn)} icon={Target} tooltipKey="Cumulative Return" />
-                <MetricCard title="Excess Return (vs CSPX)" value={formatPct(excessReturn)} sub="vs benchmark" icon={Target} variant={excessReturn >= 0 ? "positive" : "negative"} tooltipKey="Excess Return (vs CSPX)" />
+                <MetricCard title="Total Return" value={formatReturnAsX(returnMetrics.totalReturn)} sub={`${formatUsdOrCompact(returnMetrics.totalPnl)} PnL`} icon={Percent} variant={returnMetrics.totalReturn >= 0 ? "positive" : "negative"} tooltipKey="Total Return" />
+                <MetricCard title="Annualized Return" value={formatReturnAsX(returnMetrics.annualizedReturn)} icon={TrendingUp} variant={returnMetrics.annualizedReturn >= 0 ? "positive" : "negative"} tooltipKey="Annualized Return" />
+                <MetricCard title="CAGR" value={formatReturnAsX(returnMetrics.cagr)} sub="Compound Annual Growth Rate" icon={Percent} tooltipKey="CAGR" />
+                <MetricCard title="Geometric Return" value={formatReturnAsX(returnMetrics.geometricReturn)} icon={Percent} tooltipKey="Geometric Return" />
+                <MetricCard title="Arithmetic Mean Return" value={formatReturnAsX(returnMetrics.arithmeticMeanReturn)} icon={Percent} tooltipKey="Arithmetic Mean Return" />
+                <MetricCard title="Rolling Return (30d)" value={formatReturnAsX(returnMetrics.rollingReturn)} icon={Calendar} tooltipKey="Rolling Return (30d)" />
+                <MetricCard title="Cumulative Return" value={formatReturnAsX(returnMetrics.cumulativeReturn)} icon={Target} tooltipKey="Cumulative Return" />
+                <MetricCard title="Excess Return (vs CSPX)" value={formatReturnAsX(excessReturn)} sub="vs benchmark" icon={Target} variant={excessReturn >= 0 ? "positive" : "negative"} tooltipKey="Excess Return (vs CSPX)" />
               </MetricsGrid>
             </MetricSection>
 
@@ -309,9 +306,9 @@ export default async function AnalyticsPage() {
               <MetricSection title="5. Market Exposure (vs CSPX)" icon={Target}>
                 <MetricsGrid>
                   <MetricCard title="Beta" value={benchComparison.beta != null ? formatNum(benchComparison.beta) : "—"} icon={Target} tooltipKey="Beta" />
-                  <MetricCard title="Alpha (Jensen)" value={benchComparison.alpha != null ? formatPct(benchComparison.alpha) : "—"} icon={Target} variant={benchComparison.alpha != null && benchComparison.alpha >= 0 ? "positive" : "negative"} tooltipKey="Alpha (Jensen)" />
+                  <MetricCard title="Alpha (Jensen)" value={benchComparison.alpha != null ? formatReturnAsX(benchComparison.alpha) : "—"} icon={Target} variant={benchComparison.alpha != null && benchComparison.alpha >= 0 ? "positive" : "negative"} tooltipKey="Alpha (Jensen)" />
                   <MetricCard title="Tracking Error" value={benchComparison.trackingError != null ? formatPct(benchComparison.trackingError) : "—"} icon={Target} tooltipKey="Tracking Error" />
-                  <MetricCard title="Active Return" value={benchComparison.activeReturn != null ? formatPct(benchComparison.activeReturn) : "—"} icon={Target} tooltipKey="Active Return" />
+                  <MetricCard title="Active Return" value={benchComparison.activeReturn != null ? formatReturnAsX(benchComparison.activeReturn) : "—"} icon={Target} tooltipKey="Active Return" />
                 </MetricsGrid>
               </MetricSection>
               <MetricSection title="6. Portfolio Efficiency" icon={Gauge}>
@@ -319,7 +316,7 @@ export default async function AnalyticsPage() {
                   <MetricCard title="Return over Max DD (RoMaD)" value={formatNum(portEfficiency.returnOverMaxDrawdown)} icon={Gauge} tooltipKey="Return over Max DD (RoMaD)" />
                   <MetricCard title="Kelly Fraction" value={formatPct(capEfficiency.kellyFraction)} sub="Optimal bet size" icon={Gauge} tooltipKey="Kelly Fraction" />
                   <MetricCard title="Risk of Ruin" value={formatPct(capEfficiency.riskOfRuin)} icon={AlertTriangle} variant="negative" tooltipKey="Risk of Ruin" />
-                  <MetricCard title="Expected Growth Rate" value={formatPct(capEfficiency.expectedGrowthRate)} icon={TrendingUp} tooltipKey="Expected Growth Rate" />
+                  <MetricCard title="Expected Growth Rate" value={formatReturnAsX(capEfficiency.expectedGrowthRate)} icon={TrendingUp} tooltipKey="Expected Growth Rate" />
                 </MetricsGrid>
               </MetricSection>
             </div>
@@ -344,15 +341,15 @@ export default async function AnalyticsPage() {
             {/* 8. Distribution Metrics */}
             <MetricSection title="8. Distribution Metrics" icon={BarChart3}>
               <MetricsGrid>
-                <MetricCard title="Mean Return" value={formatPct(distMetrics.meanReturn)} icon={Percent} tooltipKey="Mean Return" />
-                <MetricCard title="Median Return" value={formatPct(distMetrics.medianReturn)} icon={Percent} tooltipKey="Median Return" />
+                <MetricCard title="Mean Return" value={formatReturnAsX(distMetrics.meanReturn)} icon={Percent} tooltipKey="Mean Return" />
+                <MetricCard title="Median Return" value={formatReturnAsX(distMetrics.medianReturn)} icon={Percent} tooltipKey="Median Return" />
                 <MetricCard title="Variance" value={formatNum(distMetrics.variance, 6)} icon={BarChart3} tooltipKey="Variance" />
                 <MetricCard title="Std Deviation" value={formatPct(distMetrics.standardDeviation)} icon={BarChart3} tooltipKey="Std Deviation" />
-                <MetricCard title="P5" value={formatPct(distMetrics.percentile5)} icon={Percent} tooltipKey="P5" />
-                <MetricCard title="P25" value={formatPct(distMetrics.percentile25)} icon={Percent} tooltipKey="P25" />
-                <MetricCard title="P50" value={formatPct(distMetrics.percentile50)} icon={Percent} tooltipKey="P50" />
-                <MetricCard title="P75" value={formatPct(distMetrics.percentile75)} icon={Percent} tooltipKey="P75" />
-                <MetricCard title="P95" value={formatPct(distMetrics.percentile95)} icon={Percent} tooltipKey="P95" />
+                <MetricCard title="P5" value={formatReturnAsX(distMetrics.percentile5)} icon={Percent} tooltipKey="P5" />
+                <MetricCard title="P25" value={formatReturnAsX(distMetrics.percentile25)} icon={Percent} tooltipKey="P25" />
+                <MetricCard title="P50" value={formatReturnAsX(distMetrics.percentile50)} icon={Percent} tooltipKey="P50" />
+                <MetricCard title="P75" value={formatReturnAsX(distMetrics.percentile75)} icon={Percent} tooltipKey="P75" />
+                <MetricCard title="P95" value={formatReturnAsX(distMetrics.percentile95)} icon={Percent} tooltipKey="P95" />
               </MetricsGrid>
             </MetricSection>
 
@@ -415,6 +412,10 @@ export default async function AnalyticsPage() {
             </p>
           </div>
         )}
+
+        <p className="mt-8 text-center text-sm text-slate-500">
+          Benchmark: CSPX · Risk-free: {riskFreePct.toFixed(2)}% (Fed)
+        </p>
       </div>
     </div>
   );

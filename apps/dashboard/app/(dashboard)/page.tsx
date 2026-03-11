@@ -1,9 +1,9 @@
+import { fetchActivity } from "@/lib/polymarket";
 import {
   BarChart3,
   Trophy,
   Wallet,
   TrendingUp,
-  Hash,
   Layers,
   CircleDollarSign,
   Coins,
@@ -121,6 +121,10 @@ type Position = {
   percentPnl: number;
   realizedPnl: number;
   endDate: string;
+  /** Unix timestamp (seconds) of first BUY for this asset, from activity/trades. */
+  entryTimestamp?: number;
+  /** Yes token ID for price history - always fetch Yes, not No. */
+  yesId?: string;
 };
 
 async function fetchTotalValue(): Promise<number | null> {
@@ -172,6 +176,35 @@ async function fetchPositions(): Promise<Position[]> {
   }
 }
 
+/** Map asset -> first BUY timestamp (Unix seconds). */
+function buildFirstBuyTimestampMap(activity: Array<{ asset: string; side: string; timestamp: number }>): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const a of activity) {
+    if (a.side !== "BUY") continue;
+    const cur = map.get(a.asset);
+    if (cur == null || a.timestamp < cur) map.set(a.asset, a.timestamp);
+  }
+  return map;
+}
+
+/** Resolve Yes token ID. For Yes positions asset=yesId. For No positions, fetch from Gamma. */
+async function resolveYesTokenId(asset: string, outcome: string): Promise<string> {
+  if (outcome.toLowerCase() === "yes") return asset;
+  try {
+    const url = `https://gamma-api.polymarket.com/markets?limit=1&clob_token_ids=${encodeURIComponent(asset)}`;
+    const res = await fetch(url, { headers: { Accept: "application/json" }, next: { revalidate: 300 } });
+    if (!res.ok) return asset;
+    const data = await res.json();
+    const m = Array.isArray(data) && data[0] ? data[0] : null;
+    const raw = m?.clobTokenIds;
+    if (!raw) return asset;
+    const ids = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Array.isArray(ids) && ids[0] ? String(ids[0]) : asset;
+  } catch {
+    return asset;
+  }
+}
+
 function formatUsd(value: number, decimals = 0): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -190,12 +223,23 @@ function formatCompact(value: number): string {
 }
 
 export default async function HomePage() {
-  const [account, positions, totalValue, deployableCapital] = await Promise.all([
+  const [account, positionsRaw, totalValue, deployableCapital, activity] = await Promise.all([
     fetchAccountData(),
     fetchPositions(),
     fetchTotalValue(),
     fetchUsdcBalance(),
+    fetchActivity(),
   ]);
+  const firstBuyTs = buildFirstBuyTimestampMap(activity);
+  const rawPositions = positionsRaw as Position[];
+  const yesIds = await Promise.all(
+    rawPositions.map((p) => resolveYesTokenId(p.asset, p.outcome))
+  );
+  const positions: Position[] = rawPositions.map((p, i) => ({
+    ...p,
+    entryTimestamp: firstBuyTs.get(p.asset),
+    yesId: yesIds[i],
+  }));
 
   return (
     <div className="min-h-screen bg-[rgb(var(--background-rgb))]">
@@ -209,49 +253,37 @@ export default async function HomePage() {
         }}
       />
 
-      <div className="relative z-10 mx-auto max-w-5xl px-6 py-12">
-        <header className="mb-10">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                Dashboard
-              </h1>
-              <p className="mt-1 text-slate-400">
-                Account overview and current positions
-              </p>
-            </div>
-            <a
-              href="https://polymarket.com/portfolio"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-sm text-indigo-400 hover:text-indigo-300"
-            >
-              Polymarket
-              <ExternalLink className="h-4 w-4" />
-            </a>
-          </div>
-        </header>
-
+      <div className="relative z-10 mx-auto max-w-5xl px-6 pt-4 pb-12">
         {account ? (
           <div className="space-y-6">
             {/* Main account card */}
             <div className="overflow-hidden rounded-2xl border border-slate-800/60 bg-slate-900/50 shadow-xl shadow-black/20 backdrop-blur-sm">
-              <div className="border-b border-slate-700/50 px-6 py-5">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-indigo-500/20 text-indigo-400">
-                      <Wallet className="h-7 w-7" strokeWidth={1.75} />
+              <div className="border-b border-slate-700/50 px-6 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-indigo-500/20 text-indigo-400">
+                        <Wallet className="h-7 w-7" strokeWidth={1.75} />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-semibold text-white">
+                          {account.userName || "Anonymous"}
+                        </h2>
+                        <p className="mt-0.5 text-sm">
+                          <CopyAddress address={account.proxyWallet} />
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h2 className="text-xl font-semibold text-white">
-                        {account.userName || "Anonymous"}
-                      </h2>
-                      <p className="mt-0.5 text-sm">
-                        <CopyAddress address={account.proxyWallet} />
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 rounded-lg bg-slate-800/80 px-4 py-2">
+                    <div className="flex items-center gap-4">
+                      <a
+                        href="https://polymarket.com/portfolio"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-sm text-indigo-400 hover:text-indigo-300"
+                      >
+                        Polymarket
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                      <div className="flex items-center gap-2 rounded-lg bg-slate-800/80 px-4 py-2">
                     <Trophy className="h-5 w-5 text-amber-400" />
                     <span className="font-semibold text-slate-300">Rank</span>
                     <span className="font-mono text-lg font-bold text-white">
@@ -264,49 +296,48 @@ export default async function HomePage() {
                       })()}%
                     </span>
                   </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
 
               <div className="grid gap-0 sm:grid-cols-2 lg:grid-cols-5">
                 {/* Portfolio value (deployable + positions) */}
-                <div className="flex items-center gap-4 border-b border-slate-700/50 px-6 py-6 sm:border-b-0 sm:border-r sm:border-slate-700/50">
+                <div className="flex items-center gap-4 border-b border-slate-700/50 px-6 py-3 sm:border-b-0 sm:border-r sm:border-slate-700/50">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400">
                     <Briefcase className="h-6 w-6" strokeWidth={1.75} />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-slate-400">Portfolio Value</p>
+                    <p className="text-sm font-medium text-slate-400">Portfolio</p>
                     <p className="text-2xl font-bold text-white">
                       {formatCompact(
                         (deployableCapital ?? 0) + (totalValue ?? 0)
                       )}
                     </p>
-                    <p className="text-xs text-slate-500">USDC.e + positions</p>
                   </div>
                 </div>
 
                 {/* Deployable capital (Polygon USDC.e) */}
-                <div className="flex items-center gap-4 border-b border-slate-700/50 px-6 py-6 sm:border-b-0 sm:border-r sm:border-slate-700/50">
+                <div className="flex items-center gap-4 border-b border-slate-700/50 px-6 py-3 sm:border-b-0 sm:border-r sm:border-slate-700/50">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-400">
                     <Coins className="h-6 w-6" strokeWidth={1.75} />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-slate-400">Deployable Capital</p>
+                    <p className="text-sm font-medium text-slate-400">Cash</p>
                     <p className="text-2xl font-bold text-white">
                       {deployableCapital != null
                         ? formatCompact(deployableCapital)
                         : "—"}
                     </p>
-                    <p className="text-xs text-slate-500">Polygon USDC.e</p>
                   </div>
                 </div>
 
                 {/* Total value of positions */}
-                <div className="flex items-center gap-4 border-b border-slate-700/50 px-6 py-6 sm:border-b-0 sm:border-r sm:border-slate-700/50">
+                <div className="flex items-center gap-4 border-b border-slate-700/50 px-6 py-3 sm:border-b-0 sm:border-r sm:border-slate-700/50">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400">
                     <CircleDollarSign className="h-6 w-6" strokeWidth={1.75} />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-slate-400">Total Position Value</p>
+                    <p className="text-sm font-medium text-slate-400">Positions</p>
                     <p className="text-2xl font-bold text-white">
                       {totalValue != null
                         ? formatCompact(totalValue)
@@ -316,12 +347,12 @@ export default async function HomePage() {
                 </div>
 
                 {/* PnL */}
-                <div className="flex items-center gap-4 border-b border-slate-700/50 px-6 py-6 sm:border-b-0 sm:border-r sm:border-slate-700/50">
+                <div className="flex items-center gap-4 border-b border-slate-700/50 px-6 py-3 sm:border-b-0 sm:border-r sm:border-slate-700/50">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400">
                     <TrendingUp className="h-6 w-6" strokeWidth={1.75} />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-slate-400">Profit & Loss</p>
+                    <p className="text-sm font-medium text-slate-400">P&L</p>
                     <p
                       className={`text-2xl font-bold ${
                         account.pnl >= 0 ? "text-emerald-400" : "text-red-400"
@@ -334,12 +365,12 @@ export default async function HomePage() {
                 </div>
 
                 {/* Volume */}
-                <div className="flex items-center gap-4 px-6 py-6">
+                <div className="flex items-center gap-4 px-6 py-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-400">
                     <BarChart3 className="h-6 w-6" strokeWidth={1.75} />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-slate-400">Volume (All Time)</p>
+                    <p className="text-sm font-medium text-slate-400">Volume</p>
                     <p className="text-2xl font-bold text-white">
                       {formatCompact(account.vol)}
                     </p>
@@ -347,13 +378,6 @@ export default async function HomePage() {
                 </div>
               </div>
 
-              {/* Rank badge footer */}
-              <div className="flex items-center gap-2 border-t border-slate-700/50 px-6 py-3">
-                <Hash className="h-4 w-4 text-slate-500" />
-                <span className="text-sm text-slate-500">
-                  Overall leaderboard · PnL ranking · All time
-                </span>
-              </div>
             </div>
 
             {/* Positions */}

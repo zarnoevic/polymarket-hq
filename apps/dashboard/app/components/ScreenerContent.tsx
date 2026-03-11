@@ -21,6 +21,7 @@ function SiblingsIcon({ className }: { className?: string }) {
   );
 }
 import { toast } from "sonner";
+import { PriceHistorySparkline } from "./PriceHistorySparkline";
 
 type LabelType = "vetted" | "unknowable" | "well_priced" | "traded" | "evaluating" | "disputed" | "uninformed" | "under_5" | null;
 
@@ -68,6 +69,8 @@ type ScreenerEvent = {
   labelUpdatedAt?: Date | null;
   note: string | null;
   syncedAt: Date;
+  yesId: string | null;
+  noId: string | null;
   raw?: unknown;
   tags?: unknown; // Gamma API tags: JsonValue from DB
 };
@@ -810,40 +813,45 @@ export function ScreenerContent({
                         ))}
                       </div>
                     )}
-                    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
-                      <a
-                        href={`https://polymarket.com/event/${e.parentEventSlug ?? e.slug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300"
-                      >
-                        Polymarket
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(e.externalId);
-                          toast.success("Market ID copied");
-                        }}
-                        className="inline-flex items-center gap-1 rounded p-0.5 text-slate-500 transition-colors hover:bg-slate-700/60 hover:text-slate-300"
-                        title="Copy market ID"
-                        aria-label="Copy market ID"
-                      >
-                        <Copy className="h-3.5 w-3.5" />
-                      </button>
-                      {displayCreatedAt && !isNaN(new Date(displayCreatedAt).getTime()) && (
-                        <span className="flex items-center gap-1 text-slate-500" title="Market creation (API)">
-                          <CalendarPlus className="h-3.5 w-3.5" />
-                          {formatDate(new Date(displayCreatedAt))}
-                        </span>
-                      )}
-                      {e.endDate && (
-                        <span className="flex items-center gap-1 text-slate-500">
-                          <Calendar className="h-3.5 w-3.5" />
-                          {formatDate(e.endDate)}
-                        </span>
-                      )}
+                    <div className="mt-1.5 flex w-full items-center gap-2 text-xs">
+                      <div className="flex shrink-0 flex-wrap items-center gap-2">
+                        <a
+                          href={`https://polymarket.com/event/${e.parentEventSlug ?? e.slug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300"
+                        >
+                          Polymarket
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(e.externalId);
+                            toast.success("Market ID copied");
+                          }}
+                          className="inline-flex items-center gap-1 rounded p-0.5 text-slate-500 transition-colors hover:bg-slate-700/60 hover:text-slate-300"
+                          title="Copy market ID"
+                          aria-label="Copy market ID"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </button>
+                        {displayCreatedAt && !isNaN(new Date(displayCreatedAt).getTime()) && (
+                          <span className="flex items-center gap-1 text-slate-500" title="Market creation (API)">
+                            <CalendarPlus className="h-3.5 w-3.5" />
+                            {formatDate(new Date(displayCreatedAt))}
+                          </span>
+                        )}
+                        {e.endDate && (
+                          <span className="flex items-center gap-1 text-slate-500">
+                            <Calendar className="h-3.5 w-3.5" />
+                            {formatDate(e.endDate)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1 pl-2 self-center h-4">
+                        <PriceHistorySparkline tokenId={e.yesId ?? null} tint="yes" fill />
+                      </div>
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-4">
                       <div>
@@ -898,24 +906,34 @@ export function ScreenerContent({
                               </div>
                             )}
                           </div>
-                          <div className="flex flex-col gap-1 shrink-0">
-                            {(e.yev != null || e.nev != null) && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-slate-500">YEV</span>
-                                <span className="font-mono text-sm text-emerald-500/90">{(e.yev ?? 0).toFixed(2)}</span>
-                                <span className="text-xs text-slate-500">NEV</span>
-                                <span className="font-mono text-sm text-red-500/90">{(e.nev ?? 0).toFixed(2)}</span>
+                          <div className="flex shrink-0 gap-8">
+                            <div className="flex flex-col gap-0.5">
+                              {(e.yev != null || e.nev != null) && (
+                                <div className="flex items-baseline gap-2">
+                                  <span className="text-xs text-slate-500 w-[4.5rem]">YEV</span>
+                                  <span className="font-mono text-sm text-emerald-500/90 tabular-nums min-w-[2.5rem] text-right">{(e.yev ?? 0).toFixed(2)}</span>
+                                </div>
+                              )}
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-xs text-slate-500 w-[4.5rem]">Yes PAROI</span>
+                                <span className="font-mono text-sm text-emerald-500/90 tabular-nums min-w-[2.5rem] text-right">
+                                  {computePAROI(e.probabilityYes ?? (e.probabilityNo != null ? 1 - e.probabilityNo : 0), daysToResolution(e.endDate))}
+                                </span>
                               </div>
-                            )}
-                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                              <span className="text-xs text-slate-500">Yes PAROI</span>
-                              <span className="font-mono text-sm text-emerald-500/90">
-                                {computePAROI(e.probabilityYes ?? (e.probabilityNo != null ? 1 - e.probabilityNo : 0), daysToResolution(e.endDate))}
-                              </span>
-                              <span className="text-xs text-slate-500">No PAROI</span>
-                              <span className="font-mono text-sm text-red-500/90">
-                                {computePAROI(e.probabilityNo ?? (e.probabilityYes != null ? 1 - e.probabilityYes : 0), daysToResolution(e.endDate))}
-                              </span>
+                            </div>
+                            <div className="flex flex-col gap-0.5">
+                              {(e.yev != null || e.nev != null) && (
+                                <div className="flex items-baseline gap-2">
+                                  <span className="text-xs text-slate-500 w-[4.5rem]">NEV</span>
+                                  <span className="font-mono text-sm text-red-500/90 tabular-nums min-w-[2.5rem] text-right">{(e.nev ?? 0).toFixed(2)}</span>
+                                </div>
+                              )}
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-xs text-slate-500 w-[4.5rem]">No PAROI</span>
+                                <span className="font-mono text-sm text-red-500/90 tabular-nums min-w-[2.5rem] text-right">
+                                  {computePAROI(e.probabilityNo ?? (e.probabilityYes != null ? 1 - e.probabilityYes : 0), daysToResolution(e.endDate))}
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { MetricTooltip } from "./MetricTooltip";
+import { PriceHistorySparkline } from "./PriceHistorySparkline";
 import { METRIC_TOOLTIPS } from "@/lib/metric-tooltips";
 
 export type Position = {
@@ -19,6 +20,10 @@ export type Position = {
   percentPnl: number;
   realizedPnl: number;
   endDate: string;
+  /** Unix seconds of first BUY. */
+  entryTimestamp?: number;
+  /** Yes token ID for price history. */
+  yesId?: string;
 };
 
 function formatUsd(value: number, decimals = 0): string {
@@ -198,6 +203,15 @@ export function PositionsList({ positions }: { positions: Position[] }) {
                   <MetricTooltip content={METRIC_TOOLTIPS.PAROI} />
                 </span>
               </div>
+            </div>
+            <div className="shrink-0 flex items-center w-44 h-10">
+              <PriceHistorySparkline
+                tokenId={pos.yesId ?? pos.asset}
+                tint="yes"
+                fill
+                entryTimestamp={pos.entryTimestamp}
+                entryPrice={isYes ? pos.avgPrice : 1 - pos.avgPrice}
+              />
             </div>
             <div className="shrink-0 flex min-w-[90px] w-24 flex-col gap-0.5">
               <div className="flex justify-between gap-2 text-[11px] font-medium">
