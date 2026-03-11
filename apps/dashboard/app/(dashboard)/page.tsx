@@ -1,8 +1,7 @@
 import { fetchActivity } from "@/lib/polymarket";
 import {
   computePositionAverages,
-  formatRoiAsX,
-  buildPositionValueOverTime,
+  formatRoi,
 } from "@/lib/position-metrics";
 import {
   BarChart3,
@@ -22,7 +21,6 @@ import {
 import { PositionsList } from "@/app/components/PositionsList";
 import { CopyAddress } from "@/app/components/CopyAddress";
 import { AttributionPieChart } from "@/app/components/AttributionPieChart";
-import { PositionValueChart } from "@/app/components/PositionValueChart";
 
 type LeaderboardEntry = {
   rank: string;
@@ -252,10 +250,13 @@ export default async function HomePage() {
     yesId: yesIds[i],
   }));
 
-  const { avgParoi, avgPositionSize, avgProfit } = computePositionAverages(
+  const { avgParoi, avgRoi, avgPositionSize, avgProfit } = computePositionAverages(
     positions
   );
-  const positionValueOverTime = buildPositionValueOverTime(activity, totalValue);
+
+  // If all positions resolve in our favor: each pays $1 per share; plus cash
+  const totalWinValue =
+    (deployableCapital ?? 0) + positions.reduce((s, p) => s + p.size, 0);
 
   return (
     <div className="bg-[rgb(var(--background-rgb))]">
@@ -270,63 +271,86 @@ export default async function HomePage() {
       />
 
       <div className="relative z-10 flex w-full pt-4 pb-2">
-        {/* Left margin: averages and position value chart */}
-        <div className="flex flex-1 flex-col items-center justify-start gap-4 min-w-0">
+        {/* Left margin: averages and total win */}
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 min-w-0">
           {positions.length > 0 && (
-            <>
-            <div className="overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 p-4 shadow-lg shadow-black/10">
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Averages
-              </h3>
-              <div className="space-y-4">
+            <div className="inline-flex flex-col items-stretch gap-4">
+              <div className="overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 p-4 shadow-lg shadow-black/10">
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Total Win
+                </h3>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 text-violet-400">
-                    <Target className="h-4 w-4" strokeWidth={1.75} />
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400">
+                    <Trophy className="h-4 w-4" strokeWidth={1.75} />
                   </div>
-                  <div>
-                    <p className="text-xs text-slate-400">Avg PAROI</p>
-                    <p className="font-semibold text-white">
-                      {avgParoi != null ? formatRoiAsX(avgParoi) : "—"}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-cyan-500/15 text-cyan-400">
-                    <PiggyBank className="h-4 w-4" strokeWidth={1.75} />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-400">Avg Position Size</p>
-                    <p className="font-semibold text-white">
-                      {formatCompact(avgPositionSize)}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                      avgProfit >= 0 ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"
-                    }`}
-                  >
-                    <Percent className="h-4 w-4" strokeWidth={1.75} />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-400">Avg P&L</p>
-                    <p
-                      className={`font-semibold ${
-                        avgProfit >= 0 ? "text-emerald-400" : "text-red-400"
-                      }`}
-                    >
-                      {avgProfit >= 0 ? "+" : ""}
-                      {formatCompact(avgProfit)}
+                  <div className="min-w-0">
+                    <p className="font-semibold text-emerald-400">
+                      {formatCompact(totalWinValue)}
                     </p>
                   </div>
                 </div>
               </div>
+              <div className="overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 p-4 shadow-lg shadow-black/10">
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Averages
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 text-violet-400">
+                      <Target className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Avg PAROI</p>
+                      <p className="font-semibold text-white">
+                        {avgParoi != null ? formatRoi(avgParoi) : "—"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-400">
+                      <TrendingUp className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Avg ROI</p>
+                      <p className="font-semibold text-white">
+                        {avgRoi != null ? formatRoi(avgRoi) : "—"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-cyan-500/15 text-cyan-400">
+                      <PiggyBank className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Avg Position Size</p>
+                      <p className="font-semibold text-white">
+                        {formatCompact(avgPositionSize)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                        avgProfit >= 0 ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"
+                      }`}
+                    >
+                      <Percent className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Avg P&L</p>
+                      <p
+                        className={`font-semibold ${
+                          avgProfit >= 0 ? "text-emerald-400" : "text-red-400"
+                        }`}
+                      >
+                        {avgProfit >= 0 ? "+" : ""}
+                        {formatCompact(avgProfit)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            {positionValueOverTime.length >= 2 && (
-              <PositionValueChart data={positionValueOverTime} />
-            )}
-            </>
           )}
         </div>
         {/* Center: content exactly as before (max-w-5xl centered) */}
@@ -370,22 +394,21 @@ export default async function HomePage() {
                         Polymarket
                         <ExternalLink className="h-4 w-4" />
                       </a>
-                      <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 rounded-lg bg-slate-800/80 px-4 py-2">
-                      <Trophy className="h-5 w-5 text-amber-400" />
-                      <span className="font-semibold text-slate-300">Rank</span>
-                      <span className="font-mono text-lg font-bold text-white">
-                        #{Number(account.rank).toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 rounded-lg bg-slate-800/80 px-4 py-2 text-slate-400">
-                      <Brain className="h-4 w-4 text-indigo-400" />
-                      Top {(() => {
-                        const pct = (Number(account.rank) / TOTAL_TRADERS) * 100;
-                        return pct < 0.01 ? pct.toFixed(4) : pct < 1 ? pct.toFixed(2) : pct.toFixed(1);
-                      })()}%
-                    </div>
-                  </div>
+                      <div className="flex items-center gap-2 rounded-lg bg-slate-800/80 px-4 py-2">
+                        <Trophy className="h-5 w-5 text-amber-400" />
+                        <span className="font-mono text-lg font-bold text-white">
+                          #{Number(account.rank).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 rounded-lg bg-slate-800/80 px-4 py-2">
+                        <Brain className="h-4 w-4 text-indigo-400" />
+                        <span className="flex items-center gap-1.5 text-slate-400">
+                          Top {(() => {
+                            const pct = (Number(account.rank) / TOTAL_TRADERS) * 100;
+                            return pct < 0.01 ? pct.toFixed(4) : pct < 1 ? pct.toFixed(2) : pct.toFixed(1);
+                          })()}%
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>

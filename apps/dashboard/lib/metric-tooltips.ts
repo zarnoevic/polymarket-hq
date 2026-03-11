@@ -159,6 +159,8 @@ export const METRIC_TOOLTIPS: Record<string, string> = {
     "What: Your worst historical daily return. Single-point stress scenario. What happened in practice; doesn't predict future extremes.\n\nRanges: Low (>−5%): survived well. Average (−5% to −15%): one bad day. High (<−25%): severe historical stress.\n\nCalculation: min(returns)",
 
   // Position-level ROI (dashboard)
+  ROI:
+    "What: Implied return on the quoted probability — if the event resolves in your favor, your return multiple. Displayed as Xx where 1x = 100% return.\n\nRanges: Low (<0.5x): high-probability bet. Average (0.5–2x): typical. High (>2x): contrarian or low-probability bet.\n\nFormula: ROI = 1 − 1/quoted_probability = (1 − p) / p",
   CAROI:
     "What: Cumulative Annualized ROI — linear annualized return from entry price to payoff (1). Displayed as Xx where 1x = 100% return.\n\nRanges: Low (<0.2x): low implied edge. Average (0.3–0.8x): typical prediction market entry. High (>1x): high conviction position.\n\nFormula: r = (1 − avgPrice) / avgPrice; annual_return = r × (365 / daysToResolution)",
   PAROI:

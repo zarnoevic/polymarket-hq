@@ -11,6 +11,7 @@ type Position = {
   curPrice: number;
   outcome: string;
   yesId?: string;
+  icon?: string;
 };
 
 type HistoryPoint = { t: number; p: number };
@@ -63,6 +64,7 @@ type Slice = {
   priceThen: number | null;
   priceNow: number;
   positionValue: number;
+  icon?: string;
 };
 
 export function AttributionPieChart({ positions }: { positions: Position[] }) {
@@ -99,6 +101,7 @@ export function AttributionPieChart({ positions }: { positions: Position[] }) {
           priceThen,
           priceNow,
           positionValue,
+          icon: pos.icon,
         };
       });
       const results = await Promise.all(promises);
@@ -114,6 +117,7 @@ export function AttributionPieChart({ positions }: { positions: Position[] }) {
           priceThen: r.priceThen,
           priceNow: r.priceNow,
           positionValue: r.positionValue,
+          icon: r.icon,
         }))
         .filter((r) => r.absShare > 0.001);
       setSlices(
@@ -126,6 +130,7 @@ export function AttributionPieChart({ positions }: { positions: Position[] }) {
               priceThen: r.priceThen,
               priceNow: r.priceNow,
               positionValue: r.positionValue,
+              icon: r.icon,
             }))
       );
       setLoading(false);
@@ -238,7 +243,7 @@ function PieChartInner({
         Attribution (24h)
       </h3>
       <div className="flex min-h-0 flex-1 flex-col items-center gap-4 overflow-hidden">
-        <div className="shrink-0">
+        <div className="relative shrink-0">
           <svg width={size} height={size} className="overflow-visible">
             {paths.map(({ d, color, i }) => (
               <path
@@ -258,6 +263,18 @@ function PieChartInner({
               />
             ))}
           </svg>
+          {activeSlice?.icon && (
+            <div
+              className="absolute left-1/2 top-1/2 flex h-[140px] w-[140px] -translate-x-1/2 -translate-y-1/2 items-center justify-center overflow-hidden rounded-full border-2 border-slate-700/60 bg-slate-800/80 shadow-lg transition-opacity duration-200"
+              style={{ zIndex: 1 }}
+            >
+              <img
+                src={activeSlice.icon}
+                alt={activeSlice.title}
+                className="h-full w-full object-cover"
+              />
+            </div>
+          )}
         </div>
         <div className="min-h-[7rem] w-full min-w-0 shrink-0">
           {activeSlice ? (

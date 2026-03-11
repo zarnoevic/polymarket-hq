@@ -3,6 +3,7 @@
 import { MetricTooltip } from "./MetricTooltip";
 import { PriceHistorySparkline } from "./PriceHistorySparkline";
 import { METRIC_TOOLTIPS } from "@/lib/metric-tooltips";
+import { formatRoi } from "@/lib/position-metrics";
 
 export type Position = {
   asset: string;
@@ -58,22 +59,6 @@ function formatPercent(value: number): string {
   return `${sign}${value.toFixed(1)}%`;
 }
 
-/** ROI as "Xx" where 1x = 100% return; K/M/B/T for large values, capped to avoid overflow */
-function formatRoiAsX(roi: number): string {
-  if (roi < 0 || !Number.isFinite(roi)) return "—";
-  if (roi >= 1_000_000_000_000) {
-    const t = roi / 1_000_000_000_000;
-    return t >= 999.9 ? "999+Tx" : `${t.toFixed(1)}Tx`;
-  }
-  if (roi >= 1_000_000_000) return `${(roi / 1_000_000_000).toFixed(1)}Bx`;
-  if (roi >= 1_000_000) return `${(roi / 1_000_000).toFixed(1)}Mx`;
-  if (roi >= 1_000) return `${(roi / 1_000).toFixed(1)}Kx`;
-  if (roi >= 100) return `${roi.toFixed(1)}x`;
-  if (roi >= 10) return `${roi.toFixed(1)}x`;
-  if (roi >= 1) return `${roi.toFixed(2)}x`;
-  return `${roi.toFixed(2)}x`;
-}
-
 /** Extract date from title, e.g. "by March 15" or "March 31" */
 function parseDateFromTitle(title: string): Date | null {
   const m = title.match(/(?:by\s+)?(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2})/i);
@@ -111,7 +96,7 @@ function computeCAROI(avgPrice: number, days: number | null): string {
   if (avgPrice <= 0) return "—";
   if (days == null || days <= 0) return "—"; // need holding period to annualize
   const r = (1 - avgPrice) / avgPrice;
-  return formatRoiAsX(r * (365 / days));
+  return formatRoi(r * (365 / days));
 }
 
 /** PAROI (Present): returns numeric for sorting */
@@ -127,7 +112,15 @@ function computePAROI(curPrice: number, days: number | null): string {
   if (curPrice <= 0) return "—";
   if (days == null || days <= 0) return "—"; // need holding period to annualize
   const r = (1 - curPrice) / curPrice;
-  return formatRoiAsX(r * (365 / days));
+  return formatRoi(r * (365 / days));
+}
+
+/** ROI: 1 - 1/quoted_probability = (1 - p) / p. Implied return if we win. */
+function computeROI(quotedProbability: number): string {
+  if (quotedProbability <= 0 || quotedProbability >= 1 || !Number.isFinite(quotedProbability)) return "—";
+  const roi = (1 - quotedProbability) / quotedProbability;
+  if (!Number.isFinite(roi) || roi < 0) return "—";
+  return formatRoi(roi);
 }
 
 export function PositionsList({ positions }: { positions: Position[] }) {
@@ -143,6 +136,7 @@ export function PositionsList({ positions }: { positions: Position[] }) {
     <div className="space-y-2">
       {sorted.map((pos) => {
         const days = daysToResolution(pos.endDate, pos.title);
+        const roi = computeROI(pos.avgPrice);
         const caroi = computeCAROI(pos.avgPrice, days);
         const paroi = computePAROI(pos.curPrice, days);
         // curPrice is the price of the outcome held; for Yes it's Yes prob, for No it's No prob
@@ -193,6 +187,10 @@ export function PositionsList({ positions }: { positions: Position[] }) {
                   {pos.cashPnl >= 0 ? "+" : ""}
                   {Math.abs(pos.cashPnl) >= 1_000 ? formatCompactUsd(pos.cashPnl, 0) : formatUsd(pos.cashPnl, 2)}
                   {" "}({formatPercent(pos.percentPnl)})
+                </span>
+                <span className="inline-flex items-center gap-1 text-slate-400">
+                  ROI {roi}
+                  <MetricTooltip content={METRIC_TOOLTIPS.ROI} />
                 </span>
                 <span className="inline-flex items-center gap-1 text-slate-400">
                   CAROI {caroi}

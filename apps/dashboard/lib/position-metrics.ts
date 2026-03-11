@@ -55,6 +55,13 @@ export function daysToResolution(
   return days > 0 ? Math.max(1, days) : null;
 }
 
+/** ROI numeric: (1 - p) / p for quoted probability p. */
+export function computeROINumeric(avgPrice: number): number | null {
+  if (avgPrice <= 0 || avgPrice >= 1 || !Number.isFinite(avgPrice)) return null;
+  const roi = (1 - avgPrice) / avgPrice;
+  return Number.isFinite(roi) ? roi : null;
+}
+
 /** PAROI (Present) numeric: r = (1-P)/P, annualized. */
 export function computePAROINumeric(
   curPrice: number,
@@ -82,16 +89,26 @@ export function formatRoiAsX(roi: number): string {
   return `${roi.toFixed(2)}x`;
 }
 
+/** ROI: &lt; 1 → %, ≥ 1 → x (e.g. 0.5 → 50%, 1.5 → 1.5x). */
+export function formatRoi(roi: number): string {
+  if (roi < 0 || !Number.isFinite(roi)) return "—";
+  if (roi >= 1) return formatRoiAsX(roi);
+  const pct = roi * 100;
+  return `${pct.toFixed(1)}%`;
+}
+
 export function computePositionAverages(positions: PositionForMetrics[]): {
   avgParoi: number | null;
+  avgRoi: number | null;
   avgPositionSize: number;
   avgProfit: number;
 } {
   if (positions.length === 0) {
-    return { avgParoi: null, avgPositionSize: 0, avgProfit: 0 };
+    return { avgParoi: null, avgRoi: null, avgPositionSize: 0, avgProfit: 0 };
   }
 
   const paroiValues: number[] = [];
+  const roiValues: number[] = [];
   let sumSize = 0;
   let sumProfit = 0;
 
@@ -101,6 +118,10 @@ export function computePositionAverages(positions: PositionForMetrics[]): {
     if (Number.isFinite(paroi) && paroi > -Infinity) {
       paroiValues.push(paroi);
     }
+    const roi = computeROINumeric(pos.avgPrice);
+    if (roi != null) {
+      roiValues.push(roi);
+    }
     sumSize += Math.abs(pos.currentValue);
     sumProfit += pos.cashPnl;
   }
@@ -109,80 +130,12 @@ export function computePositionAverages(positions: PositionForMetrics[]): {
     paroiValues.length > 0
       ? paroiValues.reduce((a, b) => a + b, 0) / paroiValues.length
       : null;
+  const avgRoi =
+    roiValues.length > 0
+      ? roiValues.reduce((a, b) => a + b, 0) / roiValues.length
+      : null;
   const avgPositionSize = positions.length > 0 ? sumSize / positions.length : 0;
   const avgProfit = positions.length > 0 ? sumProfit / positions.length : 0;
 
-  return { avgParoi, avgPositionSize, avgProfit };
-}
-
-/** Activity entry for position value computation */
-export type ActivityEntryForValue = {
-  timestamp: number;
-  asset: string;
-  side: "BUY" | "SELL";
-  size: number;
-  usdcSize: number;
-};
-
-export type PositionValuePoint = { date: string; value: number; timestamp: number };
-
-/**
- * Build position value (cost basis) over time from trade activity.
- * Uses FIFO cost basis. Optionally scales to match current totalValue for consistency.
- */
-export function buildPositionValueOverTime(
-  activity: ActivityEntryForValue[],
-  totalValue: number | null
-): PositionValuePoint[] {
-  const sorted = [...activity].sort((a, b) => a.timestamp - b.timestamp);
-  const inventory = new Map<
-    string,
-    Array<{ size: number; cost: number }>
-  >();
-
-  const points: PositionValuePoint[] = [];
-
-  for (const t of sorted) {
-    const key = t.asset;
-    if (!inventory.has(key)) inventory.set(key, []);
-    const queue = inventory.get(key)!;
-
-    if (t.side === "BUY") {
-      queue.push({ size: t.size, cost: t.usdcSize });
-    } else {
-      let remaining = t.size;
-      while (remaining > 0 && queue.length > 0) {
-        const first = queue[0]!;
-        const match = Math.min(first.size, remaining);
-        const costPerUnit = first.size > 0 ? first.cost / first.size : 0;
-        const costDeducted = costPerUnit * match;
-        first.size -= match;
-        first.cost -= costDeducted;
-        remaining -= match;
-        if (first.size <= 0) queue.shift();
-      }
-    }
-
-    const totalCost = [...inventory.values()].reduce(
-      (sum, q) => sum + q.reduce((s, x) => s + x.cost, 0),
-      0
-    );
-    const date = new Date(t.timestamp * 1000).toISOString().slice(0, 10);
-    points.push({ date, value: totalCost, timestamp: t.timestamp });
-  }
-
-  if (points.length === 0) return [];
-
-  // Scale to match current totalValue if available (keeps shape, aligns endpoint)
-  const lastCost = points[points.length - 1]!.value;
-  if (
-    totalValue != null &&
-    totalValue > 0 &&
-    lastCost > 0
-  ) {
-    const scale = totalValue / lastCost;
-    return points.map((p) => ({ ...p, value: p.value * scale }));
-  }
-
-  return points;
+  return { avgParoi, avgRoi, avgPositionSize, avgProfit };
 }
