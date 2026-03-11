@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { PositionsList } from "@/app/components/PositionsList";
 import { CopyAddress } from "@/app/components/CopyAddress";
+import { AttributionPieChart } from "@/app/components/AttributionPieChart";
 
 type LeaderboardEntry = {
   rank: string;
@@ -486,8 +487,12 @@ export default async function HomePage() {
           </div>
         )}
         </div>
-        {/* Right margin: balances left so content stays centered */}
-        <div className="flex-1 min-w-0" />
+        {/* Right margin: Attribution pie chart (mirrors averages on left) */}
+        <div className="flex flex-1 items-center justify-center min-w-0">
+          {positions.length > 0 && (
+            <AttributionPieChart positions={positions} />
+          )}
+        </div>
       </div>
     </div>
   );
