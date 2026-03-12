@@ -129,6 +129,106 @@ function computeROI(quotedProbability: number, spread?: number | null): string {
   return formatRoi(roi);
 }
 
+export function PositionCard({
+  position,
+  draggable,
+  onDragStart,
+}: {
+  position: Position;
+  draggable?: boolean;
+  onDragStart?: (e: React.DragEvent, asset: string) => void;
+}) {
+  const pos = position;
+  const days = daysToResolution(pos.endDate, pos.title);
+  const roi = computeROI(pos.avgPrice, pos.spread);
+  const caroi = computeCAROI(pos.avgPrice, days, pos.spread);
+  const paroi = computePAROI(pos.curPrice, days, pos.spread);
+  const probabilityYes = pos.outcome.toLowerCase() === "yes" ? pos.curPrice : 1 - pos.curPrice;
+  const probabilityNo = 1 - probabilityYes;
+  const isYes = pos.outcome.toLowerCase() === "yes";
+  const leftPct = isYes ? probabilityYes : probabilityNo;
+  const rightPct = isYes ? probabilityNo : probabilityYes;
+
+  return (
+    <div
+      draggable={draggable}
+      onDragStart={draggable ? (e) => onDragStart?.(e, pos.asset) : undefined}
+      className={`flex items-center gap-3 overflow-hidden rounded-lg border border-slate-800/60 bg-slate-900/50 px-3 py-2 ${draggable ? "cursor-grab active:cursor-grabbing" : ""}`}
+    >
+      <img src={pos.icon} alt="" className="h-9 w-9 shrink-0 rounded object-cover" />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="truncate text-sm font-medium text-white">{pos.title}</h3>
+          <span
+            className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-medium ${
+              pos.outcome.toLowerCase() === "yes" ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
+            }`}
+          >
+            {pos.outcome}
+          </span>
+          {pos.endDate && <span className="text-xs text-slate-500">{pos.endDate}</span>}
+        </div>
+        <div className="mt-1.5 flex flex-wrap items-center gap-4 text-xs">
+          <span className="text-slate-400">
+            {formatCompactNum(pos.size)} @ {(pos.avgPrice * 100).toFixed(2)}¢ | {(pos.curPrice * 100).toFixed(2)}¢
+          </span>
+          <span className="text-slate-300">
+            {Math.abs(pos.currentValue) >= 1_000 ? formatCompactUsd(pos.currentValue, 0) : formatUsd(pos.currentValue, 2)}
+          </span>
+          <span
+            className={`font-medium ${pos.cashPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}
+          >
+            {pos.cashPnl >= 0 ? "+" : ""}
+            {Math.abs(pos.cashPnl) >= 1_000 ? formatCompactUsd(pos.cashPnl, 0) : formatUsd(pos.cashPnl, 2)} (
+            {formatPercent(pos.percentPnl)})
+          </span>
+          <span className="inline-flex items-center gap-1 text-slate-400">
+            ROI {roi}
+            <MetricTooltip content={METRIC_TOOLTIPS.ROI} />
+          </span>
+          <span className="inline-flex items-center gap-1 text-slate-400">
+            CAROI {caroi}
+            <MetricTooltip content={METRIC_TOOLTIPS.CAROI} />
+          </span>
+          <span className="inline-flex items-center gap-1 text-slate-400">
+            PAROI {paroi}
+            <MetricTooltip content={METRIC_TOOLTIPS.PAROI} />
+          </span>
+        </div>
+      </div>
+      <div className="shrink-0 flex items-center w-44 h-10">
+        <PriceHistorySparkline
+          tokenId={pos.yesId ?? pos.asset}
+          tint="yes"
+          fill
+          entryTimestamp={pos.entryTimestamp}
+          entryPrice={isYes ? pos.avgPrice : 1 - pos.avgPrice}
+        />
+      </div>
+      <div className="shrink-0 flex min-w-[90px] w-24 flex-col gap-0.5">
+        <div className="flex justify-between gap-2 text-[11px] font-medium">
+          <span className={isYes ? "text-emerald-600/90" : "text-red-600/90"}>
+            {isYes ? "Yes" : "No"} {(leftPct * 100).toFixed(0)}%
+          </span>
+          <span className={isYes ? "text-red-600/90" : "text-emerald-600/90"}>
+            {isYes ? "No" : "Yes"} {(rightPct * 100).toFixed(0)}%
+          </span>
+        </div>
+        <div className="h-1.5 rounded-full overflow-hidden flex bg-slate-800/80 ring-1 ring-slate-700/60">
+          <div
+            className={`rounded-l-full min-w-0 ${isYes ? "bg-emerald-600/70" : "bg-red-600/70"}`}
+            style={{ width: `${leftPct * 100}%` }}
+          />
+          <div
+            className={`rounded-r-full min-w-0 ${isYes ? "bg-red-600/70" : "bg-emerald-600/70"}`}
+            style={{ width: `${rightPct * 100}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function PositionsList({ positions }: { positions: Position[] }) {
   const sorted = [...positions].sort((a, b) => {
     const daysA = daysToResolution(a.endDate, a.title);
@@ -140,102 +240,9 @@ export function PositionsList({ positions }: { positions: Position[] }) {
 
   return (
     <div className="space-y-2">
-      {sorted.map((pos) => {
-        const days = daysToResolution(pos.endDate, pos.title);
-        const roi = computeROI(pos.avgPrice, pos.spread);
-        const caroi = computeCAROI(pos.avgPrice, days, pos.spread);
-        const paroi = computePAROI(pos.curPrice, days, pos.spread);
-        // curPrice is the price of the outcome held; for Yes it's Yes prob, for No it's No prob
-        const probabilityYes = pos.outcome.toLowerCase() === "yes" ? pos.curPrice : 1 - pos.curPrice;
-        const probabilityNo = 1 - probabilityYes;
-        const isYes = pos.outcome.toLowerCase() === "yes";
-        // Yes position: Yes left, No right. No position: No left, Yes right.
-        const leftPct = isYes ? probabilityYes : probabilityNo;
-        const rightPct = isYes ? probabilityNo : probabilityYes;
-        return (
-          <div
-            key={pos.asset}
-            className="flex items-center gap-3 overflow-hidden rounded-lg border border-slate-800/60 bg-slate-900/50 px-3 py-2"
-          >
-            <img
-              src={pos.icon}
-              alt=""
-              className="h-9 w-9 shrink-0 rounded object-cover"
-            />
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="truncate text-sm font-medium text-white">{pos.title}</h3>
-                <span
-                  className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-medium ${
-                    pos.outcome.toLowerCase() === "yes"
-                      ? "bg-emerald-500/20 text-emerald-400"
-                      : "bg-red-500/20 text-red-400"
-                  }`}
-                >
-                  {pos.outcome}
-                </span>
-                {pos.endDate && (
-                  <span className="text-xs text-slate-500">{pos.endDate}</span>
-                )}
-              </div>
-              <div className="mt-1.5 flex flex-wrap items-center gap-4 text-xs">
-                <span className="text-slate-400">
-                  {formatCompactNum(pos.size)} @ {(pos.avgPrice * 100).toFixed(2)}¢ | {(pos.curPrice * 100).toFixed(2)}¢
-                </span>
-                <span className="text-slate-300">
-                  {Math.abs(pos.currentValue) >= 1_000 ? formatCompactUsd(pos.currentValue, 0) : formatUsd(pos.currentValue, 2)}
-                </span>
-                <span
-                  className={`font-medium ${
-                    pos.cashPnl >= 0 ? "text-emerald-400" : "text-red-400"
-                  }`}
-                >
-                  {pos.cashPnl >= 0 ? "+" : ""}
-                  {Math.abs(pos.cashPnl) >= 1_000 ? formatCompactUsd(pos.cashPnl, 0) : formatUsd(pos.cashPnl, 2)}
-                  {" "}({formatPercent(pos.percentPnl)})
-                </span>
-                <span className="inline-flex items-center gap-1 text-slate-400">
-                  ROI {roi}
-                  <MetricTooltip content={METRIC_TOOLTIPS.ROI} />
-                </span>
-                <span className="inline-flex items-center gap-1 text-slate-400">
-                  CAROI {caroi}
-                  <MetricTooltip content={METRIC_TOOLTIPS.CAROI} />
-                </span>
-                <span className="inline-flex items-center gap-1 text-slate-400">
-                  PAROI {paroi}
-                  <MetricTooltip content={METRIC_TOOLTIPS.PAROI} />
-                </span>
-              </div>
-            </div>
-            <div className="shrink-0 flex items-center w-44 h-10">
-              <PriceHistorySparkline
-                tokenId={pos.yesId ?? pos.asset}
-                tint="yes"
-                fill
-                entryTimestamp={pos.entryTimestamp}
-                entryPrice={isYes ? pos.avgPrice : 1 - pos.avgPrice}
-              />
-            </div>
-            <div className="shrink-0 flex min-w-[90px] w-24 flex-col gap-0.5">
-              <div className="flex justify-between gap-2 text-[11px] font-medium">
-                <span className={isYes ? "text-emerald-600/90" : "text-red-600/90"}>{isYes ? "Yes" : "No"} {(leftPct * 100).toFixed(0)}%</span>
-                <span className={isYes ? "text-red-600/90" : "text-emerald-600/90"}>{isYes ? "No" : "Yes"} {(rightPct * 100).toFixed(0)}%</span>
-              </div>
-              <div className="h-1.5 rounded-full overflow-hidden flex bg-slate-800/80 ring-1 ring-slate-700/60">
-                <div
-                  className={`rounded-l-full min-w-0 ${isYes ? "bg-emerald-600/70" : "bg-red-600/70"}`}
-                  style={{ width: `${leftPct * 100}%` }}
-                />
-                <div
-                  className={`rounded-r-full min-w-0 ${isYes ? "bg-red-600/70" : "bg-emerald-600/70"}`}
-                  style={{ width: `${rightPct * 100}%` }}
-                />
-              </div>
-            </div>
-          </div>
-        );
-      })}
+      {sorted.map((pos) => (
+        <PositionCard key={pos.asset} position={pos} />
+      ))}
     </div>
   );
 }

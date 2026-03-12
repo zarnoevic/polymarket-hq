@@ -19,7 +19,9 @@ import {
   PiggyBank,
   Percent,
 } from "lucide-react";
-import { PositionsList } from "@/app/components/PositionsList";
+import { CategorizedPositionsList } from "@/app/components/CategorizedPositionsList";
+import { CategoryAttributionPieChart } from "@/app/components/CategoryAttributionPieChart";
+import { CategoryCompositionPieChart } from "@/app/components/CategoryCompositionPieChart";
 import { CopyAddress } from "@/app/components/CopyAddress";
 import { AttributionPieChart } from "@/app/components/AttributionPieChart";
 
@@ -289,6 +291,9 @@ export default async function HomePage() {
   const { chanceTotalWin, initialChanceTotalWin } =
     computeTotalWinChances(positions);
 
+  const wallet =
+    process.env.POLYMARKET_MAIN_WALLET ?? DEFAULT_WALLET;
+
   return (
     <div className="bg-[rgb(var(--background-rgb))]">
       {/* Subtle grid background */}
@@ -319,6 +324,17 @@ export default async function HomePage() {
                       <p className="text-xs text-slate-400">Value</p>
                       <p className="font-semibold text-emerald-400">
                         {formatCompact(totalWinValue)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15 text-indigo-400">
+                      <Layers className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Positions</p>
+                      <p className="font-semibold text-white">
+                        {positions.length}
                       </p>
                     </div>
                   </div>
@@ -579,15 +595,11 @@ export default async function HomePage() {
 
             </div>
 
-            {/* Positions */}
             {positions.length > 0 && (
-              <div className="space-y-2">
-                <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
-                  <Layers className="h-4 w-4 text-indigo-400" />
-                  Positions ({positions.length})
-                </h2>
-                <PositionsList positions={positions} />
-              </div>
+              <CategorizedPositionsList
+                positions={positions}
+                wallet={process.env.POLYMARKET_MAIN_WALLET ?? DEFAULT_WALLET}
+              />
             )}
 
           </div>
@@ -605,10 +617,20 @@ export default async function HomePage() {
           </div>
         )}
         </div>
-        {/* Right margin: Attribution pie chart (mirrors averages on left) */}
-        <div className="flex flex-1 items-center justify-center min-w-0">
+        {/* Right margin: Pie charts - allocation, category 24h, positions 24h */}
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 min-w-0 py-4">
           {positions.length > 0 && (
-            <AttributionPieChart positions={positions} />
+            <>
+              <CategoryCompositionPieChart
+                positions={positions}
+                wallet={process.env.POLYMARKET_MAIN_WALLET ?? DEFAULT_WALLET}
+              />
+              <CategoryAttributionPieChart
+                positions={positions}
+                wallet={process.env.POLYMARKET_MAIN_WALLET ?? DEFAULT_WALLET}
+              />
+              <AttributionPieChart positions={positions} />
+            </>
           )}
         </div>
       </div>

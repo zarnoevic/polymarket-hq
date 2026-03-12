@@ -140,36 +140,42 @@ export function PriceHistorySparkline({
 
   const tooltip = `${label} price: ${(prices[prices.length - 1]! * 100).toFixed(1)}%`;
   return (
-    <svg
-      {...(fill ? { width: "100%", height: "100%" } : { width: w, height: h })}
-      className={`rounded ${className ?? ""}`}
-      viewBox={`0 0 ${w} ${h}`}
-      preserveAspectRatio="none"
-      aria-label={tooltip}
-      role="img"
-    >
-      <title>{tooltip}</title>
-      <path
-        d={pathD}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="0.75"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        vectorEffect="non-scaling-stroke"
-        className={strokeClass}
-      />
-      {entryDot != null && (
-        <circle
-          cx={entryDot.cx}
-          cy={entryDot.cy}
-          r={2.5}
-          fill="#3B82F6"
-          stroke="#1E3A8A"
-          strokeWidth="1"
+    <div className={`relative ${fill ? "w-full h-full" : ""}`} style={fill ? {} : { width: w, height: h }}>
+      <svg
+        {...(fill ? { width: "100%", height: "100%" } : { width: w, height: h })}
+        className={`rounded block ${className ?? ""}`}
+        viewBox={`0 0 ${w} ${h}`}
+        preserveAspectRatio="none"
+        aria-label={tooltip}
+        role="img"
+      >
+        <title>{tooltip}</title>
+        <path
+          d={pathD}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="0.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
           vectorEffect="non-scaling-stroke"
+          className={strokeClass}
+        />
+      </svg>
+      {entryDot != null && (
+        <div
+          className="absolute rounded-full bg-yellow-500 border border-yellow-700 pointer-events-none"
+          style={{
+            width: 6,
+            height: 6,
+            minWidth: 6,
+            minHeight: 6,
+            left: `${(entryDot.cx / w) * 100}%`,
+            top: `${(entryDot.cy / h) * 100}%`,
+            transform: "translate(-50%, -50%)",
+          }}
+          aria-hidden
         />
       )}
-    </svg>
+    </div>
   );
 }

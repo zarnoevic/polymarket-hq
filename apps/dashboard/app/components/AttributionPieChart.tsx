@@ -1,6 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import {
+  daysToResolution,
+  formatRoi,
+  computeROINumeric,
+  computePAROINumeric,
+} from "@/lib/position-metrics";
+import { MetricTooltip } from "./MetricTooltip";
+import { PriceHistorySparkline } from "./PriceHistorySparkline";
+import { METRIC_TOOLTIPS } from "@/lib/metric-tooltips";
 
 const CLOB_BASE = "https://clob.polymarket.com";
 
@@ -17,6 +26,8 @@ type Position = {
   outcome: string;
   yesId?: string;
   icon?: string;
+  endDate?: string;
+  spread?: number | null;
 };
 
 type HistoryPoint = { t: number; p: number };
@@ -61,6 +72,17 @@ function formatPositionValue(value: number): string {
   return `$${abs.toFixed(2)}`;
 }
 
+function computeCAROINumeric(
+  avgPrice: number,
+  days: number | null,
+  spread?: number | null
+): number | null {
+  const buyPrice = Math.min(0.99, avgPrice + (spread ?? 0));
+  if (buyPrice <= 0 || days == null || days <= 0) return null;
+  const r = (1 - buyPrice) / buyPrice;
+  return r * (365 / days);
+}
+
 type Slice = {
   title: string;
   pnl24h: number;
@@ -73,6 +95,10 @@ type Slice = {
   /** Position value - uses currentValue from API when available */
   positionValue: number;
   icon?: string;
+  roi: string;
+  caroi: string;
+  paroi: string;
+  sparkline?: { yesId: string; entryTimestamp?: number; outcome: string; avgPrice: number };
 };
 
 export function AttributionPieChart({ positions }: { positions: Position[] }) {
@@ -135,6 +161,20 @@ export function AttributionPieChart({ positions }: { positions: Position[] }) {
         const investedAmount =
           entryPrice != null ? pos.size * entryPrice : null;
 
+        const days = daysToResolution(pos.endDate ?? "", pos.title);
+        const roiNum = entryPrice != null ? computeROINumeric(entryPrice, pos.spread) : null;
+        const caroiNum = entryPrice != null ? computeCAROINumeric(entryPrice, days, pos.spread) : null;
+        const paroiNum = computePAROINumeric(priceNow, days, pos.spread);
+        const sparkline =
+          pos.yesId ?? pos.asset
+            ? {
+                yesId: pos.yesId ?? pos.asset,
+                entryTimestamp: pos.entryTimestamp,
+                outcome: pos.outcome,
+                avgPrice: entryPrice ?? 0.5,
+              }
+            : undefined;
+
         return {
           title: pos.title,
           pnl24h,
@@ -143,6 +183,10 @@ export function AttributionPieChart({ positions }: { positions: Position[] }) {
           investedAmount,
           positionValue,
           icon: pos.icon,
+          roi: roiNum != null ? formatRoi(roiNum) : "—",
+          caroi: caroiNum != null ? formatRoi(caroiNum) : "—",
+          paroi: Number.isFinite(paroiNum) && paroiNum > -Infinity ? formatRoi(paroiNum) : "—",
+          sparkline,
         };
       });
       const results = await Promise.all(promises);
@@ -150,36 +194,28 @@ export function AttributionPieChart({ positions }: { positions: Position[] }) {
       const fullTotal = results.reduce((s, r) => s + r.pnl24h, 0);
       setTotalPnl24h(fullTotal);
       const totalAbs = results.reduce((s, r) => s + Math.abs(r.pnl24h), 0);
-      const withShares = results
-        .map((r) => ({
-          ...r,
-          absShare: totalAbs > 0 ? Math.abs(r.pnl24h) / totalAbs : 0,
-          color: r.pnl24h >= 0 ? "#34D399" : "#F87171",
-          priceThen: r.priceThen,
-          priceNow: r.priceNow,
-          investedAmount: r.investedAmount,
-          positionValue: r.positionValue,
-          icon: r.icon,
-        }))
-        .filter((r) => r.absShare > 0.001)
-        // Sort so winners (green) are contiguous, then losers (red)
-        .sort((a, b) => (b.pnl24h >= 0 ? 1 : -1) - (a.pnl24h >= 0 ? 1 : -1));
-      setSlices(
-        withShares.length > 0
-          ? withShares
-          : results
-              .map((r) => ({
-                ...r,
-                absShare: 0,
-                color: "#64748b",
-                priceThen: r.priceThen,
-                priceNow: r.priceNow,
-                investedAmount: r.investedAmount,
-                positionValue: r.positionValue,
-                icon: r.icon,
-              }))
-              .sort((a, b) => (b.pnl24h >= 0 ? 1 : -1) - (a.pnl24h >= 0 ? 1 : -1))
+      const MIN_SHARE = 0.02;
+      const withRawShare = results.map((r) => ({
+        ...r,
+        rawShare: totalAbs > 0 ? Math.abs(r.pnl24h) / totalAbs : 1 / results.length,
+        color: r.pnl24h >= 0 ? "#34D399" : "#F87171",
+        priceThen: r.priceThen,
+        priceNow: r.priceNow,
+        investedAmount: r.investedAmount,
+        positionValue: r.positionValue,
+        icon: r.icon,
+      }));
+      const totalAdjusted = withRawShare.reduce(
+        (s, r) => s + Math.max(r.rawShare, MIN_SHARE),
+        0
       );
+      const withShares = withRawShare
+        .map(({ rawShare, ...r }) => ({
+          ...r,
+          absShare: totalAdjusted > 0 ? Math.max(rawShare, MIN_SHARE) / totalAdjusted : 1 / results.length,
+        }))
+        .sort((a, b) => (b.pnl24h >= 0 ? 1 : -1) - (a.pnl24h >= 0 ? 1 : -1));
+      setSlices(withShares);
       setLoading(false);
     };
     run();
@@ -332,20 +368,50 @@ function PieChartInner({
               <p className="text-sm font-medium text-slate-200 leading-snug">
                 {activeSlice.title}
               </p>
-              <div className="mt-2 space-y-1 text-sm">
-                {activeSlice.investedAmount != null && (
-                  <p className="font-mono text-slate-300">
+              {activeSlice.sparkline && (
+                <div className="mt-2 flex h-10 w-full items-center justify-center">
+                  <PriceHistorySparkline
+                    tokenId={activeSlice.sparkline.yesId}
+                    tint="yes"
+                    fill
+                    entryTimestamp={activeSlice.sparkline.entryTimestamp}
+                    entryPrice={
+                      activeSlice.sparkline.outcome.toLowerCase() === "yes"
+                        ? activeSlice.sparkline.avgPrice
+                        : 1 - activeSlice.sparkline.avgPrice
+                    }
+                  />
+                </div>
+              )}
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
+                {activeSlice.investedAmount != null && activeSlice.investedAmount > 0 && (
+                  <span className="font-mono text-slate-300">
                     {formatPositionValue(activeSlice.investedAmount)} invested
-                  </p>
+                  </span>
                 )}
-                <p className="font-mono text-slate-400">
+                <span className="font-mono text-slate-400">
                   {activeSlice.priceThen != null
                     ? `${formatPrice(activeSlice.priceThen)} → ${formatPrice(activeSlice.priceNow)}`
                     : `${formatPrice(activeSlice.priceNow)} now`}
-                </p>
+                </span>
+                <span className="inline-flex items-center gap-1 text-slate-400">
+                  ROI {activeSlice.roi}
+                  <MetricTooltip content={METRIC_TOOLTIPS.ROI} />
+                </span>
+                <span className="inline-flex items-center gap-1 text-slate-400">
+                  CAROI {activeSlice.caroi}
+                  <MetricTooltip content={METRIC_TOOLTIPS.CAROI} />
+                </span>
+                <span className="inline-flex items-center gap-1 text-slate-400">
+                  PAROI {activeSlice.paroi}
+                  <MetricTooltip content={METRIC_TOOLTIPS.PAROI} />
+                </span>
               </div>
+              <p className="mt-2 text-[10px] uppercase tracking-wider text-slate-500">
+                24h contribution
+              </p>
               <p
-                className={`mt-2 text-base font-semibold ${
+                className={`text-base font-semibold ${
                   activeSlice.pnl24h >= 0 ? "text-emerald-400" : "text-red-400"
                 }`}
               >
