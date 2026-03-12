@@ -3,6 +3,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { PositionCard, type Position } from "./PositionsList";
+import { formatRoi } from "@/lib/position-metrics";
+import { MetricTooltip } from "./MetricTooltip";
+import { METRIC_TOOLTIPS } from "@/lib/metric-tooltips";
 import { FolderPlus, GripVertical, Pencil, Trash2, RefreshCw } from "lucide-react";
 
 const UNCategorized_ID = "__uncategorized__";
@@ -82,6 +85,51 @@ function sortByPAROI(positions: Position[]): Position[] {
     const paroiB = computePAROINumeric(b.curPrice, daysB, b.spread);
     return paroiB - paroiA;
   });
+}
+
+function formatCompactUsd(value: number, decimals = 0): string {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "−" : "";
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1)}K`;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(value);
+}
+
+function computeCategoryMetrics(posList: Position[]): {
+  totalValue: number;
+  totalReturn: number;
+  roi: string;
+  paroi: string;
+} {
+  if (posList.length === 0) {
+    return { totalValue: 0, totalReturn: 0, roi: "—", paroi: "—" };
+  }
+  const totalValue = posList.reduce((s, p) => s + Math.abs(p.currentValue), 0);
+  const totalReturn = posList.reduce((s, p) => s + p.cashPnl, 0);
+  const totalInvested = posList.reduce((s, p) => s + p.initialValue, 0);
+  const roi =
+    totalInvested > 0
+      ? formatRoi(totalReturn / totalInvested)
+      : "—";
+  let paroiSum = 0;
+  let paroiWeight = 0;
+  for (const pos of posList) {
+    const val = Math.abs(pos.currentValue);
+    if (val <= 0) continue;
+    const days = daysToResolution(pos.endDate, pos.title);
+    const p = computePAROINumeric(pos.curPrice, days, pos.spread);
+    if (Number.isFinite(p)) {
+      paroiSum += p * val;
+      paroiWeight += val;
+    }
+  }
+  const paroi = paroiWeight > 0 ? formatRoi(paroiSum / paroiWeight) : "—";
+  return { totalValue, totalReturn, roi, paroi };
 }
 
 export function CategorizedPositionsList({
@@ -259,6 +307,7 @@ export function CategorizedPositionsList({
 
       {categoryList.map((cat) => {
         const posList = sortByPAROI(posByCategory.get(cat.id) ?? []);
+        const metrics = computeCategoryMetrics(posList);
         const isUncategorized = cat.id === UNCategorized_ID;
 
         const isDragOver = dragOverCategoryId === cat.id;
@@ -297,6 +346,25 @@ export function CategorizedPositionsList({
                 <>
                   <h3 className="text-sm font-medium text-slate-300">{cat.name}</h3>
                   <span className="text-xs text-slate-500">({posList.length})</span>
+                  {posList.length > 0 && (
+                    <div className="ml-3 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs">
+                      <span className="font-mono text-slate-400">
+                        Value {formatCompactUsd(metrics.totalValue, 0)}
+                      </span>
+                      <span
+                        className={`font-mono ${metrics.totalReturn >= 0 ? "text-emerald-400" : "text-red-400"}`}
+                      >
+                        Return {metrics.totalReturn >= 0 ? "+" : ""}
+                        {formatCompactUsd(metrics.totalReturn, 0)}
+                      </span>
+                      <span className="inline-flex items-center gap-1 font-mono text-slate-400">
+                        <MetricTooltip content={METRIC_TOOLTIPS.ROI} trigger="ROI" /> {metrics.roi}
+                      </span>
+                      <span className="inline-flex items-center gap-1 font-mono text-slate-400">
+                        <MetricTooltip content={METRIC_TOOLTIPS.PAROI} trigger="PAROI" /> {metrics.paroi}
+                      </span>
+                    </div>
+                  )}
                   {!isUncategorized && (
                     <div className="ml-auto flex items-center gap-1">
                       <button

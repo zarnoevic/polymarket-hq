@@ -183,16 +183,13 @@ export function PositionCard({
             {formatPercent(pos.percentPnl)})
           </span>
           <span className="inline-flex items-center gap-1 text-slate-400">
-            ROI {roi}
-            <MetricTooltip content={METRIC_TOOLTIPS.ROI} />
+            <MetricTooltip content={METRIC_TOOLTIPS.ROI} trigger="ROI" /> {roi}
           </span>
           <span className="inline-flex items-center gap-1 text-slate-400">
-            CAROI {caroi}
-            <MetricTooltip content={METRIC_TOOLTIPS.CAROI} />
+            <MetricTooltip content={METRIC_TOOLTIPS.CAROI} trigger="CAROI" /> {caroi}
           </span>
           <span className="inline-flex items-center gap-1 text-slate-400">
-            PAROI {paroi}
-            <MetricTooltip content={METRIC_TOOLTIPS.PAROI} />
+            <MetricTooltip content={METRIC_TOOLTIPS.PAROI} trigger="PAROI" /> {paroi}
           </span>
         </div>
       </div>

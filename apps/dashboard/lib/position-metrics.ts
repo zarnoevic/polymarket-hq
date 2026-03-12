@@ -78,28 +78,31 @@ export function computePAROINumeric(
   return r * (365 / days);
 }
 
-/** ROI as "Xx" where 1x = 100% return. */
+/** ROI as "Xx" where 1x = 100% return. Supports negative values (e.g. -1.5x). */
 export function formatRoiAsX(roi: number): string {
-  if (roi < 0 || !Number.isFinite(roi)) return "—";
-  if (roi >= 1_000_000_000_000) {
-    const t = roi / 1_000_000_000_000;
-    return t >= 999.9 ? "999+Tx" : `${t.toFixed(1)}Tx`;
+  if (!Number.isFinite(roi)) return "—";
+  const sign = roi < 0 ? "−" : "";
+  const abs = Math.abs(roi);
+  if (abs >= 1_000_000_000_000) {
+    const t = abs / 1_000_000_000_000;
+    return `${sign}${t >= 999.9 ? "999+Tx" : `${t.toFixed(1)}Tx`}`;
   }
-  if (roi >= 1_000_000_000) return `${(roi / 1_000_000_000).toFixed(1)}Bx`;
-  if (roi >= 1_000_000) return `${(roi / 1_000_000).toFixed(1)}Mx`;
-  if (roi >= 1_000) return `${(roi / 1_000).toFixed(1)}Kx`;
-  if (roi >= 100) return `${roi.toFixed(1)}x`;
-  if (roi >= 10) return `${roi.toFixed(1)}x`;
-  if (roi >= 1) return `${roi.toFixed(2)}x`;
-  return `${roi.toFixed(2)}x`;
+  if (abs >= 1_000_000_000) return `${sign}${(abs / 1_000_000_000).toFixed(1)}Bx`;
+  if (abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toFixed(1)}Mx`;
+  if (abs >= 1_000) return `${sign}${(abs / 1_000).toFixed(1)}Kx`;
+  if (abs >= 100) return `${sign}${abs.toFixed(1)}x`;
+  if (abs >= 10) return `${sign}${abs.toFixed(1)}x`;
+  if (abs >= 1) return `${sign}${abs.toFixed(2)}x`;
+  return `${sign}${abs.toFixed(2)}x`;
 }
 
-/** ROI: &lt; 1 → %, ≥ 1 → x (e.g. 0.5 → 50%, 1.5 → 1.5x). */
+/** ROI: |roi| < 1 → %, |roi| ≥ 1 → x (e.g. 0.5 → 50%, -1.5 → -1.5x). Shows negative values. */
 export function formatRoi(roi: number): string {
-  if (roi < 0 || !Number.isFinite(roi)) return "—";
-  if (roi >= 1) return formatRoiAsX(roi);
+  if (!Number.isFinite(roi)) return "—";
+  if (roi >= 1 || roi <= -1) return formatRoiAsX(roi);
   const pct = roi * 100;
-  return `${pct.toFixed(1)}%`;
+  const sign = roi < 0 ? "−" : "";
+  return `${sign}${Math.abs(pct).toFixed(1)}%`;
 }
 
 export function computePositionAverages(positions: PositionForMetrics[]): {

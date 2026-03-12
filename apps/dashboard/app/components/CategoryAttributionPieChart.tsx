@@ -539,16 +539,13 @@ function CategoryPieChartInner({
                   </span>
                 )}
                 <span className="inline-flex items-center gap-1 text-slate-400">
-                  ROI {activeSlice.roi}
-                  <MetricTooltip content={METRIC_TOOLTIPS.ROI} />
+                  <MetricTooltip content={METRIC_TOOLTIPS.ROI} trigger="ROI" /> {activeSlice.roi}
                 </span>
                 <span className="inline-flex items-center gap-1 text-slate-400">
-                  CAROI {activeSlice.caroi}
-                  <MetricTooltip content={METRIC_TOOLTIPS.CAROI} />
+                  <MetricTooltip content={METRIC_TOOLTIPS.CAROI} trigger="CAROI" /> {activeSlice.caroi}
                 </span>
                 <span className="inline-flex items-center gap-1 text-slate-400">
-                  PAROI {activeSlice.paroi}
-                  <MetricTooltip content={METRIC_TOOLTIPS.PAROI} />
+                  <MetricTooltip content={METRIC_TOOLTIPS.PAROI} trigger="PAROI" /> {activeSlice.paroi}
                 </span>
               </div>
             </div>

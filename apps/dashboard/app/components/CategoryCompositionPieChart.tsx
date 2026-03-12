@@ -18,6 +18,8 @@ type Position = {
   size: number;
   curPrice: number;
   avgPrice?: number;
+  /** From Polymarket API - canonical amount invested (matches positions list). */
+  initialValue?: number;
   currentValue?: number;
   entryTimestamp?: number;
   outcome: string;
@@ -26,6 +28,18 @@ type Position = {
   endDate?: string;
   spread?: number | null;
 };
+
+/** Position value for allocation: use API currentValue when available (matches Positions card), else size×curPrice. */
+function getPositionValue(pos: Position): number {
+  if (
+    pos.currentValue != null &&
+    Number.isFinite(pos.currentValue) &&
+    pos.currentValue >= 0
+  ) {
+    return pos.currentValue;
+  }
+  return pos.size * (pos.curPrice ?? 0);
+}
 
 function computeCAROINumeric(
   avgPrice: number,
@@ -89,11 +103,13 @@ export function CategoryCompositionPieChart({
   wallet?: string;
 }) {
   const [slices, setSlices] = useState<CompositionSlice[]>([]);
+  const [totalInvested, setTotalInvested] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (positions.length === 0) {
       setSlices([]);
+      setTotalInvested(0);
       setLoading(false);
       return;
     }
@@ -109,13 +125,7 @@ export function CategoryCompositionPieChart({
 
     for (const pos of positions) {
       const categoryId = positionToCategory[pos.asset] ?? UNCategorized_ID;
-      const invested =
-        pos.avgPrice != null &&
-        Number.isFinite(pos.avgPrice) &&
-        pos.avgPrice > 0 &&
-        pos.avgPrice < 1
-          ? pos.size * pos.avgPrice
-          : pos.size * (pos.curPrice ?? 0);
+      const invested = getPositionValue(pos);
 
       const cur = byCategory.get(categoryId);
       if (!cur) {
@@ -126,14 +136,14 @@ export function CategoryCompositionPieChart({
       }
     }
 
-    const totalInvested = Array.from(byCategory.values()).reduce(
+    const computedTotal = Array.from(byCategory.values()).reduce(
       (s, c) => s + c.invested,
       0
     );
 
     const slicesArray: CompositionSlice[] = Array.from(byCategory.entries())
       .map(([catId, { invested, positions: catPositions }], idx) => {
-        const share = totalInvested > 0 ? invested / totalInvested : 0;
+        const share = computedTotal > 0 ? invested / computedTotal : 0;
         const bestPos = catPositions.reduce((best, cur) => {
           const days = daysToResolution(cur.endDate ?? "", cur.title);
           const paroi = computePAROINumeric(cur.curPrice, days, cur.spread);
@@ -148,19 +158,25 @@ export function CategoryCompositionPieChart({
         let sumParoi = 0;
         let weightSum = 0;
         for (const pos of catPositions) {
-          const inv =
+          const inv = getPositionValue(pos);
+          totalInvestedCat += inv;
+          if (inv <= 0) continue;
+          const days = daysToResolution(pos.endDate ?? "", pos.title);
+          const roi =
             pos.avgPrice != null &&
             Number.isFinite(pos.avgPrice) &&
             pos.avgPrice > 0 &&
             pos.avgPrice < 1
-              ? pos.size * pos.avgPrice
-              : 0;
-          if (inv <= 0) continue;
-          const days = daysToResolution(pos.endDate ?? "", pos.title);
-          const roi = computeROINumeric(pos.avgPrice!, pos.spread);
-          const caroi = computeCAROINumeric(pos.avgPrice!, days, pos.spread);
+              ? computeROINumeric(pos.avgPrice, pos.spread)
+              : null;
+          const caroi =
+            pos.avgPrice != null &&
+            Number.isFinite(pos.avgPrice) &&
+            pos.avgPrice > 0 &&
+            pos.avgPrice < 1
+              ? computeCAROINumeric(pos.avgPrice, days, pos.spread)
+              : null;
           const paroi = computePAROINumeric(pos.curPrice, days, pos.spread);
-          totalInvestedCat += inv;
           if (roi != null) {
             sumRoi += roi * inv;
             weightSum += inv;
@@ -197,11 +213,33 @@ export function CategoryCompositionPieChart({
             wParoi != null && wParoi > -Infinity ? formatRoi(wParoi) : "—",
           sparkline,
         };
-      })
-      .filter((s) => s.share > 0.001)
-      .sort((a, b) => b.share - a.share);
+      });
 
-    setSlices(slicesArray);
+    const MIN_SHARE = 0.001;
+    const aboveThreshold = slicesArray.filter((s) => s.share > MIN_SHARE);
+    const belowThreshold = slicesArray.filter((s) => s.share <= MIN_SHARE);
+    const otherInvested = belowThreshold.reduce((s, sl) => s + sl.investedAmount, 0);
+    const otherShare = computedTotal > 0 ? otherInvested / computedTotal : 0;
+
+    const slicesFinal =
+      otherInvested > 0 && belowThreshold.length > 0
+        ? [
+            ...aboveThreshold.sort((a, b) => b.share - a.share),
+            {
+              title: "Other",
+              investedAmount: otherInvested,
+              share: otherShare,
+              positionCount: belowThreshold.reduce((s, sl) => s + sl.positionCount, 0),
+              color: "#475569",
+              roi: "—",
+              caroi: "—",
+              paroi: "—",
+            } as CompositionSlice,
+          ]
+        : aboveThreshold.sort((a, b) => b.share - a.share);
+
+    setSlices(slicesFinal);
+    setTotalInvested(computedTotal);
     setLoading(false);
   }, [positions, wallet]);
 
@@ -235,9 +273,7 @@ export function CategoryCompositionPieChart({
   }
 
   return (
-    <CompositionPieChartInner slices={slices} totalInvested={
-      slices.reduce((s, sl) => s + sl.investedAmount, 0)
-    } />
+    <CompositionPieChartInner slices={slices} totalInvested={totalInvested} />
   );
 }
 
@@ -344,7 +380,7 @@ function CompositionPieChartInner({
               <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
                 {activeSlice.investedAmount > 0 && (
                   <span className="font-mono text-slate-300">
-                    {formatPositionValue(activeSlice.investedAmount)} invested
+                    {formatPositionValue(activeSlice.investedAmount)} value
                   </span>
                 )}
                 <span className="font-mono text-slate-400">
@@ -355,22 +391,19 @@ function CompositionPieChartInner({
                   {(activeSlice.share * 100).toFixed(1)}%
                 </span>
                 <span className="inline-flex items-center gap-1 text-slate-400">
-                  ROI {activeSlice.roi}
-                  <MetricTooltip content={METRIC_TOOLTIPS.ROI} />
+                  <MetricTooltip content={METRIC_TOOLTIPS.ROI} trigger="ROI" /> {activeSlice.roi}
                 </span>
                 <span className="inline-flex items-center gap-1 text-slate-400">
-                  CAROI {activeSlice.caroi}
-                  <MetricTooltip content={METRIC_TOOLTIPS.CAROI} />
+                  <MetricTooltip content={METRIC_TOOLTIPS.CAROI} trigger="CAROI" /> {activeSlice.caroi}
                 </span>
                 <span className="inline-flex items-center gap-1 text-slate-400">
-                  PAROI {activeSlice.paroi}
-                  <MetricTooltip content={METRIC_TOOLTIPS.PAROI} />
+                  <MetricTooltip content={METRIC_TOOLTIPS.PAROI} trigger="PAROI" /> {activeSlice.paroi}
                 </span>
               </div>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-3 text-center">
-              <p className="text-xs text-slate-500">Total invested</p>
+              <p className="text-xs text-slate-500">Positions value</p>
               <p className="mt-0.5 text-xl font-bold text-white">
                 {formatPositionValue(totalInvested)}
               </p>

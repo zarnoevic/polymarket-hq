@@ -39,7 +39,7 @@ type LeaderboardEntry = {
 const DEFAULT_WALLET = "0x25012ec798e4861e38c645df919f86dc3c177e28";
 
 // Total traders on Polymarket (for percentile calculation; not displayed)
-const TOTAL_TRADERS = 2_360_397;
+const TOTAL_TRADERS = 2_361_540;
 
 // Polygon USDC.e (bridged) - 6 decimals
 const USDC_E_POLYGON = "0x2791bca1f2de4661ed88a30c99a7a9449aa84174" as const;

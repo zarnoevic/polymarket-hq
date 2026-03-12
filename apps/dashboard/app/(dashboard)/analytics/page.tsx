@@ -121,8 +121,7 @@ function MetricCard({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 truncate text-xs font-medium uppercase tracking-wider text-slate-500">
-            {titleEl}
-            {tooltip && <MetricTooltip content={tooltip} />}
+            {tooltip ? <MetricTooltip content={tooltip} trigger={titleEl} /> : titleEl}
           </div>
           <p className="truncate font-semibold text-white">{value}</p>
           {sub && <p className="text-xs text-slate-500">{sub}</p>}

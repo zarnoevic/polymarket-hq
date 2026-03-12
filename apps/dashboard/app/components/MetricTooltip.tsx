@@ -1,10 +1,16 @@
 "use client";
 
 import { HelpCircle } from "lucide-react";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-export function MetricTooltip({ content }: { content: string }) {
+type MetricTooltipProps = {
+  content: string;
+  /** When provided, this label is the hover target (e.g. "ROI") instead of the ? icon. */
+  trigger?: ReactNode;
+};
+
+export function MetricTooltip({ content, trigger }: MetricTooltipProps) {
   const [visible, setVisible] = useState(false);
   const [coords, setCoords] = useState({ x: 0, y: 0, placement: "top" as "top" | "bottom" });
   const triggerRef = useRef<HTMLSpanElement>(null);
@@ -98,9 +104,15 @@ export function MetricTooltip({ content }: { content: string }) {
         onMouseEnter={updatePositionAndShow}
         onMouseLeave={scheduleHide}
       >
-        <span className="cursor-help text-slate-500 transition-colors hover:text-indigo-400">
-          <HelpCircle className="h-3.5 w-3.5" />
-        </span>
+        {trigger != null ? (
+          <span className="cursor-help underline decoration-dotted decoration-slate-500 underline-offset-1 transition-colors hover:decoration-indigo-400 hover:text-indigo-400">
+            {trigger}
+          </span>
+        ) : (
+          <span className="cursor-help text-slate-500 transition-colors hover:text-indigo-400">
+            <HelpCircle className="h-3.5 w-3.5" />
+          </span>
+        )}
       </span>
       {typeof document !== "undefined" && tooltipContent && createPortal(tooltipContent, document.body)}
     </>
