@@ -1,5 +1,6 @@
 import {
   fetchActivity,
+  getInitialEquity,
 } from "../../../lib/polymarket";
 import { fetchMarketData } from "../../../lib/benchmark";
 import { matchRoundTrips } from "../../../lib/round-trip";
@@ -170,7 +171,7 @@ export default async function AnalyticsPage() {
   const roundTrips = matchRoundTrips(trades);
   const totalPositionsHeld = new Set(trades.map((t) => t.asset)).size;
   const totalBuyVolume = roundTrips.reduce((s, r) => s + r.buyUsdc, 0);
-  const initialEquity = Math.max(10_000, totalBuyVolume * 0.3);
+  const initialEquity = getInitialEquity(totalBuyVolume);
 
   const equityCurve = buildEquityCurve(roundTrips, initialEquity);
   const returnMetrics = computeReturnMetrics(roundTrips, equityCurve, initialEquity);

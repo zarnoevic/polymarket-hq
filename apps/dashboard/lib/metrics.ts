@@ -4,25 +4,41 @@ import type { BenchmarkData, MarketData } from "./benchmark";
 /** Crypto markets trade 365 days/year (no weekends/holidays) */
 export const TRADING_DAYS_PER_YEAR = 365;
 
-/** Daily equity and return series built from round-trips */
+/**
+ * Daily equity and return series built from round-trips.
+ * Uses a full calendar series (first to last trade date) with zero returns on non-trading days.
+ * This ensures Sharpe and other risk metrics are not inflated by treating sparse "active days"
+ * as if returns occurred every day.
+ */
 export function buildEquityCurve(
   roundTrips: RoundTrip[],
   initialEquity: number
 ): { dates: string[]; equity: number[]; returns: number[] } {
+  if (roundTrips.length === 0) return { dates: [], equity: [], returns: [] };
+
   const byDay = new Map<string, number>();
   for (const rt of roundTrips) {
     const d = new Date(rt.sellDate * 1000).toISOString().slice(0, 10);
     byDay.set(d, (byDay.get(d) ?? 0) + rt.pnl);
   }
-  const sorted = [...byDay.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+
+  const allDates = [...byDay.keys()].sort((a, b) => a.localeCompare(b));
+  const firstDate = allDates[0]!;
+  const lastDate = allDates[allDates.length - 1]!;
+
+  // Build full calendar series so mean/std are over true daily returns
   const dates: string[] = [];
   const equity: number[] = [];
   const returns: number[] = [];
   let e = initialEquity;
-  for (const [d, pnl] of sorted) {
+  const start = new Date(firstDate);
+  const end = new Date(lastDate);
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const dateStr = d.toISOString().slice(0, 10);
+    const pnl = byDay.get(dateStr) ?? 0;
     const r = e > 0 ? pnl / e : 0;
     e += pnl;
-    dates.push(d);
+    dates.push(dateStr);
     equity.push(e);
     returns.push(r);
   }
@@ -83,14 +99,17 @@ export function computeReturnMetrics(
   const rets = equityCurve.returns;
   const n = rets.length;
   const daysActive = equityCurve.dates.length;
-  const years = daysActive / 365;
+  const years = Math.max(daysActive / TRADING_DAYS_PER_YEAR, 1 / TRADING_DAYS_PER_YEAR);
 
   const arithmeticMeanReturn = mean(rets);
-  // Linear annualization: return / years (not geometric/CAGR)
+  // CAGR: geometric annualization — (final/initial)^(1/years) - 1
+  const cagr =
+    years > 0 && initialEquity > 0 && finalEquity > 0
+      ? (finalEquity / initialEquity) ** (1 / years) - 1
+      : cumulativeReturn;
   const linearAnnualized = years > 0 ? cumulativeReturn / years : cumulativeReturn;
-  const annualizedReturn = linearAnnualized;
-  const cagr = linearAnnualized;
-  const geoReturn = linearAnnualized;
+  const annualizedReturn = cagr;
+  const geoReturn = cagr;
 
   // Rolling 30-day (approx) - use last 30 returns
   const rollWindow = Math.min(30, rets.length);
@@ -180,17 +199,23 @@ export function computeRiskAdjustedMetrics(
   const burkeDenom = volAnn || 0.01;
   const burke = excessRetAnn / burkeDenom;
 
+  // Cap risk-adjusted ratios when sample size is small — estimated Sharpe has high variance
+  // and can spuriously exceed 3. Realistic Sharpe >3 is extremely rare.
+  const n = rets.length;
+  const cap = n < 60 ? 3 : Infinity;
+  const capRatio = (r: number) => (Number.isFinite(r) ? Math.min(r, cap) : r);
+
   return {
-    sharpeRatio: sharpe,
-    sortinoRatio: sortino,
-    informationRatio: infoRatio,
+    sharpeRatio: capRatio(sharpe),
+    sortinoRatio: capRatio(sortino),
+    informationRatio: capRatio(infoRatio),
     treynorRatio: treynor,
-    calmarRatio: calmar,
-    sterlingRatio: sterling,
-    omegaRatio,
-    burkeRatio: burke,
+    calmarRatio: capRatio(calmar),
+    sterlingRatio: capRatio(sterling),
+    omegaRatio: capRatio(omegaRatio),
+    burkeRatio: capRatio(burke),
     gainLossRatio,
-    modiglianiRatio: modigliani,
+    modiglianiRatio: capRatio(modigliani),
     alpha,
     beta,
   };

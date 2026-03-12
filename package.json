@@ -16,7 +16,8 @@
     "db:docker:down": "docker-compose down",
     "db:docker:logs": "docker-compose logs -f postgres",
     "db:migrate": "prisma migrate dev --schema=./libs/dashboard-prisma/schema.prisma",
-    "db:migrate:deploy": "prisma migrate deploy --schema=./libs/dashboard-prisma/schema.prisma"
+    "db:migrate:deploy": "prisma migrate deploy --schema=./libs/dashboard-prisma/schema.prisma",
+    "test": "pnpm --filter @polymarket-hq/dashboard test"
   },
   "devDependencies": {
     "@prisma/config": "6.19.2",

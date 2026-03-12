@@ -291,9 +291,6 @@ export default async function HomePage() {
   const { chanceTotalWin, initialChanceTotalWin } =
     computeTotalWinChances(positions);
 
-  const wallet =
-    process.env.POLYMARKET_MAIN_WALLET ?? DEFAULT_WALLET;
-
   return (
     <div className="bg-[rgb(var(--background-rgb))]">
       {/* Subtle grid background */}
