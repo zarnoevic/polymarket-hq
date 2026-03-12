@@ -93,7 +93,23 @@ function daysToResolution(endDateStr: string, title?: string): number | null {
   return days > 0 ? Math.max(1, days) : null;
 }
 
-/** CAROI (Cumulative): r = (P1-P0)/P0, annual_return = r * (365/T). P0=entry+spread (buy price), P1=1. */
+/** CROI (Cumulative ROI): simple (1 - buyPrice) / buyPrice, no annualization. */
+function computeCROI(avgPrice: number, spread?: number | null): string {
+  const buyPrice = Math.min(0.99, avgPrice + (spread ?? 0));
+  if (buyPrice <= 0 || buyPrice >= 1 || !Number.isFinite(buyPrice)) return "—";
+  const r = (1 - buyPrice) / buyPrice;
+  return Number.isFinite(r) ? formatRoi(r) : "—";
+}
+
+/** PROI (Present ROI): simple (1 - buyPrice) / buyPrice from current price, no annualization. */
+function computePROI(curPrice: number, spread?: number | null): string {
+  const buyPrice = Math.min(0.99, curPrice + (spread ?? 0));
+  if (buyPrice <= 0 || buyPrice >= 1 || !Number.isFinite(buyPrice)) return "—";
+  const r = (1 - buyPrice) / buyPrice;
+  return Number.isFinite(r) ? formatRoi(r) : "—";
+}
+
+/** CAROI (Cumulative Annualized): r = (P1-P0)/P0, annual_return = r * (365/T). P0=entry+spread (buy price), P1=1. */
 function computeCAROI(avgPrice: number, days: number | null, spread?: number | null): string {
   const buyPrice = Math.min(0.99, avgPrice + (spread ?? 0));
   if (buyPrice <= 0) return "—";
@@ -111,22 +127,13 @@ function computePAROINumeric(curPrice: number, days: number | null, spread?: num
   return r * (365 / days);
 }
 
-/** PAROI (Present): r = (P1-P0)/P0, annual_return = r * (365/T). P0=current+spread (buy price), P1=1. */
+/** PAROI (Present Annualized): r = (P1-P0)/P0, annual_return = r * (365/T). P0=current+spread (buy price), P1=1. */
 function computePAROI(curPrice: number, days: number | null, spread?: number | null): string {
   const buyPrice = Math.min(0.99, curPrice + (spread ?? 0));
   if (buyPrice <= 0) return "—";
   if (days == null || days <= 0) return "—"; // need holding period to annualize
   const r = (1 - buyPrice) / buyPrice;
   return formatRoi(r * (365 / days));
-}
-
-/** ROI: (1 - buyPrice) / buyPrice where buyPrice = quotedProbability + spread (for buy). */
-function computeROI(quotedProbability: number, spread?: number | null): string {
-  const buyPrice = Math.min(0.99, quotedProbability + (spread ?? 0));
-  if (buyPrice <= 0 || buyPrice >= 1 || !Number.isFinite(buyPrice)) return "—";
-  const roi = (1 - buyPrice) / buyPrice;
-  if (!Number.isFinite(roi) || roi < 0) return "—";
-  return formatRoi(roi);
 }
 
 export function PositionCard({
@@ -140,8 +147,9 @@ export function PositionCard({
 }) {
   const pos = position;
   const days = daysToResolution(pos.endDate, pos.title);
-  const roi = computeROI(pos.avgPrice, pos.spread);
+  const croi = computeCROI(pos.avgPrice, pos.spread);
   const caroi = computeCAROI(pos.avgPrice, days, pos.spread);
+  const proi = computePROI(pos.curPrice, pos.spread);
   const paroi = computePAROI(pos.curPrice, days, pos.spread);
   const probabilityYes = pos.outcome.toLowerCase() === "yes" ? pos.curPrice : 1 - pos.curPrice;
   const probabilityNo = 1 - probabilityYes;
@@ -183,10 +191,13 @@ export function PositionCard({
             {formatPercent(pos.percentPnl)})
           </span>
           <span className="inline-flex items-center gap-1 text-slate-400">
-            <MetricTooltip content={METRIC_TOOLTIPS.ROI} trigger="ROI" /> {roi}
+            <MetricTooltip content={METRIC_TOOLTIPS.CROI} trigger="CROI" /> {croi}
           </span>
           <span className="inline-flex items-center gap-1 text-slate-400">
             <MetricTooltip content={METRIC_TOOLTIPS.CAROI} trigger="CAROI" /> {caroi}
+          </span>
+          <span className="inline-flex items-center gap-1 text-slate-400">
+            <MetricTooltip content={METRIC_TOOLTIPS.PROI} trigger="PROI" /> {proi}
           </span>
           <span className="inline-flex items-center gap-1 text-slate-400">
             <MetricTooltip content={METRIC_TOOLTIPS.PAROI} trigger="PAROI" /> {paroi}

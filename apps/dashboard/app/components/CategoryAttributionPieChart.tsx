@@ -101,7 +101,7 @@ function computeROINumeric(avgPrice: number, spread?: number | null): number | n
   const buyPrice = Math.min(0.99, avgPrice + (spread ?? 0));
   if (buyPrice <= 0 || buyPrice >= 1 || !Number.isFinite(buyPrice)) return null;
   const roi = (1 - buyPrice) / buyPrice;
-  return Number.isFinite(roi) && roi >= 0 ? roi : null;
+  return Number.isFinite(roi) ? roi : null;
 }
 
 function computeCAROINumeric(avgPrice: number, days: number | null, spread?: number | null): number | null {
@@ -127,6 +127,7 @@ type CategorySlice = {
   investedAmount: number;
   roi: string;
   caroi: string;
+  proi: string;
   paroi: string;
   sparkline?: { yesId: string; entryTimestamp?: number; outcome: string; avgPrice: number };
 };
@@ -235,6 +236,7 @@ export function CategoryAttributionPieChart({
           let totalInvested = 0;
           let sumRoi = 0;
           let sumCaroi = 0;
+          let sumProi = 0;
           let sumParoi = 0;
           let weightSum = 0;
           for (const { pos } of positions) {
@@ -249,6 +251,7 @@ export function CategoryAttributionPieChart({
             const days = daysToResolution(pos.endDate ?? "", pos.title);
             const roi = computeROINumeric(pos.avgPrice!, pos.spread);
             const caroi = computeCAROINumeric(pos.avgPrice!, days, pos.spread);
+            const proi = computeROINumeric(pos.curPrice, pos.spread); // simple present
             const paroi = computePAROINumeric(pos.curPrice, days, pos.spread);
             totalInvested += inv;
             if (roi != null) {
@@ -258,12 +261,14 @@ export function CategoryAttributionPieChart({
             if (caroi != null) {
               sumCaroi += caroi * inv;
             }
+            if (proi != null) sumProi += proi * inv;
             if (Number.isFinite(paroi) && paroi > -Infinity) {
               sumParoi += paroi * inv;
             }
           }
           const wRoi = weightSum > 0 ? sumRoi / weightSum : null;
           const wCaroi = totalInvested > 0 ? sumCaroi / totalInvested : null;
+          const wProi = totalInvested > 0 ? sumProi / totalInvested : null;
           const wParoi = totalInvested > 0 ? sumParoi / totalInvested : null;
           const p = bestPos.pos;
           const sparkline =
@@ -284,6 +289,7 @@ export function CategoryAttributionPieChart({
             investedAmount: totalInvested,
             roi: wRoi != null ? formatRoi(wRoi) : "—",
             caroi: wCaroi != null ? formatRoi(wCaroi) : "—",
+            proi: wProi != null ? formatRoi(wProi) : "—",
             paroi: wParoi != null && wParoi > -Infinity ? formatRoi(wParoi) : "—",
             sparkline,
           };
@@ -314,6 +320,7 @@ export function CategoryAttributionPieChart({
               let totalInvested = 0;
               let sumRoi = 0;
               let sumCaroi = 0;
+              let sumProi = 0;
               let sumParoi = 0;
               let weightSum = 0;
               for (const { pos } of positions) {
@@ -328,6 +335,7 @@ export function CategoryAttributionPieChart({
                 const days = daysToResolution(pos.endDate ?? "", pos.title);
                 const roi = computeROINumeric(pos.avgPrice!, pos.spread);
                 const caroi = computeCAROINumeric(pos.avgPrice!, days, pos.spread);
+                const proi = computeROINumeric(pos.curPrice, pos.spread);
                 const paroi = computePAROINumeric(pos.curPrice, days, pos.spread);
                 totalInvested += inv;
                 if (roi != null) {
@@ -335,10 +343,12 @@ export function CategoryAttributionPieChart({
                   weightSum += inv;
                 }
                 if (caroi != null) sumCaroi += caroi * inv;
+                if (proi != null) sumProi += proi * inv;
                 if (Number.isFinite(paroi) && paroi > -Infinity) sumParoi += paroi * inv;
               }
               const wRoi = weightSum > 0 ? sumRoi / weightSum : null;
               const wCaroi = totalInvested > 0 ? sumCaroi / totalInvested : null;
+              const wProi = totalInvested > 0 ? sumProi / totalInvested : null;
               const wParoi = totalInvested > 0 ? sumParoi / totalInvested : null;
               const p = bestPos.pos;
               const sparkline =
@@ -354,6 +364,7 @@ export function CategoryAttributionPieChart({
                 investedAmount: totalInvested,
                 roi: wRoi != null ? formatRoi(wRoi) : "—",
                 caroi: wCaroi != null ? formatRoi(wCaroi) : "—",
+                proi: wProi != null ? formatRoi(wProi) : "—",
                 paroi: wParoi != null && wParoi > -Infinity ? formatRoi(wParoi) : "—",
                 sparkline,
               };
@@ -539,10 +550,13 @@ function CategoryPieChartInner({
                   </span>
                 )}
                 <span className="inline-flex items-center gap-1 text-slate-400">
-                  <MetricTooltip content={METRIC_TOOLTIPS.ROI} trigger="ROI" /> {activeSlice.roi}
+                  <MetricTooltip content={METRIC_TOOLTIPS.CROI} trigger="CROI" /> {activeSlice.roi}
                 </span>
                 <span className="inline-flex items-center gap-1 text-slate-400">
                   <MetricTooltip content={METRIC_TOOLTIPS.CAROI} trigger="CAROI" /> {activeSlice.caroi}
+                </span>
+                <span className="inline-flex items-center gap-1 text-slate-400">
+                  <MetricTooltip content={METRIC_TOOLTIPS.PROI} trigger="PROI" /> {activeSlice.proi}
                 </span>
                 <span className="inline-flex items-center gap-1 text-slate-400">
                   <MetricTooltip content={METRIC_TOOLTIPS.PAROI} trigger="PAROI" /> {activeSlice.paroi}

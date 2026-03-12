@@ -165,6 +165,10 @@ export const METRIC_TOOLTIPS: Record<string, string> = {
     "What: Cumulative Annualized ROI — linear annualized return from entry price to payoff (1). Displayed as Xx where 1x = 100% return.\n\nRanges: Low (<0.2x): low implied edge. Average (0.3–0.8x): typical prediction market entry. High (>1x): high conviction position.\n\nFormula: r = (1 − avgPrice) / avgPrice; annual_return = r × (365 / daysToResolution)",
   PAROI:
     "What: Present Annualized ROI — linear annualized return from current market price to payoff (1). Displayed as Xx where 1x = 100% return. Negative = market moved against you.\n\nRanges: Low (<0.2x): market disagrees. Average (0.3–0.8x): in line. High (>1x): market strongly agrees with your position.\n\nFormula: r = (1 − curPrice) / curPrice; annual_return = r × (365 / daysToResolution)\n\nCategory average: Value-weighted — Σ(PAROI_i × |currentValue_i|) / Σ(|currentValue_i|)",
+  CROI:
+    "What: Cumulative ROI — annualized return from your entry price to payoff (1). How much you stand to gain if the event resolves in your favor, annualized over time to resolution.\n\nRanges: Low (<0.2x): low implied edge. Average (0.3–0.8x): typical prediction market entry. High (>1x): high conviction position.\n\nFormula: r = (1 − avgPrice) / avgPrice; annual_return = r × (365 / daysToResolution)",
+  PROI:
+    "What: Present ROI — annualized return from current market price to payoff (1). How the market values your position now. Negative = market moved against you.\n\nRanges: Low (<0.2x): market disagrees. Average (0.3–0.8x): in line. High (>1x): market strongly agrees with your position.\n\nFormula: r = (1 − curPrice) / curPrice; annual_return = r × (365 / daysToResolution)",
 
   // 12. Portfolio Construction
   "Diversification Ratio":

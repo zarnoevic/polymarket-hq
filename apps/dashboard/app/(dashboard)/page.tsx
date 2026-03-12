@@ -281,7 +281,7 @@ export default async function HomePage() {
     spread: spreads[i] ?? null,
   }));
 
-  const { avgParoi, avgRoi, avgPositionSize, avgProfit, avgBettedChance, avgCurrentChance } =
+  const { avgParoi, avgCaroi, avgRoi, avgPositionSize, avgProfit, avgBettedChance, avgCurrentChance } =
     computePositionAverages(positions);
 
   // If all positions resolve in our favor: each pays $1 per share; plus cash
@@ -373,6 +373,17 @@ export default async function HomePage() {
                       <Target className="h-4 w-4" strokeWidth={1.75} />
                     </div>
                     <div>
+                      <p className="text-xs text-slate-400">Avg PROI</p>
+                      <p className="font-semibold text-white">
+                        {avgParoi != null ? formatRoi(avgParoi) : "—"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 text-violet-400">
+                      <Target className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div>
                       <p className="text-xs text-slate-400">Avg PAROI</p>
                       <p className="font-semibold text-white">
                         {avgParoi != null ? formatRoi(avgParoi) : "—"}
@@ -410,9 +421,31 @@ export default async function HomePage() {
                       <TrendingUp className="h-4 w-4" strokeWidth={1.75} />
                     </div>
                     <div>
-                      <p className="text-xs text-slate-400">Avg ROI</p>
+                      <p className="text-xs text-slate-400">Avg CROI</p>
                       <p className="font-semibold text-white">
                         {avgRoi != null ? formatRoi(avgRoi) : "—"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-400">
+                      <TrendingUp className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Avg CAROI</p>
+                      <p className="font-semibold text-white">
+                        {avgCaroi != null ? formatRoi(avgCaroi) : "—"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-400">
+                      <TrendingUp className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Avg PROI</p>
+                      <p className="font-semibold text-white">
+                        {avgParoi != null ? formatRoi(avgParoi) : "—"}
                       </p>
                     </div>
                   </div>

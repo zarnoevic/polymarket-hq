@@ -81,6 +81,7 @@ type CompositionSlice = {
   icon?: string;
   roi: string;
   caroi: string;
+  proi: string;
   paroi: string;
   sparkline?: { yesId: string; entryTimestamp?: number; outcome: string; avgPrice: number };
 };
@@ -155,6 +156,7 @@ export function CategoryCompositionPieChart({
         let totalInvestedCat = 0;
         let sumRoi = 0;
         let sumCaroi = 0;
+        let sumProi = 0;
         let sumParoi = 0;
         let weightSum = 0;
         for (const pos of catPositions) {
@@ -176,16 +178,19 @@ export function CategoryCompositionPieChart({
             pos.avgPrice < 1
               ? computeCAROINumeric(pos.avgPrice, days, pos.spread)
               : null;
+          const proi = computeROINumeric(pos.curPrice, pos.spread);
           const paroi = computePAROINumeric(pos.curPrice, days, pos.spread);
           if (roi != null) {
             sumRoi += roi * inv;
             weightSum += inv;
           }
           if (caroi != null) sumCaroi += caroi * inv;
+          if (proi != null) sumProi += proi * inv;
           if (Number.isFinite(paroi) && paroi > -Infinity) sumParoi += paroi * inv;
         }
         const wRoi = weightSum > 0 ? sumRoi / weightSum : null;
         const wCaroi = totalInvestedCat > 0 ? sumCaroi / totalInvestedCat : null;
+        const wProi = totalInvestedCat > 0 ? sumProi / totalInvestedCat : null;
         const wParoi = totalInvestedCat > 0 ? sumParoi / totalInvestedCat : null;
 
         const sparkline =
@@ -209,6 +214,7 @@ export function CategoryCompositionPieChart({
           icon: bestPos.icon,
           roi: wRoi != null ? formatRoi(wRoi) : "—",
           caroi: wCaroi != null ? formatRoi(wCaroi) : "—",
+          proi: wProi != null ? formatRoi(wProi) : "—",
           paroi:
             wParoi != null && wParoi > -Infinity ? formatRoi(wParoi) : "—",
           sparkline,
@@ -391,10 +397,13 @@ function CompositionPieChartInner({
                   {(activeSlice.share * 100).toFixed(1)}%
                 </span>
                 <span className="inline-flex items-center gap-1 text-slate-400">
-                  <MetricTooltip content={METRIC_TOOLTIPS.ROI} trigger="ROI" /> {activeSlice.roi}
+                  <MetricTooltip content={METRIC_TOOLTIPS.CROI} trigger="CROI" /> {activeSlice.roi}
                 </span>
                 <span className="inline-flex items-center gap-1 text-slate-400">
                   <MetricTooltip content={METRIC_TOOLTIPS.CAROI} trigger="CAROI" /> {activeSlice.caroi}
+                </span>
+                <span className="inline-flex items-center gap-1 text-slate-400">
+                  <MetricTooltip content={METRIC_TOOLTIPS.PROI} trigger="PROI" /> {activeSlice.proi}
                 </span>
                 <span className="inline-flex items-center gap-1 text-slate-400">
                   <MetricTooltip content={METRIC_TOOLTIPS.PAROI} trigger="PAROI" /> {activeSlice.paroi}

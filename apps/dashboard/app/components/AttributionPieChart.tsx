@@ -97,6 +97,7 @@ type Slice = {
   icon?: string;
   roi: string;
   caroi: string;
+  proi: string;
   paroi: string;
   sparkline?: { yesId: string; entryTimestamp?: number; outcome: string; avgPrice: number };
 };
@@ -164,6 +165,7 @@ export function AttributionPieChart({ positions }: { positions: Position[] }) {
         const days = daysToResolution(pos.endDate ?? "", pos.title);
         const roiNum = entryPrice != null ? computeROINumeric(entryPrice, pos.spread) : null;
         const caroiNum = entryPrice != null ? computeCAROINumeric(entryPrice, days, pos.spread) : null;
+        const proiNum = computeROINumeric(priceNow, pos.spread); // simple present, no annualization
         const paroiNum = computePAROINumeric(priceNow, days, pos.spread);
         const sparkline =
           pos.yesId ?? pos.asset
@@ -185,6 +187,7 @@ export function AttributionPieChart({ positions }: { positions: Position[] }) {
           icon: pos.icon,
           roi: roiNum != null ? formatRoi(roiNum) : "—",
           caroi: caroiNum != null ? formatRoi(caroiNum) : "—",
+          proi: proiNum != null ? formatRoi(proiNum) : "—",
           paroi: Number.isFinite(paroiNum) && paroiNum > -Infinity ? formatRoi(paroiNum) : "—",
           sparkline,
         };
@@ -395,10 +398,13 @@ function PieChartInner({
                     : `${formatPrice(activeSlice.priceNow)} now`}
                 </span>
                 <span className="inline-flex items-center gap-1 text-slate-400">
-                  <MetricTooltip content={METRIC_TOOLTIPS.ROI} trigger="ROI" /> {activeSlice.roi}
+                  <MetricTooltip content={METRIC_TOOLTIPS.CROI} trigger="CROI" /> {activeSlice.roi}
                 </span>
                 <span className="inline-flex items-center gap-1 text-slate-400">
                   <MetricTooltip content={METRIC_TOOLTIPS.CAROI} trigger="CAROI" /> {activeSlice.caroi}
+                </span>
+                <span className="inline-flex items-center gap-1 text-slate-400">
+                  <MetricTooltip content={METRIC_TOOLTIPS.PROI} trigger="PROI" /> {activeSlice.proi}
                 </span>
                 <span className="inline-flex items-center gap-1 text-slate-400">
                   <MetricTooltip content={METRIC_TOOLTIPS.PAROI} trigger="PAROI" /> {activeSlice.paroi}
