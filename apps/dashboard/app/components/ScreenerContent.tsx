@@ -387,7 +387,6 @@ export function ScreenerContent({
                           : "Marked as evaluating";
       toast.success(msg);
       if (label === "evaluating") {
-        setActiveTab("evaluating");
         const ev = events.find((x) => x.id === eventId);
         if (ev && ev.lastThinkAppraisedAt == null) {
           handleAppraise(eventId, "think");
