@@ -135,6 +135,8 @@ type Position = {
   entryTimestamp?: number;
   /** Yes token ID for price history - always fetch Yes, not No. */
   yesId?: string;
+  /** Ask-bid spread for the outcome token (add to buy price for ROI/PAROI). */
+  spread?: number | null;
 };
 
 async function fetchTotalValue(): Promise<number | null> {
@@ -197,6 +199,30 @@ function buildFirstBuyTimestampMap(activity: Array<{ asset: string; side: string
   return map;
 }
 
+const CLOB_BASE = "https://clob.polymarket.com";
+
+type OrderBookEntry = { price: string; size: string };
+type OrderBookResponse = { bids?: OrderBookEntry[]; asks?: OrderBookEntry[] };
+
+/** Fetch ask-bid spread for a token. Returns null on error or missing data. */
+async function fetchSpread(tokenId: string): Promise<number | null> {
+  try {
+    const res = await fetch(`${CLOB_BASE}/book?token_id=${encodeURIComponent(tokenId)}`, {
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return null;
+    const data: OrderBookResponse = await res.json();
+    const bids = (data.bids ?? []).map((b) => parseFloat(b.price)).filter((p) => Number.isFinite(p)).sort((a, b) => b - a);
+    const asks = (data.asks ?? []).map((a) => parseFloat(a.price)).filter((p) => Number.isFinite(p)).sort((a, b) => a - b);
+    const bestAsk = asks[0] ?? 0;
+    const bestBid = bids[0] ?? 0;
+    if (bestAsk > 0 && bestBid > 0) return bestAsk - bestBid;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /** Resolve Yes token ID. For Yes positions asset=yesId. For No positions, fetch from Gamma. */
 async function resolveYesTokenId(asset: string, outcome: string): Promise<string> {
   if (outcome.toLowerCase() === "yes") return asset;
@@ -242,13 +268,15 @@ export default async function HomePage() {
   ]);
   const firstBuyTs = buildFirstBuyTimestampMap(activity);
   const rawPositions = positionsRaw as Position[];
-  const yesIds = await Promise.all(
-    rawPositions.map((p) => resolveYesTokenId(p.asset, p.outcome))
-  );
+  const [yesIds, spreads] = await Promise.all([
+    Promise.all(rawPositions.map((p) => resolveYesTokenId(p.asset, p.outcome))),
+    Promise.all(rawPositions.map((p) => fetchSpread(p.asset))),
+  ]);
   const positions: Position[] = rawPositions.map((p, i) => ({
     ...p,
     entryTimestamp: firstBuyTs.get(p.asset),
     yesId: yesIds[i],
+    spread: spreads[i] ?? null,
   }));
 
   const { avgParoi, avgRoi, avgPositionSize, avgProfit, avgBettedChance, avgCurrentChance } =

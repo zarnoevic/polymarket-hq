@@ -25,6 +25,8 @@ export type Position = {
   entryTimestamp?: number;
   /** Yes token ID for price history. */
   yesId?: string;
+  /** Ask-bid spread for the outcome token (add to buy price for ROI/PAROI). */
+  spread?: number | null;
 };
 
 function formatUsd(value: number, decimals = 0): string {
@@ -91,34 +93,38 @@ function daysToResolution(endDateStr: string, title?: string): number | null {
   return days > 0 ? Math.max(1, days) : null;
 }
 
-/** CAROI (Cumulative): r = (P1-P0)/P0, annual_return = r * (365/T). P0=entry, P1=1. */
-function computeCAROI(avgPrice: number, days: number | null): string {
-  if (avgPrice <= 0) return "—";
+/** CAROI (Cumulative): r = (P1-P0)/P0, annual_return = r * (365/T). P0=entry+spread (buy price), P1=1. */
+function computeCAROI(avgPrice: number, days: number | null, spread?: number | null): string {
+  const buyPrice = Math.min(0.99, avgPrice + (spread ?? 0));
+  if (buyPrice <= 0) return "—";
   if (days == null || days <= 0) return "—"; // need holding period to annualize
-  const r = (1 - avgPrice) / avgPrice;
+  const r = (1 - buyPrice) / buyPrice;
   return formatRoi(r * (365 / days));
 }
 
-/** PAROI (Present): returns numeric for sorting */
-function computePAROINumeric(curPrice: number, days: number | null): number {
-  if (curPrice <= 0) return -Infinity;
+/** PAROI (Present): returns numeric for sorting. Uses buyPrice = curPrice + spread. */
+function computePAROINumeric(curPrice: number, days: number | null, spread?: number | null): number {
+  const buyPrice = Math.min(0.99, curPrice + (spread ?? 0));
+  if (buyPrice <= 0) return -Infinity;
   if (days == null || days <= 0) return -Infinity;
-  const r = (1 - curPrice) / curPrice;
+  const r = (1 - buyPrice) / buyPrice;
   return r * (365 / days);
 }
 
-/** PAROI (Present): r = (P1-P0)/P0, annual_return = r * (365/T). P0=current, P1=1. */
-function computePAROI(curPrice: number, days: number | null): string {
-  if (curPrice <= 0) return "—";
+/** PAROI (Present): r = (P1-P0)/P0, annual_return = r * (365/T). P0=current+spread (buy price), P1=1. */
+function computePAROI(curPrice: number, days: number | null, spread?: number | null): string {
+  const buyPrice = Math.min(0.99, curPrice + (spread ?? 0));
+  if (buyPrice <= 0) return "—";
   if (days == null || days <= 0) return "—"; // need holding period to annualize
-  const r = (1 - curPrice) / curPrice;
+  const r = (1 - buyPrice) / buyPrice;
   return formatRoi(r * (365 / days));
 }
 
-/** ROI: 1 - 1/quoted_probability = (1 - p) / p. Implied return if we win. */
-function computeROI(quotedProbability: number): string {
-  if (quotedProbability <= 0 || quotedProbability >= 1 || !Number.isFinite(quotedProbability)) return "—";
-  const roi = (1 - quotedProbability) / quotedProbability;
+/** ROI: (1 - buyPrice) / buyPrice where buyPrice = quotedProbability + spread (for buy). */
+function computeROI(quotedProbability: number, spread?: number | null): string {
+  const buyPrice = Math.min(0.99, quotedProbability + (spread ?? 0));
+  if (buyPrice <= 0 || buyPrice >= 1 || !Number.isFinite(buyPrice)) return "—";
+  const roi = (1 - buyPrice) / buyPrice;
   if (!Number.isFinite(roi) || roi < 0) return "—";
   return formatRoi(roi);
 }
@@ -127,8 +133,8 @@ export function PositionsList({ positions }: { positions: Position[] }) {
   const sorted = [...positions].sort((a, b) => {
     const daysA = daysToResolution(a.endDate, a.title);
     const daysB = daysToResolution(b.endDate, b.title);
-    const paroiA = computePAROINumeric(a.curPrice, daysA);
-    const paroiB = computePAROINumeric(b.curPrice, daysB);
+    const paroiA = computePAROINumeric(a.curPrice, daysA, a.spread);
+    const paroiB = computePAROINumeric(b.curPrice, daysB, b.spread);
     return paroiB - paroiA; // descending: highest PAROI first
   });
 
@@ -136,9 +142,9 @@ export function PositionsList({ positions }: { positions: Position[] }) {
     <div className="space-y-2">
       {sorted.map((pos) => {
         const days = daysToResolution(pos.endDate, pos.title);
-        const roi = computeROI(pos.avgPrice);
-        const caroi = computeCAROI(pos.avgPrice, days);
-        const paroi = computePAROI(pos.curPrice, days);
+        const roi = computeROI(pos.avgPrice, pos.spread);
+        const caroi = computeCAROI(pos.avgPrice, days, pos.spread);
+        const paroi = computePAROI(pos.curPrice, days, pos.spread);
         // curPrice is the price of the outcome held; for Yes it's Yes prob, for No it's No prob
         const probabilityYes = pos.outcome.toLowerCase() === "yes" ? pos.curPrice : 1 - pos.curPrice;
         const probabilityNo = 1 - probabilityYes;

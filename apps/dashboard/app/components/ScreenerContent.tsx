@@ -78,6 +78,8 @@ type ScreenerEvent = {
   syncedAt: Date;
   yesId: string | null;
   noId: string | null;
+  yesSpread?: number | null;
+  noSpread?: number | null;
   raw?: unknown;
   tags?: unknown; // Gamma API tags: JsonValue from DB
 };
@@ -159,20 +161,22 @@ function daysToResolution(endDate: Date | string | null): number | null {
   return days > 0 ? Math.max(1, days) : null;
 }
 
-/** Linear annualized return: r = (P1-P0)/P0, annual_return = r * (365/T). P0=current, P1=1. */
-function computePAROI(curPrice: number, days: number | null): string {
-  if (curPrice > 1 || !Number.isFinite(curPrice)) return "—";
-  if (curPrice <= 0 || curPrice < 1e-9) return "999+x";
-  const r = (1 - curPrice) / curPrice;
+/** Linear annualized return: r = (P1-P0)/P0, annual_return = r * (365/T). P0=buy price (price+spread), P1=1. */
+function computePAROI(curPrice: number, days: number | null, spread?: number | null): string {
+  const buyPrice = Math.min(0.99, curPrice + (spread ?? 0));
+  if (buyPrice > 1 || !Number.isFinite(buyPrice)) return "—";
+  if (buyPrice <= 0 || buyPrice < 1e-9) return "999+x";
+  const r = (1 - buyPrice) / buyPrice;
   const roi = days == null || days <= 0 ? r : r * (365 / days);
   return formatRoi(roi);
 }
 
-/** Simple (non-annualized) ROI: r < 1 → %, r >= 1 → x format (e.g. 0.57 → 57%, 4 → 4x). */
-function computeROI(curPrice: number): string {
-  if (curPrice > 1 || !Number.isFinite(curPrice)) return "—";
-  if (curPrice <= 0 || curPrice < 1e-9) return "999+x";
-  const r = (1 - curPrice) / curPrice;
+/** Simple (non-annualized) ROI: buy price = price + spread, r = (1 - buyPrice) / buyPrice. */
+function computeROI(curPrice: number, spread?: number | null): string {
+  const buyPrice = Math.min(0.99, curPrice + (spread ?? 0));
+  if (buyPrice > 1 || !Number.isFinite(buyPrice)) return "—";
+  if (buyPrice <= 0 || buyPrice < 1e-9) return "999+x";
+  const r = (1 - buyPrice) / buyPrice;
   return formatRoi(r);
 }
 
@@ -964,7 +968,7 @@ export function ScreenerContent({
                         {e.yesId && (
                           <div>
                             <p className="text-xs text-slate-500">Spread</p>
-                            <SpreadLabel tokenId={e.yesId} />
+                            <SpreadLabel tokenId={e.noId} />
                           </div>
                         )}
                         {(e.yesId || e.noId) && (
@@ -1013,13 +1017,13 @@ export function ScreenerContent({
                               <div className="flex items-baseline gap-2">
                                 <span className="text-xs text-slate-500 w-[4.5rem]">Yes PAROI</span>
                                 <span className="font-mono text-sm text-emerald-500/90 tabular-nums min-w-[2.5rem] text-right">
-                                  {computePAROI(e.probabilityYes ?? (e.probabilityNo != null ? 1 - e.probabilityNo : 0), daysToResolution(e.endDate))}
+                                  {computePAROI(e.probabilityYes ?? (e.probabilityNo != null ? 1 - e.probabilityNo : 0), daysToResolution(e.endDate), e.yesSpread)}
                                 </span>
                               </div>
                               <div className="flex items-baseline gap-2">
                                 <span className="text-xs text-slate-500 w-[4.5rem]">Yes ROI</span>
                                 <span className="font-mono text-sm text-emerald-500/90 tabular-nums min-w-[2.5rem] text-right">
-                                  {computeROI(e.probabilityYes ?? (e.probabilityNo != null ? 1 - e.probabilityNo : 0))}
+                                  {computeROI(e.probabilityYes ?? (e.probabilityNo != null ? 1 - e.probabilityNo : 0), e.yesSpread)}
                                 </span>
                               </div>
                             </div>
@@ -1033,13 +1037,13 @@ export function ScreenerContent({
                               <div className="flex items-baseline gap-2">
                                 <span className="text-xs text-slate-500 w-[4.5rem]">No PAROI</span>
                                 <span className="font-mono text-sm text-red-500/90 tabular-nums min-w-[2.5rem] text-right">
-                                  {computePAROI(e.probabilityNo ?? (e.probabilityYes != null ? 1 - e.probabilityYes : 0), daysToResolution(e.endDate))}
+                                  {computePAROI(e.probabilityNo ?? (e.probabilityYes != null ? 1 - e.probabilityYes : 0), daysToResolution(e.endDate), e.noSpread)}
                                 </span>
                               </div>
                               <div className="flex items-baseline gap-2">
                                 <span className="text-xs text-slate-500 w-[4.5rem]">No ROI</span>
                                 <span className="font-mono text-sm text-red-500/90 tabular-nums min-w-[2.5rem] text-right">
-                                  {computeROI(e.probabilityNo ?? (e.probabilityYes != null ? 1 - e.probabilityYes : 0))}
+                                  {computeROI(e.probabilityNo ?? (e.probabilityYes != null ? 1 - e.probabilityYes : 0), e.noSpread)}
                                 </span>
                               </div>
                             </div>

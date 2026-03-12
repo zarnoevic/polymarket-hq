@@ -10,6 +10,8 @@ export type PositionForMetrics = {
   size: number;
   currentValue: number;
   cashPnl: number;
+  /** Ask-bid spread for the outcome token (add to buy price for ROI/PAROI). */
+  spread?: number | null;
 };
 
 /** Extract date from title, e.g. "by March 15" or "March 31" */
@@ -55,21 +57,24 @@ export function daysToResolution(
   return days > 0 ? Math.max(1, days) : null;
 }
 
-/** ROI numeric: (1 - p) / p for quoted probability p. */
-export function computeROINumeric(avgPrice: number): number | null {
-  if (avgPrice <= 0 || avgPrice >= 1 || !Number.isFinite(avgPrice)) return null;
-  const roi = (1 - avgPrice) / avgPrice;
+/** ROI numeric: (1 - buyPrice) / buyPrice where buyPrice = avgPrice + spread (for buy). */
+export function computeROINumeric(avgPrice: number, spread?: number | null): number | null {
+  const buyPrice = Math.min(0.99, avgPrice + (spread ?? 0));
+  if (buyPrice <= 0 || buyPrice >= 1 || !Number.isFinite(buyPrice)) return null;
+  const roi = (1 - buyPrice) / buyPrice;
   return Number.isFinite(roi) ? roi : null;
 }
 
-/** PAROI (Present) numeric: r = (1-P)/P, annualized. */
+/** PAROI (Present) numeric: r = (1-P)/P, annualized. P = curPrice + spread (buy price). */
 export function computePAROINumeric(
   curPrice: number,
-  days: number | null
+  days: number | null,
+  spread?: number | null
 ): number {
-  if (curPrice <= 0) return -Infinity;
+  const buyPrice = Math.min(0.99, curPrice + (spread ?? 0));
+  if (buyPrice <= 0) return -Infinity;
   if (days == null || days <= 0) return -Infinity;
-  const r = (1 - curPrice) / curPrice;
+  const r = (1 - buyPrice) / buyPrice;
   return r * (365 / days);
 }
 
@@ -118,11 +123,11 @@ export function computePositionAverages(positions: PositionForMetrics[]): {
 
   for (const pos of positions) {
     const days = daysToResolution(pos.endDate, pos.title);
-    const paroi = computePAROINumeric(pos.curPrice, days);
+    const paroi = computePAROINumeric(pos.curPrice, days, pos.spread);
     if (Number.isFinite(paroi) && paroi > -Infinity) {
       paroiValues.push(paroi);
     }
-    const roi = computeROINumeric(pos.avgPrice);
+    const roi = computeROINumeric(pos.avgPrice, pos.spread);
     if (roi != null) {
       roiValues.push(roi);
     }

@@ -50,6 +50,8 @@ model ScreenerEvent {
   tags          Json?    @map("tags") // Gamma API /markets/{id}/tags (array of {id, label, slug, ...})
   yesId         String?  @map("yes_id") // First clobTokenId (Yes outcome)
   noId          String?  @map("no_id")  // Second clobTokenId (No outcome)
+  yesSpread     Float?   @map("yes_spread") // Ask-bid spread for Yes token (for ROI/PAROI buy price)
+  noSpread      Float?   @map("no_spread")  // Ask-bid spread for No token
 
   @@index([syncedAt])
   @@index([label])

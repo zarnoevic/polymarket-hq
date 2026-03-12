@@ -2,6 +2,29 @@ import { NextResponse } from "next/server";
 import { prisma } from "@polymarket-hq/dashboard-prisma";
 
 const GAMMA_BASE = "https://gamma-api.polymarket.com/markets";
+const CLOB_BASE = "https://clob.polymarket.com";
+
+type OrderBookEntry = { price: string; size: string };
+type OrderBookResponse = { bids?: OrderBookEntry[]; asks?: OrderBookEntry[] };
+
+/** Fetch ask-bid spread for a token. Returns null on error or missing data. */
+async function fetchSpread(tokenId: string): Promise<number | null> {
+  try {
+    const res = await fetch(`${CLOB_BASE}/book?token_id=${encodeURIComponent(tokenId)}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const data: OrderBookResponse = await res.json();
+    const bids = (data.bids ?? []).map((b) => parseFloat(b.price)).filter((p) => Number.isFinite(p)).sort((a, b) => b - a);
+    const asks = (data.asks ?? []).map((a) => parseFloat(a.price)).filter((p) => Number.isFinite(p)).sort((a, b) => a - b);
+    const bestAsk = asks[0] ?? 0;
+    const bestBid = bids[0] ?? 0;
+    if (bestAsk > 0 && bestBid > 0) return bestAsk - bestBid;
+    return null;
+  } catch {
+    return null;
+  }
+}
 const PAGE_LIMIT = 100;
 const TAGS_CONCURRENCY = 5;
 const TAGS_RETRIES = 3;
@@ -237,6 +260,10 @@ export async function POST() {
       const createdAt = m.createdAt ? new Date(m.createdAt) : null;
       const { yes: probYes, no: probNo } = parseProbabilities(m);
       const { yesId, noId } = parseClobTokenIds(m);
+      const [yesSpread, noSpread] = await Promise.all([
+        yesId ? fetchSpread(yesId) : Promise.resolve(null),
+        noId ? fetchSpread(noId) : Promise.resolve(null),
+      ]);
       const parentEventSlug = m.events?.[0]?.slug ?? null;
       // Category status: under_5 if yes or no < 5% (low priority), else discovery (null)
       const isUnder5 = (probYes != null && probYes < 0.05) || (probNo != null && probNo < 0.05);
@@ -268,6 +295,8 @@ export async function POST() {
         noParoi,
         yesId,
         noId,
+        yesSpread,
+        noSpread,
       };
       const currentLabel = existingLabelByExternalId.get(m.id);
       const isStatusCategory = currentLabel === null || currentLabel === "under_5";
@@ -285,6 +314,8 @@ export async function POST() {
           noParoi,
           yesId,
           noId,
+          yesSpread,
+          noSpread,
           ...(isStatusCategory && { label: isUnder5 ? "under_5" : null }),
         },
       });
