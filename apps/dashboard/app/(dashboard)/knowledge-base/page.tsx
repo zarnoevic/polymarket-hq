@@ -1,7 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Globe, MapPin } from "lucide-react";
+import {
+  getSourcesByTheater,
+  getCategoriesForTheater,
+} from "@/lib/knowledge-base-data";
+import {
+  KnowledgeBaseSourceCard,
+  useKnowledgeBaseState,
+} from "@/app/components/KnowledgeBaseSourceCard";
 
 type TheaterTab = "iranian" | "russian" | "chinese";
 
@@ -13,6 +21,24 @@ const theaterTabs: { tab: TheaterTab; label: string }[] = [
 
 export default function KnowledgeBasePage() {
   const [activeTab, setActiveTab] = useState<TheaterTab>("iranian");
+  const { state, setRead, setNote } = useKnowledgeBaseState();
+
+  const sources = useMemo(
+    () => getSourcesByTheater(activeTab),
+    [activeTab]
+  );
+  const categories = useMemo(
+    () => getCategoriesForTheater(activeTab),
+    [activeTab]
+  );
+
+  const sourcesByCategory = useMemo(() => {
+    const map = new Map<string, typeof sources>();
+    for (const cat of categories) {
+      map.set(cat, sources.filter((s) => s.category === cat));
+    }
+    return map;
+  }, [sources, categories]);
 
   return (
     <div className="min-h-screen bg-[rgb(var(--background-rgb))]">
@@ -29,7 +55,7 @@ export default function KnowledgeBasePage() {
         <div className="mb-6">
           <h1 className="text-2xl font-semibold text-white">Knowledge Base</h1>
           <p className="mt-1 text-slate-400">
-            Geopolitical theater briefings and analysis
+            Information wars: Ukrainian war, Iran/Middle East, Taiwan. Wikipedia & books with read tracking and notes.
           </p>
         </div>
 
@@ -61,27 +87,33 @@ export default function KnowledgeBasePage() {
                   {theaterTabs.find((t) => t.tab === activeTab)?.label ?? activeTab}
                 </h2>
                 <p className="text-sm text-slate-400">
-                  Overview and key developments
+                  Sources to understand information wars & historical context
                 </p>
               </div>
             </div>
           </div>
           <div className="px-6 py-6">
-            {activeTab === "iranian" && (
-              <div className="space-y-4 text-slate-300">
-                <p>Iranian Theater content coming soon.</p>
-              </div>
-            )}
-            {activeTab === "russian" && (
-              <div className="space-y-4 text-slate-300">
-                <p>Russian Theater content coming soon.</p>
-              </div>
-            )}
-            {activeTab === "chinese" && (
-              <div className="space-y-4 text-slate-300">
-                <p>Chinese Theater content coming soon.</p>
-              </div>
-            )}
+            <div className="space-y-8">
+              {categories.map((category) => (
+                <div key={category}>
+                  <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    {category}
+                  </h3>
+                  <div className="space-y-3">
+                    {sourcesByCategory.get(category)?.map((source) => (
+                      <KnowledgeBaseSourceCard
+                        key={source.id}
+                        source={source}
+                        read={state.read[source.id] ?? false}
+                        note={state.notes[source.id] ?? ""}
+                        onReadChange={setRead}
+                        onNoteChange={setNote}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
