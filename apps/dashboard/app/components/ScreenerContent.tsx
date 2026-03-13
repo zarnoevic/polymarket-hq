@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { RefreshCw, Filter, Calendar, CalendarPlus, BarChart3, ExternalLink, Loader2, RotateCw, X, Brain, Star, Compass, HelpCircle, BadgeCheck, TrendingUp, ClipboardList, ChevronDown, AlertTriangle, StickyNote, BookOpen, Percent, Copy, ScrollText, Clock } from "lucide-react";
+import { RefreshCw, Filter, Calendar, CalendarPlus, BarChart3, ExternalLink, Loader2, RotateCw, X, Brain, Star, Compass, HelpCircle, BadgeCheck, TrendingUp, ClipboardList, ChevronDown, AlertTriangle, StickyNote, BookOpen, Percent, Copy, ScrollText, Clock, Search } from "lucide-react";
 
 /** Icon: one circle with smaller circles sprouting (tree/siblings) */
 function SiblingsIcon({ className }: { className?: string }) {
@@ -251,8 +251,10 @@ export function ScreenerContent({
   const [activeTab, setActiveTab] = useState<"discovery" | "evaluating" | "vetted" | "traded" | "unknowable" | "well_priced" | "disputed" | "uninformed" | "under_5">("discovery");
   const [categoryOpen, setCategoryOpen] = useState(false);
   const categoryRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [alsoClassifySiblingsIds, setAlsoClassifySiblingsIds] = useState<Set<string>>(new Set());
   const [rulesPopupEventId, setRulesPopupEventId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -297,7 +299,7 @@ export function ScreenerContent({
     disputed: "disputed",
     uninformed: "uninformed",
   };
-  const displayedEvents =
+  const baseDisplayedEvents =
     activeTab === "discovery"
       ? discoveryEvents
       : activeTab === "under_5"
@@ -309,6 +311,22 @@ export function ScreenerContent({
             return bt - at; // most recent first
           })
         : events.filter((e) => e.label === tabToLabel[activeTab]);
+
+  /** Filter by search: id/externalId (exact), slug and name (partial, case-insensitive). */
+  const q = searchQuery.trim();
+  const qLower = q.toLowerCase();
+  const matchesSearch = (e: ScreenerEvent) => {
+    if (e.id === q || e.externalId === q) return true;
+    if (e.slug?.toLowerCase().includes(qLower)) return true;
+    if (e.title?.toLowerCase().includes(qLower)) return true;
+    return false;
+  };
+  const displayedEvents = q
+    ? baseDisplayedEvents.filter(matchesSearch)
+    : baseDisplayedEvents;
+
+  /** Search results from ALL categories (not just current tab) - shown in div above. */
+  const searchResultsEvents = q ? events.filter(matchesSearch) : [];
 
   function getSiblingIds(eventId: string): string[] {
     const ev = events.find((x) => x.id === eventId);
@@ -513,13 +531,44 @@ export function ScreenerContent({
     <>
       <header className="mb-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-              Screener
-            </h1>
-            <p className="mt-1 text-slate-400">
-              Events from Gamma API (tag_id=100265, 1628) · closed=false · end_date within today–3 months
-            </p>
+          <div className="flex flex-1 min-w-0 max-w-md items-center gap-2">
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <input
+                ref={searchInputRef}
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    (e.target as HTMLInputElement).blur();
+                  }
+                }}
+                placeholder="Search markets by id, slug, or name…"
+                className="w-full rounded-xl border border-slate-700/60 bg-slate-800/40 py-2.5 pl-10 pr-10 text-sm text-white placeholder-slate-500 focus:border-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-600"
+                aria-label="Search markets by id, slug, or name"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-500 transition-colors hover:bg-slate-700/60 hover:text-white"
+                  aria-label="Clear search"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => searchInputRef.current?.focus()}
+              className="flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-700/60 bg-slate-800/60 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-700/60"
+              aria-label="Search"
+            >
+              <Search className="h-4 w-4" />
+              Search
+            </button>
           </div>
           <div className="flex items-center gap-2">
             <div className="flex flex-wrap items-center gap-1 rounded-lg border border-slate-700/60 bg-slate-800/40 p-0.5">
@@ -631,7 +680,259 @@ export function ScreenerContent({
             Refresh
           </button>
         </div>
-      ) : displayedEvents.length === 0 ? (
+      ) : (
+        <div>
+          {q && searchResultsEvents.length > 0 && (
+            <div className="mb-8 space-y-4">
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <Search className="h-4 w-4" />
+                <span>Search results: {searchResultsEvents.length} markets (all categories)</span>
+              </div>
+              <div className="space-y-4">
+                {searchResultsEvents.map((e) => {
+                  const rightContent = e.appraisalExplanation
+                    ? { title: "Appraisal explanation", text: e.appraisalExplanation }
+                    : e.description
+                      ? { title: "Market description", text: e.description }
+                      : null;
+                  const rawCreated = (e.raw as { createdAt?: string } | null)?.createdAt;
+                  const displayCreatedAt = e.createdAt ?? (rawCreated || null);
+                  const showAppraise = e.label != null;
+                  return (
+                    <div key={`search-${e.id}`} className="flex w-full gap-4 items-stretch">
+                      <div className="w-1/2 min-w-0 shrink-0 overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-700/60">
+                        <div className="flex gap-4 p-5">
+                          <div className="flex shrink-0 flex-col items-center gap-0.5 pt-1">
+                            <button
+                              onClick={() => handleSetLabel(e.id, "evaluating")}
+                              className={`rounded p-0.5 transition-colors ${e.label === "evaluating" ? "text-violet-400" : "text-slate-500 hover:text-violet-400/70"}`}
+                              title="Mark as evaluating"
+                            >
+                              <ClipboardList className="h-5 w-5" />
+                            </button>
+                            <button
+                              onClick={() => handleSetLabel(e.id, e.label === "vetted" ? null : "vetted")}
+                              className={`rounded p-0.5 transition-colors ${e.label === "vetted" ? "text-amber-400 hover:text-amber-300" : "text-slate-500 hover:text-amber-400/70"}`}
+                              title={e.label === "vetted" ? "Remove from vetted" : "Add to vetted"}
+                            >
+                              <Star className={`h-5 w-5 ${e.label === "vetted" ? "fill-current" : ""}`} />
+                            </button>
+                            <button
+                              onClick={() => handleSetLabel(e.id, "traded")}
+                              className={`rounded p-0.5 transition-colors ${e.label === "traded" ? "text-indigo-400" : "text-slate-500 hover:text-indigo-400/70"}`}
+                              title="Mark as traded"
+                            >
+                              <TrendingUp className="h-5 w-5" />
+                            </button>
+                            <button
+                              onClick={() => handleSetLabel(e.id, "unknowable")}
+                              className={`rounded p-0.5 transition-colors ${e.label === "unknowable" ? "text-slate-400" : "text-slate-500 hover:text-slate-400"}`}
+                              title="Mark as unknowable"
+                            >
+                              <HelpCircle className="h-5 w-5" />
+                            </button>
+                            <button
+                              onClick={() => handleSetLabel(e.id, "well_priced")}
+                              className={`rounded p-0.5 transition-colors ${e.label === "well_priced" ? "text-emerald-400" : "text-slate-500 hover:text-emerald-400/70"}`}
+                              title="Mark as well-priced"
+                            >
+                              <BadgeCheck className="h-5 w-5" />
+                            </button>
+                            <button
+                              onClick={() => handleSetLabel(e.id, "disputed")}
+                              className={`rounded p-0.5 transition-colors ${e.label === "disputed" ? "text-amber-500" : "text-slate-500 hover:text-amber-500/70"}`}
+                              title="Mark as disputed"
+                            >
+                              <AlertTriangle className="h-5 w-5" />
+                            </button>
+                            <button
+                              onClick={() => handleSetLabel(e.id, "uninformed")}
+                              className={`rounded p-0.5 transition-colors ${e.label === "uninformed" ? "text-sky-400" : "text-slate-500 hover:text-sky-400/70"}`}
+                              title="Mark as uninformed"
+                            >
+                              <BookOpen className="h-5 w-5" />
+                            </button>
+                            {e.label != null && (
+                              <button
+                                onClick={() => handleSetLabel(e.id, null)}
+                                className="rounded p-0.5 text-slate-500 transition-colors hover:text-white"
+                                title="Clear label (back to discovery)"
+                              >
+                                <X className="h-5 w-5" />
+                              </button>
+                            )}
+                            {e.parentEventSlug && (
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={alsoClassifySiblingsIds.has(e.id)}
+                                aria-label="Also classify sibling markets"
+                                title="Also classify sibling markets"
+                                onClick={() => {
+                                  setAlsoClassifySiblingsIds((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(e.id)) next.delete(e.id);
+                                    else next.add(e.id);
+                                    return next;
+                                  });
+                                }}
+                                className={`mt-2 flex flex-col items-center gap-1 rounded-lg px-2 py-1.5 transition-all duration-200 ${alsoClassifySiblingsIds.has(e.id) ? "bg-indigo-500/20 text-indigo-400 shadow-sm ring-1 ring-indigo-500/30 hover:bg-indigo-500/30" : "bg-slate-800/40 text-slate-500 ring-1 ring-slate-700/50 hover:bg-slate-700/50 hover:text-slate-400 hover:ring-slate-600/60"}`}
+                              >
+                                <SiblingsIcon className="h-4 w-4" />
+                                <span className="text-[10px] font-medium leading-tight">Siblings</span>
+                              </button>
+                            )}
+                          </div>
+                          {(e.image ?? e.icon) && (
+                            <img src={e.image ?? e.icon ?? ""} alt="" className="h-14 w-14 shrink-0 rounded-lg object-cover" />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-medium text-white">{e.title}</h3>
+                              {e.label != null && (
+                                <span className="rounded bg-slate-700/60 px-1.5 py-0.5 text-xs text-slate-400">
+                                  {e.label.replace("_", "-")}
+                                </span>
+                              )}
+                            </div>
+                            {e.tags && Array.isArray(e.tags) && e.tags.length > 0 && (
+                              <div className="mt-1 flex flex-wrap gap-1.5">
+                                {(e.tags as Array<{ id?: string; label?: string; slug?: string }>).map((t, i) => (
+                                  <span key={t.id ?? t.slug ?? `tag-${i}`} className="inline-flex rounded-md bg-slate-700/60 px-2 py-0.5 text-xs text-slate-300">
+                                    {t.label ?? t.slug ?? t.id ?? "—"}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            <div className="mt-1.5 flex w-full items-center gap-2 text-xs">
+                              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                                <a
+                                  href={`https://polymarket.com/event/${e.parentEventSlug ?? e.slug}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300"
+                                >
+                                  Polymarket
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                                <button
+                                  type="button"
+                                  onClick={() => { navigator.clipboard.writeText(e.externalId); toast.success("Market ID copied"); }}
+                                  className="inline-flex items-center gap-1 rounded p-0.5 text-slate-500 transition-colors hover:bg-slate-700/60 hover:text-slate-300"
+                                  title="Copy market ID"
+                                >
+                                  <Copy className="h-3.5 w-3.5" />
+                                </button>
+                                {displayCreatedAt && !isNaN(new Date(displayCreatedAt).getTime()) && (
+                                  <span className="flex items-center gap-1 text-slate-500">
+                                    <CalendarPlus className="h-3.5 w-3.5" />
+                                    {formatDate(new Date(displayCreatedAt))}
+                                  </span>
+                                )}
+                                {e.endDate && (
+                                  <span className="flex items-center gap-1 text-slate-500">
+                                    <Calendar className="h-3.5 w-3.5" />
+                                    {formatDate(e.endDate)}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1 pl-2 self-center h-4">
+                                <PriceHistorySparkline tokenId={e.yesId ?? null} tint="yes" fill />
+                              </div>
+                            </div>
+                            <div className="mt-3 flex flex-wrap items-center gap-4">
+                              {(() => {
+                                const days = daysToResolution(e.endDate);
+                                return days != null ? (
+                                  <div>
+                                    <p className="text-xs text-slate-500">Days left</p>
+                                    <p className="font-mono font-medium text-slate-300">{days} {days === 1 ? "day" : "days"}</p>
+                                  </div>
+                                ) : null;
+                              })()}
+                              <div>
+                                <p className="text-xs text-slate-500">Volume</p>
+                                <p className="font-mono font-medium text-white">{formatCompact(e.volume)}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-slate-500">Liquidity</p>
+                                <p className="font-mono font-medium text-slate-300">{formatCompact(e.liquidity)}</p>
+                              </div>
+                            </div>
+                            {showAppraise && (
+                              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                <button
+                                  onClick={() => handleAppraise(e.id, "think")}
+                                  disabled={appraisingIds.has(e.id)}
+                                  className="flex items-center gap-1.5 rounded-lg border border-indigo-500/60 bg-indigo-500/20 px-3 py-1.5 text-xs font-medium text-indigo-300 transition-colors hover:bg-indigo-500/30 disabled:opacity-50"
+                                >
+                                  {appraisingIds.has(e.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Brain className="h-3 w-3" />}
+                                  Think Appraise
+                                </button>
+                                <button
+                                  onClick={() => handleAppraise(e.id, "reappraise")}
+                                  disabled={appraisingIds.has(e.id) || e.lastAppraised == null}
+                                  className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-slate-700/60 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {appraisingIds.has(e.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCw className="h-3 w-3" />}
+                                  Reappraise
+                                </button>
+                                {e.description && (
+                                  <button
+                                    onClick={() => setRulesPopupEventId(e.id)}
+                                    className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-700/60"
+                                  >
+                                    <ScrollText className="h-3 w-3" />
+                                    Show rules
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                            {showAppraise && (
+                              <div className="mt-2">
+                                {noteEditingId === e.id ? (
+                                  <div className="flex flex-col gap-2">
+                                    <textarea
+                                      value={noteDraft}
+                                      onChange={(ev) => setNoteDraft(ev.target.value)}
+                                      placeholder="Note (included in appraisal)"
+                                      className="w-full rounded border border-slate-600/60 bg-transparent px-0 py-1 text-sm text-slate-300 placeholder-slate-500 focus:border-slate-500 focus:outline-none"
+                                      rows={2}
+                                      autoFocus
+                                    />
+                                    <div className="flex gap-2">
+                                      <button onClick={() => handleSetNote(e.id, noteDraft.trim() || null)} disabled={savingNoteId === e.id} className="text-xs text-indigo-400 hover:text-indigo-300 disabled:opacity-50">Save</button>
+                                      <button onClick={() => { setNoteEditingId(null); setNoteDraft(""); }} className="text-xs text-slate-500 hover:text-slate-400">Cancel</button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => { setNoteEditingId(e.id); setNoteDraft(e.note ?? ""); }}
+                                    className="flex items-center gap-2 text-left text-sm text-slate-500 hover:text-slate-400"
+                                  >
+                                    <StickyNote className={`h-3.5 w-3.5 shrink-0 ${e.note ? "text-amber-500/70" : ""}`} />
+                                    {e.note ? <span className="text-slate-400">{e.note}</span> : <span>Add note</span>}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="w-1/2 min-w-0 shrink-0 rounded-xl border border-slate-700/60 bg-slate-800/30 p-5">
+                        <p className="mb-3 text-sm font-medium text-slate-400">{rightContent ? rightContent.title : "Market description"}</p>
+                        <div className="max-h-80 overflow-y-auto pr-2 text-sm leading-relaxed">
+                          {rightContent ? <ExplanationText text={rightContent.text} /> : <span className="text-slate-500">No description available</span>}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {displayedEvents.length === 0 ? (
         <div className="rounded-2xl border border-slate-800/60 bg-slate-900/50 px-8 py-16 text-center">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-700/50 text-slate-500">
             {activeTab === "discovery" ? (
@@ -1169,6 +1470,8 @@ export function ScreenerContent({
             );
             })}
           </div>
+        </div>
+      )}
         </div>
       )}
 

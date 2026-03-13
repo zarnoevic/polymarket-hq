@@ -40,6 +40,7 @@ import {
 import { METRIC_TOOLTIPS } from "../../../lib/metric-tooltips";
 import { METRIC_SOURCES } from "../../../lib/metric-sources";
 import { MetricTooltip } from "../../components/MetricTooltip";
+import { AiAnalysisSection } from "../../components/AiAnalysisSection";
 
 function formatUsd(value: number, decimals = 0): string {
   return new Intl.NumberFormat("en-US", {
@@ -204,6 +205,7 @@ export default async function AnalyticsPage() {
       <div className="relative z-10 mx-auto max-w-6xl px-6 pt-4 pb-12">
         {trades.length > 0 ? (
           <div className="space-y-8">
+            <AiAnalysisSection />
             {/* Overview */}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <MetricCard

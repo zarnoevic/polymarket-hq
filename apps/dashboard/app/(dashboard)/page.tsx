@@ -285,8 +285,18 @@ export default async function HomePage() {
     computePositionAverages(positions);
 
   // If all positions resolve in our favor: each pays $1 per share; plus cash
-  const totalWinValue =
-    (deployableCapital ?? 0) + positions.reduce((s, p) => s + p.size, 0);
+  const positionsSize = positions.reduce((s, p) => s + p.size, 0);
+  const totalWinValue = (deployableCapital ?? 0) + positionsSize;
+
+  const portfolioValue = (deployableCapital ?? 0) + (totalValue ?? 0);
+  const positionsPct =
+    portfolioValue > 0 && totalValue != null
+      ? ((totalValue / portfolioValue) * 100)
+      : null;
+  const totalWinROI =
+    portfolioValue > 0
+      ? (totalWinValue - portfolioValue) / portfolioValue
+      : null;
 
   const { chanceTotalWin, initialChanceTotalWin } =
     computeTotalWinChances(positions);
@@ -332,6 +342,30 @@ export default async function HomePage() {
                       <p className="text-xs text-slate-400">Positions</p>
                       <p className="font-semibold text-white">
                         {positions.length}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15 text-indigo-400">
+                      <Percent className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Positions %</p>
+                      <p className="font-semibold text-white">
+                        {positionsPct != null
+                          ? `${positionsPct.toFixed(1)}%`
+                          : "—"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400">
+                      <TrendingUp className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Total Win ROI</p>
+                      <p className="font-semibold text-emerald-400">
+                        {totalWinROI != null ? formatRoi(totalWinROI) : "—"}
                       </p>
                     </div>
                   </div>
