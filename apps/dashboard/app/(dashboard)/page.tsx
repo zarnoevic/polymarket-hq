@@ -70,7 +70,7 @@ async function fetchUsdcBalance(): Promise<number | null> {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body,
-        next: { revalidate: 60 },
+        cache: "no-store",
       });
 
       if (!res.ok) continue;

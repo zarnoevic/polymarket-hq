@@ -176,6 +176,7 @@ export function CategorizedPositionsList({
   wallet?: string;
 }) {
   const router = useRouter();
+  const [refreshing, setRefreshing] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [positionToCategory, setPositionToCategory] = useState<Record<string, string>>({});
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
@@ -183,6 +184,16 @@ export function CategorizedPositionsList({
   const [newCategoryName, setNewCategoryName] = useState("");
   const [addMode, setAddMode] = useState(false);
   const [dragOverCategoryId, setDragOverCategoryId] = useState<string | null>(null);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetch("/api/dashboard/refresh", { method: "POST" });
+      router.refresh();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     const stored = loadStored(wallet);
@@ -332,11 +343,12 @@ export function CategorizedPositionsList({
         )}
         </div>
         <button
-          onClick={() => router.refresh()}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/50 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:border-indigo-600/50 hover:bg-slate-800 hover:text-indigo-400"
-          title="Refresh data"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/50 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:border-indigo-600/50 hover:bg-slate-800 hover:text-indigo-400 disabled:opacity-60"
+          title="Refresh data (positions, cash, account)"
         >
-          <RefreshCw className="h-3.5 w-3.5" />
+          <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
           Refresh
         </button>
       </div>
