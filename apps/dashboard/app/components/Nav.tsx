@@ -3,12 +3,13 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, BarChart3, Filter } from "lucide-react";
+import { LayoutDashboard, BarChart3, Filter, BookOpen } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/screener", label: "Screener", icon: Filter },
+  { href: "/knowledge-base", label: "Knowledge Base", icon: BookOpen },
 ];
 
 export function Nav() {

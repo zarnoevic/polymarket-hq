@@ -314,8 +314,8 @@ export default async function HomePage() {
       />
 
       <div className="relative z-10 flex w-full pt-4 pb-2">
-        {/* Left margin: averages and total win */}
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 min-w-0">
+        {/* Left margin: total win (aligned with category by allocation), averages beneath */}
+        <div className="flex flex-1 flex-col items-center justify-start gap-4 min-w-0 pt-4">
           {positions.length > 0 && (
             <div className="inline-flex flex-col items-stretch gap-4">
               <div className="overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 p-4 shadow-lg shadow-black/10">
@@ -681,8 +681,8 @@ export default async function HomePage() {
           </div>
         )}
         </div>
-        {/* Right margin: Pie charts - allocation, category 24h, positions 24h */}
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 min-w-0 py-4">
+        {/* Right margin: Pie charts - allocation (aligned with total win), category 24h, positions 24h */}
+        <div className="flex flex-1 flex-col items-center justify-start gap-4 min-w-0 pt-4">
           {positions.length > 0 && (
             <>
               <CategoryCompositionPieChart
