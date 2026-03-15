@@ -25,6 +25,7 @@ import { PriceHistorySparkline } from "./PriceHistorySparkline";
 import { OrderBookLabel } from "./OrderBookLabel";
 import { MarketFees } from "./MarketFees";
 import { SpreadLabel } from "./SpreadLabel";
+import { computeKellyCriterion } from "@/lib/kelly";
 
 type LabelType = "vetted" | "unknowable" | "well_priced" | "traded" | "evaluating" | "disputed" | "uninformed" | "under_5" | null;
 
@@ -80,6 +81,10 @@ type ScreenerEvent = {
   noId: string | null;
   yesSpread?: number | null;
   noSpread?: number | null;
+  traderAppraisedYes?: number | null;
+  kellyPosition?: "yes" | "no" | null;
+  kellyC?: number | null;
+  kellyCriterion?: number | null;
   raw?: unknown;
   tags?: unknown; // Gamma API tags: JsonValue from DB
 };
@@ -248,6 +253,9 @@ export function ScreenerContent({
   const [noteEditingId, setNoteEditingId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [savingNoteId, setSavingNoteId] = useState<string | null>(null);
+  const [savingKellyId, setSavingKellyId] = useState<string | null>(null);
+  const [kellyDrafts, setKellyDrafts] = useState<Record<string, { p: string; c: string; position: "yes" | "no" }>>({});
+  const kellySaveTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [activeTab, setActiveTab] = useState<"discovery" | "evaluating" | "vetted" | "traded" | "unknowable" | "well_priced" | "disputed" | "uninformed" | "under_5">("discovery");
   const [categoryOpen, setCategoryOpen] = useState(false);
   const categoryRef = useRef<HTMLDivElement>(null);
@@ -255,6 +263,11 @@ export function ScreenerContent({
   const [alsoClassifySiblingsIds, setAlsoClassifySiblingsIds] = useState<Set<string>>(new Set());
   const [rulesPopupEventId, setRulesPopupEventId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [portfolioSummary, setPortfolioSummary] = useState<{
+    portfolioValue: number;
+    cash: number;
+    cashPct: number;
+  } | null>(null);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -272,6 +285,24 @@ export function ScreenerContent({
     const id = setInterval(() => setElapsedTick((t) => t + 1), 1000);
     return () => clearInterval(id);
   }, [appraisingIds.size]);
+
+  // Fetch portfolio when viewing Kelly tabs (evaluating, vetted, traded)
+  const kellyTabs = ["evaluating", "vetted", "traded"] as const;
+  useEffect(() => {
+    if (!kellyTabs.includes(activeTab)) return;
+    fetch("/api/portfolio/summary")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.portfolioValue != null && d.cash != null && d.cashPct != null) {
+          setPortfolioSummary({
+            portfolioValue: Number(d.portfolioValue),
+            cash: Number(d.cash),
+            cashPct: Number(d.cashPct),
+          });
+        }
+      })
+      .catch(() => {});
+  }, [activeTab]);
 
   const discoveryEvents = events
     .filter((e) => e.label === null)
@@ -437,6 +468,76 @@ export function ScreenerContent({
       toast.error(msg);
     } finally {
       setSavingNoteId(null);
+    }
+  }
+
+  async function handleSetKelly(
+    eventId: string,
+    traderAppraisedYes: number,
+    kellyC: number,
+    kellyPosition: "yes" | "no"
+  ) {
+    setSavingKellyId(eventId);
+    try {
+      const res = await fetch("/api/screener/kelly", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId, traderAppraisedYes, kellyC, kellyPosition }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Failed to update Kelly");
+      setEvents((prev) =>
+        prev.map((e) =>
+          e.id === eventId
+            ? {
+                ...e,
+                traderAppraisedYes: data.traderAppraisedYes,
+                kellyC: data.kellyC,
+                kellyCriterion: data.kellyCriterion,
+                kellyPosition: data.kellyPosition ?? "no",
+              }
+            : e
+        )
+      );
+      toast.success("Kelly saved");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to save Kelly";
+      toast.error(msg);
+    } finally {
+      setSavingKellyId(null);
+    }
+  }
+
+  async function handleToggleKellyPosition(eventId: string) {
+    const ev = events.find((x) => x.id === eventId);
+    if (!ev) return;
+    const nextPos = (ev.kellyPosition ?? "no") === "yes" ? "no" : "yes";
+    setSavingKellyId(eventId);
+    try {
+      const res = await fetch("/api/screener/kelly", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId, kellyPosition: nextPos }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Failed to update position");
+      setEvents((prev) =>
+        prev.map((e) =>
+          e.id === eventId
+            ? {
+                ...e,
+                kellyPosition: data.kellyPosition ?? "no",
+                kellyCriterion: data.kellyCriterion,
+              }
+            : e
+        )
+      );
+      toast.success(`Position: ${nextPos.toUpperCase()}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to update position";
+      toast.error(msg);
+    } finally {
+      setSavingKellyId(null);
     }
   }
 
@@ -1021,6 +1122,9 @@ export function ScreenerContent({
               {activeTab === "evaluating" && " evaluating"}
               {activeTab === "vetted" && " vetted"}
               {activeTab === "traded" && " traded"}
+              {kellyTabs.includes(activeTab) && portfolioSummary != null && (
+                <> · <span title="% of portfolio in cash (Polygon USDC)">{portfolioSummary.cashPct.toFixed(1)}% in cash</span></>
+              )}
               {activeTab === "unknowable" && " unknowable"}
               {activeTab === "well_priced" && " well-priced"}
               {activeTab === "disputed" && " disputed"}
@@ -1351,6 +1455,116 @@ export function ScreenerContent({
                         </div>
                       )}
                     </div>
+                    {kellyTabs.includes(activeTab) && e.probabilityYes != null && (() => {
+                      const def = kellyDrafts[e.id] ?? {
+                        p: ((e.traderAppraisedYes ?? e.appraisedYes) != null ? ((e.traderAppraisedYes ?? e.appraisedYes)! * 100).toString() : ""),
+                        c: e.kellyC != null ? e.kellyC.toString() : "4",
+                        position: (e.kellyPosition ?? "no") as "yes" | "no",
+                      };
+                      const pNum = parseFloat(def.p);
+                      const cNum = parseFloat(def.c);
+                      const quotedYes = e.probabilityYes ?? (e.probabilityNo != null ? 1 - e.probabilityNo : null);
+                      const quotedNo = e.probabilityNo ?? (e.probabilityYes != null ? 1 - e.probabilityYes : null);
+                      const rawBuyPrice = def.position === "yes"
+                        ? (quotedYes != null ? quotedYes + (e.yesSpread ?? 0) : null)
+                        : (quotedNo != null ? quotedNo + (e.noSpread ?? 0) : null);
+                      const buyPrice = rawBuyPrice != null ? Math.min(0.99, rawBuyPrice) : null;
+                      const pForKelly = def.position === "yes" ? (Number.isFinite(pNum) ? pNum / 100 : 0) : (Number.isFinite(pNum) ? 1 - pNum / 100 : 0);
+                      const kellyResult = buyPrice != null && buyPrice > 0 && buyPrice < 1 && pForKelly > 0 && pForKelly < 1 && Number.isFinite(cNum) && cNum > 0
+                        ? computeKellyCriterion(pForKelly, buyPrice, cNum)
+                        : null;
+                      const scheduleSave = (p: string, c: string, pos: "yes" | "no") => {
+                        const prev = kellySaveTimersRef.current[e.id];
+                        if (prev) clearTimeout(prev);
+                        kellySaveTimersRef.current[e.id] = setTimeout(async () => {
+                          const pVal = parseFloat(p);
+                          const cVal = parseFloat(c);
+                          if (Number.isFinite(pVal) && pVal >= 0 && pVal <= 100 && Number.isFinite(cVal) && cVal > 0) {
+                            await handleSetKelly(e.id, pVal / 100, cVal, pos);
+                          }
+                          delete kellySaveTimersRef.current[e.id];
+                        }, 400);
+                      };
+                      return (
+                    <div className="mt-2 flex flex-wrap items-center gap-3 rounded-lg border border-slate-700/60 bg-slate-800/30 px-3 py-2">
+                      <span className="text-xs text-slate-500 self-center">Kelly</span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-label="Kelly position (YES or NO)"
+                        title={`Entering ${def.position === "yes" ? "NO" : "YES"} — click to switch`}
+                        onClick={() => {
+                          const next = def.position === "yes" ? "no" : "yes";
+                          setKellyDrafts((d) => ({ ...d, [e.id]: { ...def, position: next } }));
+                          handleToggleKellyPosition(e.id);
+                        }}
+                        disabled={savingKellyId === e.id}
+                        className={`flex flex-col items-center gap-1 rounded-lg px-2 py-1.5 transition-all duration-200 ${
+                          def.position === "yes"
+                            ? "bg-emerald-500/20 text-emerald-400 shadow-sm ring-1 ring-emerald-500/30 hover:bg-emerald-500/30"
+                            : "bg-red-500/20 text-red-400 shadow-sm ring-1 ring-red-500/30 hover:bg-red-500/30"
+                        } disabled:opacity-50`}
+                      >
+                        <span className="text-[10px] font-bold leading-tight">{def.position.toUpperCase()}</span>
+                      </button>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-400"><span className="italic">p</span><sub>YES</sub></span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={0.1}
+                          value={def.p}
+                          onChange={(ev) => {
+                            const v = ev.target.value;
+                            setKellyDrafts((d) => ({ ...d, [e.id]: { ...def, p: v } }));
+                            scheduleSave(v, def.c, def.position);
+                          }}
+                          onBlur={() => {
+                            const pVal = parseFloat(def.p);
+                            const cVal = parseFloat(def.c);
+                            if (Number.isFinite(pVal) && pVal >= 0 && pVal <= 100 && Number.isFinite(cVal) && cVal > 0) {
+                              handleSetKelly(e.id, pVal / 100, cVal, def.position);
+                            }
+                          }}
+                          placeholder={(e.traderAppraisedYes ?? e.appraisedYes) != null ? ((e.traderAppraisedYes ?? e.appraisedYes)! * 100).toString() : ""}
+                          className="w-16 rounded border border-slate-600/60 bg-slate-900/50 px-2 py-1 text-xs font-mono text-white"
+                        />
+                        <span className="text-xs text-slate-400">%</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-400">c</span>
+                        <input
+                          type="number"
+                          min={0.1}
+                          step={0.1}
+                          value={def.c}
+                          onChange={(ev) => {
+                            const v = ev.target.value;
+                            setKellyDrafts((d) => ({ ...d, [e.id]: { ...def, c: v } }));
+                            scheduleSave(def.p, v, def.position);
+                          }}
+                          onBlur={() => {
+                            const pVal = parseFloat(def.p);
+                            const cVal = parseFloat(def.c);
+                            if (Number.isFinite(pVal) && pVal >= 0 && pVal <= 100 && Number.isFinite(cVal) && cVal > 0) {
+                              handleSetKelly(e.id, pVal / 100, cVal, def.position);
+                            }
+                          }}
+                          className="w-14 rounded border border-slate-600/60 bg-slate-900/50 px-2 py-1 text-xs font-mono text-white"
+                        />
+                      </div>
+                      {kellyResult != null && (
+                        <span className="font-mono text-sm font-medium text-amber-400/90 tabular-nums">
+                          → {(kellyResult * 100).toFixed(1)}%
+                          {portfolioSummary != null && portfolioSummary.portfolioValue > 0 && (
+                            <> · {formatCompact(kellyResult * portfolioSummary.portfolioValue)}</>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                      );
+                    })()}
                     {activeTab !== "discovery" && (
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
                       <button

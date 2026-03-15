@@ -52,6 +52,10 @@ model ScreenerEvent {
   noId          String?  @map("no_id")  // Second clobTokenId (No outcome)
   yesSpread     Float?   @map("yes_spread") // Ask-bid spread for Yes token (for ROI/PAROI buy price)
   noSpread      Float?   @map("no_spread")  // Ask-bid spread for No token
+  traderAppraisedYes Float? @map("trader_appraised_yes") // Trader's manual probability of YES (0-1) for Kelly
+  kellyPosition String?  @map("kelly_position") // "yes" | "no" - which side you're entering (default yes)
+  kellyC        Float?   @map("kelly_c") // Kelly scaling factor (fractional Kelly = full Kelly / c)
+  kellyCriterion Float?  @map("kelly_criterion") // Calculated Kelly criterion (fractional), displayed as %
 
   @@index([syncedAt])
   @@index([label])
