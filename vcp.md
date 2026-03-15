@@ -1,3 +1,12 @@
+fix analyses
+
+fix build
+
+fx screener
+gold price gram
+Rolices
+
+add politics
 
 Introduce math page
 

@@ -1113,23 +1113,34 @@ export function ScreenerContent({
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <BarChart3 className="h-4 w-4" />
-            <span>
-              {displayedEvents.length} markets
-              {activeTab === "discovery" && " · sorted by probability closest to 50%"}
-              {activeTab === "under_5" && " <5% (low priority)"}
-              {activeTab === "evaluating" && " evaluating"}
-              {activeTab === "vetted" && " vetted"}
-              {activeTab === "traded" && " traded"}
-              {(kellyTabs as readonly string[]).includes(activeTab) && portfolioSummary != null && (
-                <> · <span title="% of portfolio in cash (Polygon USDC)">{portfolioSummary.cashPct.toFixed(1)}% in cash</span></>
-              )}
-              {activeTab === "unknowable" && " unknowable"}
-              {activeTab === "well_priced" && " well-priced"}
-              {activeTab === "disputed" && " disputed"}
-              {activeTab === "uninformed" && " uninformed"}
-            </span>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <BarChart3 className="h-4 w-4" />
+              <span>
+                {displayedEvents.length} markets
+                {activeTab === "discovery" && " · sorted by probability closest to 50%"}
+                {activeTab === "under_5" && " <5% (low priority)"}
+                {activeTab === "evaluating" && " evaluating"}
+                {activeTab === "vetted" && " vetted"}
+                {activeTab === "traded" && " traded"}
+                {activeTab === "unknowable" && " unknowable"}
+                {activeTab === "well_priced" && " well-priced"}
+                {activeTab === "disputed" && " disputed"}
+                {activeTab === "uninformed" && " uninformed"}
+              </span>
+            </div>
+            {(kellyTabs as readonly string[]).includes(activeTab) && portfolioSummary != null && (
+              <div className="flex items-center gap-3 rounded-lg border border-slate-600/80 bg-slate-800/60 px-4 py-2">
+                <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Portfolio</span>
+                <span className="text-base font-semibold text-emerald-400" title="% of portfolio in cash (Polygon USDC)">
+                  {portfolioSummary.cashPct.toFixed(1)}% cash
+                </span>
+                <span className="text-slate-500">·</span>
+                <span className="text-base font-semibold text-violet-400" title="% of portfolio in positions">
+                  {(100 - portfolioSummary.cashPct).toFixed(1)}% positions
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="space-y-4">
@@ -1465,9 +1476,16 @@ export function ScreenerContent({
                       const cNum = parseFloat(def.c);
                       const quotedYes = e.probabilityYes ?? (e.probabilityNo != null ? 1 - e.probabilityNo : null);
                       const quotedNo = e.probabilityNo ?? (e.probabilityYes != null ? 1 - e.probabilityYes : null);
+                      // Normalize to 0-1: if value > 1, assume it's stored as percent (0-100)
+                      const toDec = (v: number | null | undefined) =>
+                        v != null && Number.isFinite(v) ? (v > 1 ? v / 100 : v) : 0;
+                      const qYes = quotedYes != null ? toDec(quotedYes) : null;
+                      const qNo = quotedNo != null ? toDec(quotedNo) : null;
+                      const spYes = toDec(e.yesSpread);
+                      const spNo = toDec(e.noSpread);
                       const rawBuyPrice = def.position === "yes"
-                        ? (quotedYes != null ? quotedYes + (e.yesSpread ?? 0) : null)
-                        : (quotedNo != null ? quotedNo + (e.noSpread ?? 0) : null);
+                        ? (qYes != null ? qYes + spYes : null)
+                        : (qNo != null ? qNo + spNo : null);
                       const buyPrice = rawBuyPrice != null ? Math.min(0.99, rawBuyPrice) : null;
                       const pForKelly = def.position === "yes" ? (Number.isFinite(pNum) ? pNum / 100 : 0) : (Number.isFinite(pNum) ? 1 - pNum / 100 : 0);
                       const kellyResult = buyPrice != null && buyPrice > 0 && buyPrice < 1 && pForKelly > 0 && pForKelly < 1 && Number.isFinite(cNum) && cNum > 0
@@ -1558,7 +1576,13 @@ export function ScreenerContent({
                         <span className="font-mono text-sm font-medium text-amber-400/90 tabular-nums">
                           → {(kellyResult * 100).toFixed(1)}%
                           {portfolioSummary != null && portfolioSummary.portfolioValue > 0 && (
-                            <> · {formatCompact(kellyResult * portfolioSummary.portfolioValue)}</>
+                            <>
+                              {" · "}
+                              {formatCompact(kellyResult * portfolioSummary.portfolioValue)}
+                              {portfolioSummary.cash > 0 && (kellyResult * portfolioSummary.portfolioValue) > 0 && (
+                                <> · Cash / {(portfolioSummary.cash / (kellyResult * portfolioSummary.portfolioValue)).toFixed(2)}</>
+                              )}
+                            </>
                           )}
                         </span>
                       )}

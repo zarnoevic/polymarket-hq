@@ -31,16 +31,21 @@ export async function POST(req: Request) {
     const position = kellyPosition === "no" ? "no" : "yes";
     const quotedYes = event.probabilityYes ?? (event.probabilityNo != null ? 1 - event.probabilityNo : null);
     const quotedNo = event.probabilityNo ?? (event.probabilityYes != null ? 1 - event.probabilityYes : null);
-    // buyPrice = quoted + spread. Spread is (bestAsk-bestBid). If quoted is mid, use spread/2 for ask.
-    // Gamma outcomePrices may be mid or last; we add full spread for conservative (higher) buy cost.
+    // Normalize to 0-1: if value > 1, assume stored as percent (0-100) — fixes spread/prob from wrong units
+    const toDec = (v: number | null | undefined) =>
+      v != null && Number.isFinite(v) ? (v > 1 ? v / 100 : v) : 0;
+    const qYes = quotedYes != null ? toDec(quotedYes) : null;
+    const qNo = quotedNo != null ? toDec(quotedNo) : null;
+    const spYes = toDec(event.yesSpread);
+    const spNo = toDec(event.noSpread);
     let buyPrice: number | null = null;
     let pForKelly: number;
     if (position === "yes") {
-      const raw = quotedYes != null ? quotedYes + (event.yesSpread ?? 0) : null;
+      const raw = qYes != null ? qYes + spYes : null;
       buyPrice = raw != null ? Math.min(0.99, raw) : null;
       pForKelly = p;
     } else {
-      const raw = quotedNo != null ? quotedNo + (event.noSpread ?? 0) : null;
+      const raw = qNo != null ? qNo + spNo : null;
       buyPrice = raw != null ? Math.min(0.99, raw) : null;
       pForKelly = 1 - p; // P(NO) = 1 - P(YES)
     }
