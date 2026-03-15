@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { DM_Sans } from "next/font/google";
 import "./globals.css";
+import { WealthTabsNav } from "./components/WealthTabsNav";
+import { ToasterClient } from "./components/ToasterClient";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -9,8 +11,8 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Polymarket HQ",
-  description: "Private dashboard for Polymarket market analysis and insights",
+  title: "Wealth HQ",
+  description: "Wealth dashboard: Polymarket, stocks, gold, and FX insights",
   icons: {
     icon: "/logo.svg",
   },
@@ -24,6 +26,8 @@ export default function RootLayout({
   return (
     <html lang="en" className={`dark ${dmSans.variable}`} suppressHydrationWarning>
       <body className="antialiased flex min-h-screen flex-col font-sans">
+        <ToasterClient />
+        <WealthTabsNav />
         {children}
       </body>
     </html>

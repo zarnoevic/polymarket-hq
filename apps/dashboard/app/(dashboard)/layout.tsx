@@ -1,4 +1,4 @@
-import { Nav } from "../components/Nav";
+import { PolymarketNav } from "../components/PolymarketNav";
 import { ToasterClient } from "../components/ToasterClient";
 
 export default function DashboardLayout({
@@ -9,7 +9,7 @@ export default function DashboardLayout({
   return (
     <>
       <ToasterClient />
-      <Nav />
+      <PolymarketNav />
       <main className="flex-1">{children}</main>
     </>
   );

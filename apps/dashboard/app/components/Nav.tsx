@@ -17,14 +17,7 @@ export function Nav() {
 
   return (
     <nav className="border-b border-slate-800/60 bg-slate-900/30 backdrop-blur-sm">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-lg font-semibold tracking-tight text-white transition-opacity hover:opacity-90"
-        >
-          <Image src="/logo.svg" alt="" width={28} height={28} className="rounded-lg" />
-          Polymarket HQ
-        </Link>
+      <div className="mx-auto flex max-w-5xl items-center px-6 py-3">
         <div className="flex gap-1">
           {navItems.map(({ href, label, icon: Icon }) => {
             const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
