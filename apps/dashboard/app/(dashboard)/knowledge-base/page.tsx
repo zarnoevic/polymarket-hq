@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Globe, MapPin } from "lucide-react";
 import {
   getSourcesByTheater,
   getCategoriesForTheater,
@@ -14,10 +13,26 @@ import {
 type TheaterTab = "iranian" | "russian" | "chinese";
 
 const theaterTabs: { tab: TheaterTab; label: string }[] = [
-  { tab: "iranian", label: "Iranian Theater" },
-  { tab: "russian", label: "Russian Theater" },
-  { tab: "chinese", label: "Chinese Theater" },
+  { tab: "iranian", label: "🇮🇷 Iranian Theater" },
+  { tab: "russian", label: "🇷🇺 Russian Theater" },
+  { tab: "chinese", label: "🇨🇳 Chinese Theater" },
 ];
+
+const emojiPrefix = /^[\p{Emoji}\s]+/u;
+
+/** Flags for category headers that reference countries/regions */
+const categoryFlags: Record<string, string> = {
+  "Iran-Iraq War": "🇮🇷 🇮🇶",
+  "Iraq War": "🇮🇶",
+  "Gulf Wars": "🇮🇶 🇸🇦",
+  Israel: "🇮🇱",
+  Ukraine: "🇺🇦",
+  Taiwan: "🇹🇼",
+  "Hong Kong": "🇭🇰",
+  "US Relations": "🇺🇸",
+  "Sino-Japanese": "🇨🇳 🇯🇵",
+  Regional: "🌍",
+};
 
 export default function KnowledgeBasePage() {
   const [activeTab, setActiveTab] = useState<TheaterTab>("iranian");
@@ -70,33 +85,31 @@ export default function KnowledgeBasePage() {
                   : "text-slate-400 hover:bg-slate-700/60 hover:text-white"
               }`}
             >
-              <MapPin className="h-4 w-4" />
-              {label}
+              <span className="text-lg leading-none">{label.match(emojiPrefix)?.[0] ?? ""}</span>
+              <span>{label.replace(emojiPrefix, "").trim()}</span>
             </button>
           ))}
         </div>
 
         <div className="mt-6 overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-xl shadow-black/20 backdrop-blur-sm">
           <div className="border-b border-slate-700/50 px-6 py-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-500/20 text-indigo-400">
-                <Globe className="h-5 w-5" strokeWidth={1.75} />
-              </div>
-              <div>
+            <div>
                 <h2 className="text-lg font-semibold text-white">
                   {theaterTabs.find((t) => t.tab === activeTab)?.label ?? activeTab}
                 </h2>
                 <p className="text-sm text-slate-400">
                   Sources to understand information wars & historical context
                 </p>
-              </div>
             </div>
           </div>
           <div className="px-6 py-6">
             <div className="space-y-8">
               {categories.map((category) => (
                 <div key={category}>
-                  <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    {categoryFlags[category] && (
+                      <span className="text-base leading-none">{categoryFlags[category]}</span>
+                    )}
                     {category}
                   </h3>
                   <div className="space-y-3">

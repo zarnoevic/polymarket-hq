@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { TrendingUp, Coins, ArrowLeftRight, LayoutDashboard, BarChart3, Filter, BookOpen } from "lucide-react";
+import { TrendingUp, Coins, ArrowLeftRight, LayoutDashboard, BarChart3, Filter, BookOpen, Sigma } from "lucide-react";
 
 const BIG_CATEGORIES = [
   { href: "/", label: "Polymarket", logo: "/polymarket-icon.png" },
@@ -17,6 +17,7 @@ const POLYMARKET_NAV_ITEMS = [
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/screener", label: "Screener", icon: Filter },
   { href: "/knowledge-base", label: "Knowledge Base", icon: BookOpen },
+  { href: "/math", label: "Math", icon: Sigma },
 ] as const;
 
 // Placeholder for other categories - add items as needed
@@ -25,7 +26,7 @@ const GOLD_NAV_ITEMS: readonly { href: string; label: string; icon: typeof Layou
 const FX_NAV_ITEMS: readonly { href: string; label: string; icon: typeof LayoutDashboard }[] = [];
 
 function isPolymarketPath(path: string) {
-  return path === "/" || path.startsWith("/analytics") || path.startsWith("/screener") || path.startsWith("/knowledge-base");
+  return path === "/" || path.startsWith("/analytics") || path.startsWith("/screener") || path.startsWith("/knowledge-base") || path.startsWith("/math");
 }
 
 function getCategoryNavItems(path: string) {

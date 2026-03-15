@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@polymarket-hq/dashboard-prisma": "workspace:*",
+    "katex": "^0.16.38",
     "lucide-react": "0.563.0",
     "next": "15.5.12",
     "openai": "^6.27.0",

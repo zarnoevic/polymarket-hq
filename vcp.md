@@ -8,20 +8,12 @@ Rolices
 
 add politics
 
-Introduce math page
 
-Core
 
-EV for pa, pq, pr
-proi paroi caroi croi
+cutoffs
 
 hedging calculation, NO by March 31, YES by December 31
 
-NO vs YES graphs
-
-
-Analytics
-all calculations
 
 
 Introduce order execution
