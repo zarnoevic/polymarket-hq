@@ -82,7 +82,7 @@ type ScreenerEvent = {
   yesSpread?: number | null;
   noSpread?: number | null;
   traderAppraisedYes?: number | null;
-  kellyPosition?: "yes" | "no" | null;
+  kellyPosition?: string | null; // DB stores "yes" | "no"
   kellyC?: number | null;
   kellyCriterion?: number | null;
   raw?: unknown;
@@ -289,7 +289,7 @@ export function ScreenerContent({
   // Fetch portfolio when viewing Kelly tabs (evaluating, vetted, traded)
   const kellyTabs = ["evaluating", "vetted", "traded"] as const;
   useEffect(() => {
-    if (!kellyTabs.includes(activeTab)) return;
+    if (!(kellyTabs as readonly string[]).includes(activeTab)) return;
     fetch("/api/portfolio/summary")
       .then((r) => r.json())
       .then((d) => {
@@ -1122,7 +1122,7 @@ export function ScreenerContent({
               {activeTab === "evaluating" && " evaluating"}
               {activeTab === "vetted" && " vetted"}
               {activeTab === "traded" && " traded"}
-              {kellyTabs.includes(activeTab) && portfolioSummary != null && (
+              {(kellyTabs as readonly string[]).includes(activeTab) && portfolioSummary != null && (
                 <> · <span title="% of portfolio in cash (Polygon USDC)">{portfolioSummary.cashPct.toFixed(1)}% in cash</span></>
               )}
               {activeTab === "unknowable" && " unknowable"}
@@ -1455,7 +1455,7 @@ export function ScreenerContent({
                         </div>
                       )}
                     </div>
-                    {kellyTabs.includes(activeTab) && e.probabilityYes != null && (() => {
+                    {(kellyTabs as readonly string[]).includes(activeTab) && e.probabilityYes != null && (() => {
                       const def = kellyDrafts[e.id] ?? {
                         p: ((e.traderAppraisedYes ?? e.appraisedYes) != null ? ((e.traderAppraisedYes ?? e.appraisedYes)! * 100).toString() : ""),
                         c: e.kellyC != null ? e.kellyC.toString() : "4",

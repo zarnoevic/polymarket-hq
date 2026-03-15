@@ -132,6 +132,8 @@ type CategorySlice = {
   sparkline?: { yesId: string; entryTimestamp?: number; outcome: string; avgPrice: number };
 };
 
+type CategorySliceRaw = Omit<CategorySlice, "absShare"> & { rawShare: number };
+
 function loadCategoryData(wallet?: string): {
   positionToCategory: Record<string, string>;
   catNames: Record<string, string>;
@@ -224,7 +226,7 @@ export function CategoryAttributionPieChart({
       setTotalPnl24h(fullTotal);
 
       const totalAbs = Array.from(byCategory.values()).reduce((s, v) => s + Math.abs(v.pnl), 0);
-      const categorySlices: CategorySlice[] = Array.from(byCategory.entries())
+      const categorySlicesRaw = Array.from(byCategory.entries())
         .map(([catId, { pnl, positions }]) => {
           const bestPos = positions.reduce((best, cur) => {
             const days = daysToResolution(cur.pos.endDate ?? "", cur.pos.title);
@@ -295,14 +297,14 @@ export function CategoryAttributionPieChart({
           };
         });
       const MIN_SHARE = 0.02;
-      const totalAdjusted = categorySlices.reduce(
+      const totalAdjusted = categorySlicesRaw.reduce(
         (s, sl) => s + Math.max(sl.rawShare, MIN_SHARE),
         0
       );
-      const slicesWithMin = categorySlices
+      const slicesWithMin = categorySlicesRaw
         .map(({ rawShare, ...sl }) => ({
           ...sl,
-          absShare: totalAdjusted > 0 ? Math.max(rawShare, MIN_SHARE) / totalAdjusted : 1 / categorySlices.length,
+          absShare: totalAdjusted > 0 ? Math.max(rawShare, MIN_SHARE) / totalAdjusted : 1 / categorySlicesRaw.length,
         }))
         .sort((a, b) => (b.pnl24h >= 0 ? 1 : -1) - (a.pnl24h >= 0 ? 1 : -1));
 

@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import { prisma } from "@polymarket-hq/dashboard-prisma";
 import { ScreenerContent } from "../../components/ScreenerContent";
 
@@ -15,6 +16,13 @@ export default async function ScreenerPage() {
     return maxB - maxA;
   });
 
+  // Narrow kellyPosition from Prisma's string to "yes" | "no" for ScreenerContent
+  const normalized = sorted.map((e) => ({
+    ...e,
+    kellyPosition:
+      e.kellyPosition === "yes" ? "yes" : e.kellyPosition === "no" ? "no" : null,
+  }));
+
   return (
     <div className="min-h-screen bg-[rgb(var(--background-rgb))]">
       <div
@@ -27,7 +35,11 @@ export default async function ScreenerPage() {
       />
 
       <div className="relative z-10 mx-auto w-[90vw] max-w-[90vw] px-4 py-12">
-        <ScreenerContent initialEvents={sorted} />
+        <ScreenerContent
+          initialEvents={
+            normalized as ComponentProps<typeof ScreenerContent>["initialEvents"]
+          }
+        />
       </div>
     </div>
   );
