@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { RefreshCw, Filter, Calendar, CalendarPlus, BarChart3, ExternalLink, Loader2, RotateCw, X, Brain, Star, Compass, HelpCircle, BadgeCheck, TrendingUp, ClipboardList, ChevronDown, ChevronLeft, ChevronRight, AlertTriangle, StickyNote, BookOpen, Percent, Copy, ScrollText, Clock, Search, Tag, Plus, DollarSign, ArrowLeftRight } from "lucide-react";
+import { RefreshCw, Filter, Calendar, CalendarPlus, BarChart3, ExternalLink, Loader2, RotateCw, X, Brain, Star, Compass, HelpCircle, BadgeCheck, TrendingUp, ClipboardList, ChevronDown, ChevronLeft, ChevronRight, AlertTriangle, StickyNote, BookOpen, Percent, Copy, ScrollText, Clock, Search, Tag, Plus, Minus, DollarSign, ArrowLeftRight } from "lucide-react";
 
 /** Icon: one circle with smaller circles sprouting (tree/siblings) */
 function SiblingsIcon({ className }: { className?: string }) {
@@ -279,6 +279,21 @@ export function ScreenerContent({
   const categoryRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [alsoClassifySiblingsIds, setAlsoClassifySiblingsIds] = useState<Set<string>>(new Set());
+
+  // Siblings selected by default when events load
+  useEffect(() => {
+    setAlsoClassifySiblingsIds((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const e of events) {
+        if (!next.has(e.id)) {
+          next.add(e.id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [events]);
   const [rulesPopupEventId, setRulesPopupEventId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [portfolioSummary, setPortfolioSummary] = useState<{
@@ -288,6 +303,7 @@ export function ScreenerContent({
   } | null>(null);
   const [allTags, setAllTags] = useState<Array<{ id: string; label: string; slug: string }>>([]);
   const [selectedTagPrefs, setSelectedTagPrefs] = useState<Array<{ tagId: string; label: string; slug: string }>>([]);
+  const [excludedTagPrefs, setExcludedTagPrefs] = useState<Array<{ tagId: string; label: string; slug: string }>>([]);
   const [tagsOpen, setTagsOpen] = useState(false);
   const [tagSearchInput, setTagSearchInput] = useState("");
   const [loadingTags, setLoadingTags] = useState(false);
@@ -315,12 +331,15 @@ export function ScreenerContent({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Load tag preferences on mount
+  // Load tag preferences and exclusions on mount
   useEffect(() => {
-    fetch("/api/screener/tag-preferences")
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) setSelectedTagPrefs(data);
+    Promise.all([
+      fetch("/api/screener/tag-preferences").then((r) => r.json()),
+      fetch("/api/screener/tag-exclusions").then((r) => r.json()),
+    ])
+      .then(([prefs, exclusions]) => {
+        if (Array.isArray(prefs)) setSelectedTagPrefs(prefs);
+        if (Array.isArray(exclusions)) setExcludedTagPrefs(exclusions);
       })
       .catch(() => {});
   }, []);
@@ -395,6 +414,22 @@ export function ScreenerContent({
   useEffect(() => {
     setSearchPage(1);
   }, [searchQuery]);
+
+  // Make siblings selected by default for all events when they load
+  useEffect(() => {
+    if (events.length === 0) return;
+    setAlsoClassifySiblingsIds((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      for (const e of events) {
+        if (!next.has(e.id)) {
+          next.add(e.id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [events]);
 
   /** Exclude from discovery when any spread is >5¢ (poor liquidity). */
   const hasWideSpread = (e: ScreenerEvent) =>
@@ -837,6 +872,86 @@ export function ScreenerContent({
     }
   }
 
+  async function handleAddToIncluded(tag: { id: string; label: string; slug: string }) {
+    const newIncluded = [...selectedTagPrefs.filter((p) => p.tagId !== tag.id), { tagId: tag.id, label: tag.label, slug: tag.slug }];
+    const newExcluded = excludedTagPrefs.filter((p) => p.tagId !== tag.id);
+    setSavingTagPrefs(true);
+    try {
+      const [prefRes, exclRes] = await Promise.all([
+        fetch("/api/screener/tag-preferences", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tagIds: newIncluded.map((p) => p.tagId) }),
+        }),
+        fetch("/api/screener/tag-exclusions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tagIds: newExcluded.map((p) => p.tagId) }),
+        }),
+      ]);
+      const [prefData, exclData] = await Promise.all([prefRes.json(), exclRes.json()]);
+      if (!prefRes.ok) throw new Error(prefData?.error ?? "Failed to save");
+      if (!exclRes.ok) throw new Error(exclData?.error ?? "Failed to save");
+      setSelectedTagPrefs(Array.isArray(prefData) ? prefData : newIncluded);
+      setExcludedTagPrefs(Array.isArray(exclData) ? exclData : newExcluded);
+      toast.success("Tag added to included");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to save tags");
+    } finally {
+      setSavingTagPrefs(false);
+    }
+  }
+
+  async function handleAddToExcluded(tag: { id: string; label: string; slug: string }) {
+    const newIncluded = selectedTagPrefs.filter((p) => p.tagId !== tag.id);
+    const newExcluded = [...excludedTagPrefs.filter((p) => p.tagId !== tag.id), { tagId: tag.id, label: tag.label, slug: tag.slug }];
+    setSavingTagPrefs(true);
+    try {
+      const [prefRes, exclRes] = await Promise.all([
+        fetch("/api/screener/tag-preferences", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tagIds: newIncluded.map((p) => p.tagId) }),
+        }),
+        fetch("/api/screener/tag-exclusions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tagIds: newExcluded.map((p) => p.tagId) }),
+        }),
+      ]);
+      const [prefData, exclData] = await Promise.all([prefRes.json(), exclRes.json()]);
+      if (!prefRes.ok) throw new Error(prefData?.error ?? "Failed to save");
+      if (!exclRes.ok) throw new Error(exclData?.error ?? "Failed to save");
+      setSelectedTagPrefs(Array.isArray(prefData) ? prefData : newIncluded);
+      setExcludedTagPrefs(Array.isArray(exclData) ? exclData : newExcluded);
+      toast.success("Tag added to excluded");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to save tags");
+    } finally {
+      setSavingTagPrefs(false);
+    }
+  }
+
+  async function handleRemoveFromExcluded(tag: { id: string; label: string; slug: string }) {
+    const newExcluded = excludedTagPrefs.filter((p) => p.tagId !== tag.id);
+    setSavingTagPrefs(true);
+    try {
+      const res = await fetch("/api/screener/tag-exclusions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tagIds: newExcluded.map((p) => p.tagId) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Failed to save");
+      setExcludedTagPrefs(Array.isArray(data) ? data : newExcluded);
+      toast.success("Tag removed from excluded");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to save tags");
+    } finally {
+      setSavingTagPrefs(false);
+    }
+  }
+
   return (
     <>
       <header className="mb-8">
@@ -920,35 +1035,37 @@ export function ScreenerContent({
                 <ChevronDown className={`h-4 w-4 transition-transform ${categoryOpen ? "rotate-180" : ""}`} />
               </button>
               {categoryOpen && (
-                <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-slate-700/60 bg-slate-800 py-1 shadow-xl">
-                  {[
-                    { tab: "under_10" as const, icon: Percent, label: "<10%", count: events.filter((e) => e.label === "under_10").length },
-                    { tab: "under_2k_vol" as const, icon: DollarSign, label: "<2k VOL", count: events.filter((e) => e.label === "under_2k_vol").length },
-                    { tab: "spread_gt_5c" as const, icon: ArrowLeftRight, label: ">5¢ spread", count: events.filter((e) => e.noSpread != null && e.noSpread > 0.05).length },
-                    { tab: "unknowable" as const, icon: HelpCircle, label: "Unknowable", count: events.filter((e) => e.label === "unknowable").length },
-                    { tab: "well_priced" as const, icon: BadgeCheck, label: "Well-priced", count: events.filter((e) => e.label === "well_priced").length },
-                    { tab: "disputed" as const, icon: AlertTriangle, label: "Disputed", count: events.filter((e) => e.label === "disputed").length },
-                    { tab: "uninformed" as const, icon: BookOpen, label: "Uninformed", count: events.filter((e) => e.label === "uninformed").length },
-                  ].map(({ tab, icon: Icon, label, count }) => (
-                    <button
-                      key={tab}
-                      onClick={() => {
-                        setActiveTab(tab);
-                        setCategoryOpen(false);
-                      }}
-                      className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm ${
-                        activeTab === tab ? "bg-slate-700/60 text-white" : "text-slate-300 hover:bg-slate-700/60 hover:text-white"
-                      }`}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {label}
-                      {count > 0 && (
-                        <span className="ml-auto rounded bg-slate-600/50 px-1.5 py-0.5 text-xs">
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  ))}
+                <div className="absolute right-0 top-full z-20 mt-1 w-52 rounded-lg border border-slate-700/60 bg-slate-800 py-1 shadow-xl">
+                  <div className="grid grid-cols-2 gap-0.5 px-1">
+                    {[
+                      { tab: "under_10" as const, icon: Percent, label: "<10%", count: events.filter((e) => e.label === "under_10").length },
+                      { tab: "under_2k_vol" as const, icon: DollarSign, label: "<2k VOL", count: events.filter((e) => e.label === "under_2k_vol").length },
+                      { tab: "spread_gt_5c" as const, icon: ArrowLeftRight, label: ">5¢ spread", count: events.filter((e) => e.noSpread != null && e.noSpread > 0.05).length },
+                      { tab: "unknowable" as const, icon: HelpCircle, label: "Unknowable", count: events.filter((e) => e.label === "unknowable").length },
+                      { tab: "well_priced" as const, icon: BadgeCheck, label: "Well-priced", count: events.filter((e) => e.label === "well_priced").length },
+                      { tab: "disputed" as const, icon: AlertTriangle, label: "Disputed", count: events.filter((e) => e.label === "disputed").length },
+                      { tab: "uninformed" as const, icon: BookOpen, label: "Uninformed", count: events.filter((e) => e.label === "uninformed").length },
+                    ].map(({ tab, icon: Icon, label, count }) => (
+                      <button
+                        key={tab}
+                        onClick={() => {
+                          setActiveTab(tab);
+                          setCategoryOpen(false);
+                        }}
+                        className={`flex items-center gap-1.5 px-2 py-1 text-left text-xs ${
+                          activeTab === tab ? "bg-slate-700/60 text-white rounded" : "text-slate-300 hover:bg-slate-700/60 hover:text-white rounded"
+                        }`}
+                      >
+                        <Icon className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{label}</span>
+                        {count > 0 && (
+                          <span className="ml-auto shrink-0 rounded bg-slate-600/50 px-1 py-px text-[10px]">
+                            {count}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -956,19 +1073,32 @@ export function ScreenerContent({
               <button
                 onClick={() => setTagsOpen(!tagsOpen)}
                 className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
-                  selectedTagPrefs.length > 0 ? "bg-slate-700/60 text-white" : "text-slate-500 hover:text-slate-400"
+                  selectedTagPrefs.length > 0 || excludedTagPrefs.length > 0
+                    ? "bg-slate-700/60 text-white"
+                    : "text-slate-500 hover:text-slate-400"
                 }`}
                 title="Select tags for refresh (Refresh fetches markets for selected tags only)"
               >
                 <Tag className="h-4 w-4" />
                 <span className="hidden sm:inline">Tags</span>
-                {selectedTagPrefs.length > 0 && (
-                  <span className="rounded bg-slate-600/50 px-1.5 py-0.5 text-xs">{selectedTagPrefs.length}</span>
+                {(selectedTagPrefs.length > 0 || excludedTagPrefs.length > 0) && (
+                  <span className="flex items-center gap-1">
+                    {selectedTagPrefs.length > 0 && (
+                      <span className="rounded bg-indigo-500/30 px-1.5 py-0.5 text-xs text-indigo-300">
+                        {selectedTagPrefs.length}
+                      </span>
+                    )}
+                    {excludedTagPrefs.length > 0 && (
+                      <span className="rounded bg-rose-500/30 px-1.5 py-0.5 text-xs text-rose-300">
+                        {excludedTagPrefs.length}
+                      </span>
+                    )}
+                  </span>
                 )}
                 <ChevronDown className={`h-4 w-4 transition-transform ${tagsOpen ? "rotate-180" : ""}`} />
               </button>
               {tagsOpen && (
-                <div className="absolute right-0 top-full z-20 mt-1 w-80 max-h-96 rounded-lg border border-slate-700/60 bg-slate-800 shadow-xl flex flex-col overflow-hidden">
+                <div className="absolute right-0 top-full z-20 mt-1 w-[420px] max-h-[480px] rounded-lg border border-slate-700/60 bg-slate-800 shadow-xl flex flex-col overflow-hidden">
                   <div className="p-2 border-b border-slate-700/60 space-y-2">
                     <input
                       type="search"
@@ -1003,32 +1133,83 @@ export function ScreenerContent({
                       Sync from Gamma
                     </button>
                   </div>
-                  <div className="flex-1 overflow-y-auto min-h-[120px] max-h-64 p-1">
+                  <div className="flex-1 overflow-y-auto min-h-[160px] max-h-[360px] p-1">
                     {loadingTags ? (
                       <div className="flex items-center justify-center py-8">
                         <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {selectedTagPrefs.length > 0 && (
-                          <div className="space-y-0.5">
-                            <p className="px-2 py-1 text-xs font-medium text-slate-500 uppercase tracking-wider">Selected</p>
-                            {selectedTagPrefs.map((p) => (
-                              <button
-                                key={p.tagId}
-                                type="button"
-                                onClick={() =>
-                                  handleToggleTagPreference({ id: p.tagId, label: p.label, slug: p.slug })
-                                }
-                                disabled={savingTagPrefs}
-                                className="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 disabled:opacity-50"
-                              >
-                                <span className="truncate">{p.label}</span>
-                                <span className="shrink-0 text-indigo-400">✓</span>
-                              </button>
-                            ))}
+                        <div className="space-y-0.5">
+                          <p className="px-2 py-1 text-xs font-medium text-slate-500 uppercase tracking-wider">Included</p>
+                          <div className="flex flex-wrap gap-1 px-2">
+                            {selectedTagPrefs.length === 0 ? (
+                              <span className="text-xs text-slate-500 italic">None</span>
+                            ) : (
+                              selectedTagPrefs.map((p) => (
+                                <span
+                                  key={p.tagId}
+                                  className="inline-flex items-center gap-0.5 rounded bg-indigo-500/20 px-1.5 py-px text-[10px] text-indigo-300"
+                                >
+                                  <span className="truncate max-w-[120px]">{p.label}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAddToExcluded({ id: p.tagId, label: p.label, slug: p.slug })}
+                                    disabled={savingTagPrefs}
+                                    className="shrink-0 rounded p-0.5 text-indigo-400/80 hover:bg-indigo-500/30 hover:text-indigo-300 disabled:opacity-50"
+                                    title="Exclude"
+                                  >
+                                    <Minus className="h-3 w-3" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleTagPreference({ id: p.tagId, label: p.label, slug: p.slug })}
+                                    disabled={savingTagPrefs}
+                                    className="shrink-0 rounded p-0.5 text-indigo-400/80 hover:bg-indigo-500/30 hover:text-indigo-300 disabled:opacity-50"
+                                    title="Remove"
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              ))
+                            )}
                           </div>
-                        )}
+                        </div>
+                        <div className="space-y-0.5">
+                          <p className="px-2 py-1 text-xs font-medium text-slate-500 uppercase tracking-wider">Excluded</p>
+                          <div className="flex flex-wrap gap-1 px-2">
+                            {excludedTagPrefs.length === 0 ? (
+                              <span className="text-xs text-slate-500 italic">None</span>
+                            ) : (
+                              excludedTagPrefs.map((p) => (
+                                <span
+                                  key={p.tagId}
+                                  className="inline-flex items-center gap-0.5 rounded bg-rose-500/20 px-1.5 py-px text-[10px] text-rose-300"
+                                >
+                                  <span className="truncate max-w-[120px]">{p.label}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAddToIncluded({ id: p.tagId, label: p.label, slug: p.slug })}
+                                    disabled={savingTagPrefs}
+                                    className="shrink-0 rounded p-0.5 text-rose-400/80 hover:bg-rose-500/30 hover:text-rose-300 disabled:opacity-50"
+                                    title="Include"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveFromExcluded({ id: p.tagId, label: p.label, slug: p.slug })}
+                                    disabled={savingTagPrefs}
+                                    className="shrink-0 rounded p-0.5 text-rose-400/80 hover:bg-rose-500/30 hover:text-rose-300 disabled:opacity-50"
+                                    title="Remove"
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              ))
+                            )}
+                          </div>
+                        </div>
                         <div className="space-y-0.5">
                           <p className="px-2 py-1 text-xs font-medium text-slate-500 uppercase tracking-wider">
                             {tagSearchInput.trim() ? "Search results" : "All tags"}
@@ -1036,12 +1217,14 @@ export function ScreenerContent({
                           {(function () {
                             const q = tagSearchInput.trim();
                             const selectedIds = new Set(selectedTagPrefs.map((p) => p.tagId));
+                            const excludedIds = new Set(excludedTagPrefs.map((p) => p.tagId));
+                            const isIncludedOrExcluded = (t: { id: string }) => selectedIds.has(t.id) || excludedIds.has(t.id);
                             const filtered = !q
-                              ? allTags.filter((t) => !selectedIds.has(t.id))
+                              ? allTags.filter((t) => !isIncludedOrExcluded(t))
                               : (() => {
                                   const tokens = q.toLowerCase().split(/\s+/).filter(Boolean);
                                   return allTags.filter((t) => {
-                                    if (selectedIds.has(t.id)) return false;
+                                    if (isIncludedOrExcluded(t)) return false;
                                     const searchable = `${(t.label ?? "").toLowerCase()} ${(t.slug ?? "").toLowerCase()} ${t.id}`;
                                     return tokens.every((token) => searchable.includes(token));
                                   });
@@ -1053,25 +1236,44 @@ export function ScreenerContent({
                                 </p>
                               );
                             }
-                            return filtered.map((tag) => (
-                              <button
-                                key={tag.id}
-                                type="button"
-                                onClick={() => handleToggleTagPreference(tag)}
-                                disabled={savingTagPrefs}
-                                className="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors text-slate-300 hover:bg-slate-700/60 hover:text-white disabled:opacity-50"
-                              >
-                                <span className="truncate">{tag.label}</span>
-                              </button>
-                            ));
+                            return (
+                              <div className="flex flex-wrap gap-1 px-2 pb-2">
+                                {filtered.map((tag) => (
+                                  <span
+                                    key={tag.id}
+                                    className="inline-flex items-center gap-0.5 rounded bg-slate-700/60 px-2 py-1 text-xs text-slate-300"
+                                  >
+                                    <span className="truncate max-w-[140px]">{tag.label}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAddToIncluded(tag)}
+                                      disabled={savingTagPrefs}
+                                      className="shrink-0 rounded p-0.5 text-emerald-400/80 hover:bg-emerald-500/30 hover:text-emerald-300 disabled:opacity-50"
+                                      title="Include"
+                                    >
+                                      <Plus className="h-3 w-3" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAddToExcluded(tag)}
+                                      disabled={savingTagPrefs}
+                                      className="shrink-0 rounded p-0.5 text-rose-400/80 hover:bg-rose-500/30 hover:text-rose-300 disabled:opacity-50"
+                                      title="Exclude"
+                                    >
+                                      <Minus className="h-3 w-3" />
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                            );
                           })()}
                         </div>
                       </div>
                     )}
                   </div>
-                  {selectedTagPrefs.length > 0 && (
+                  {(selectedTagPrefs.length > 0 || excludedTagPrefs.length > 0) && (
                     <div className="border-t border-slate-700/60 p-2 text-xs text-slate-400">
-                      {selectedTagPrefs.length} tag{selectedTagPrefs.length !== 1 ? "s" : ""} selected · Refresh uses these only
+                      {selectedTagPrefs.length} included · {excludedTagPrefs.length} excluded · Refresh fetches included only, skips markets with excluded tags
                     </div>
                   )}
                 </div>
@@ -1101,12 +1303,7 @@ export function ScreenerContent({
                     ) : lastRefreshAt ? (
                       <>
                         <Clock className="h-3 w-3 shrink-0" />
-                        <span>
-                          Last: {formatTimeAgo(lastRefreshAt)}
-                          {lastRefreshDurationSec != null && lastRefreshDurationSec > 0
-                            ? ` (took ${formatDurationSeconds(lastRefreshDurationSec)})`
-                            : ""}
-                        </span>
+                        <span>Last: {formatTimeAgo(lastRefreshAt)}</span>
                       </>
                     ) : null}
                   </div>
@@ -1317,9 +1514,9 @@ export function ScreenerContent({
                               )}
                             </div>
                             {e.tags && Array.isArray(e.tags) && e.tags.length > 0 && (
-                              <div className="mt-1 flex flex-wrap gap-1.5">
+                              <div className="mt-1 flex flex-wrap gap-1">
                                 {(e.tags as Array<{ id?: string; label?: string; slug?: string }>).map((t, i) => (
-                                  <span key={t.id ?? t.slug ?? `tag-${i}`} className="inline-flex rounded-md bg-slate-700/60 px-2 py-0.5 text-xs text-slate-300">
+                                  <span key={t.id ?? t.slug ?? `tag-${i}`} className="inline-flex rounded bg-slate-700/60 px-1.5 py-px text-[10px] text-slate-300">
                                     {t.label ?? t.slug ?? t.id ?? "—"}
                                   </span>
                                 ))}
@@ -1738,13 +1935,13 @@ export function ScreenerContent({
                   <div className="min-w-0 flex-1">
                     <h3 className="font-medium text-white">{e.title}</h3>
                     {e.tags && Array.isArray(e.tags) && e.tags.length > 0 && (
-                      <div className="mt-1 flex flex-wrap gap-1.5">
+                      <div className="mt-1 flex flex-wrap gap-1">
                         {(e.tags as Array<{ id?: string; label?: string; slug?: string }>).map((t, i) => {
                           const tagId = t.id ?? t.slug ?? null;
                           return (
                             <span
                               key={t.id ?? t.slug ?? `tag-${i}`}
-                              className="group/tag relative inline-flex rounded-md bg-slate-700/60 px-2 py-0.5 text-xs text-slate-300"
+                              className="group/tag relative inline-flex rounded bg-slate-700/60 px-1.5 py-px text-[10px] text-slate-300"
                             >
                               {t.label ?? t.slug ?? t.id ?? "—"}
                               {tagId && (

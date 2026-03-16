@@ -73,6 +73,7 @@ model GammaTag {
   updatedAt          DateTime @updatedAt @map("updated_at")
 
   preferences ScreenerTagPreference[]
+  exclusions   ScreenerTagExclusion[]
 
   @@map("gamma_tags")
 }
@@ -88,6 +89,19 @@ model ScreenerTagPreference {
 
   @@unique([tagId])
   @@map("screener_tag_preferences")
+}
+
+// Excluded tag IDs for screener refresh (markets with these tags are skipped)
+model ScreenerTagExclusion {
+  id        String   @id @default(uuid()) @map("id")
+  tagId     String   @map("tag_id") // References GammaTag.id
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tag GammaTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([tagId])
+  @@map("screener_tag_exclusions")
 }
 
 // Placeholder for future Polymarket data sync

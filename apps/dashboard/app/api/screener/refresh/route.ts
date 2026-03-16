@@ -208,10 +208,11 @@ export async function POST() {
   const startedAt = new Date();
 
   try {
-    const prefs = await prisma.screenerTagPreference.findMany({
-      orderBy: { sortOrder: "asc" },
-      select: { tagId: true },
-    });
+    const [prefs, exclusions] = await Promise.all([
+      prisma.screenerTagPreference.findMany({ orderBy: { sortOrder: "asc" }, select: { tagId: true } }),
+      prisma.screenerTagExclusion.findMany({ select: { tagId: true } }),
+    ]);
+    const excludedTagIds = new Set(exclusions.map((e) => e.tagId));
     let tagIds = prefs.map((p) => p.tagId);
     if (tagIds.length === 0) {
       // Seed default preferences (100265, 1628) from DB only. Run sync first if tags empty.
@@ -307,6 +308,14 @@ export async function POST() {
       const statusLabel =
         isUnder10 ? "under_10" : isUnder2kVol ? "under_2k_vol" : null;
       const tags = tagsByMarketId.get(m.id) ?? [];
+      const hasExcludedTag =
+        excludedTagIds.size > 0 &&
+        tags.some((t) => {
+          const tid = t.id ?? t.slug;
+          return tid && excludedTagIds.has(String(tid));
+        });
+      if (hasExcludedTag) continue;
+
       const days = daysToResolution(endDate);
       const yesParoi = computeParoiNumeric(probYes ?? (probNo != null ? 1 - probNo : null), days);
       const noParoi = computeParoiNumeric(probNo ?? (probYes != null ? 1 - probYes : null), days);
