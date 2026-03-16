@@ -311,7 +311,7 @@ export default async function HomePage() {
         }}
       />
 
-      <div className="relative z-10 flex w-full pt-4 pb-2">
+      <div className="relative z-10 flex w-full flex-nowrap pt-4 pb-2">
         {/* Left margin: total win (aligned with category by allocation), averages beneath */}
         <div className="flex flex-1 flex-col items-center justify-start gap-4 min-w-0 pt-4">
           {positions.length > 0 && (
@@ -320,7 +320,7 @@ export default async function HomePage() {
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Total Win
                 </h3>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                <div className="flex flex-col gap-3">
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400">
                       <Trophy className="h-4 w-4" strokeWidth={1.75} />
@@ -399,7 +399,7 @@ export default async function HomePage() {
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Averages
                 </h3>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                <div className="flex flex-col gap-3">
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 text-violet-400">
                       <Target className="h-4 w-4" strokeWidth={1.75} />
@@ -679,8 +679,8 @@ export default async function HomePage() {
           </div>
         )}
         </div>
-        {/* Right margin: Pie charts - allocation (aligned with total win), category 24h, positions 24h */}
-        <div className="flex flex-1 flex-col items-center justify-start gap-4 min-w-0 pt-4">
+        {/* Right margin: Pie charts - allocation, category 24h, positions 24h */}
+        <div className="flex flex-1 flex-col items-center justify-start gap-4 min-w-[380px] shrink-0 pt-4">
           {positions.length > 0 && (
             <DashboardPieCharts
               positions={positions}

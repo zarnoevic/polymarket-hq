@@ -8,7 +8,6 @@ import {
   computePAROINumeric,
 } from "@/lib/position-metrics";
 import { MetricTooltip } from "./MetricTooltip";
-import { PriceHistorySparkline } from "./PriceHistorySparkline";
 import { METRIC_TOOLTIPS } from "@/lib/metric-tooltips";
 
 const CLOB_BASE = "https://clob.polymarket.com";
@@ -56,6 +55,16 @@ async function fetchPrice24hAgo(tokenId: string): Promise<number | null> {
   } catch {
     return null;
   }
+}
+
+/** Darken hex color for matching stroke (factor 0.55 = 50% darker) */
+function darkenHex(hex: string, factor = 0.55): string {
+  const m = hex.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+  if (!m) return hex;
+  const r = Math.round(parseInt(m[1], 16) * factor);
+  const g = Math.round(parseInt(m[2], 16) * factor);
+  const b = Math.round(parseInt(m[3], 16) * factor);
+  return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
 }
 
 function formatUsd(value: number): string {
@@ -228,16 +237,16 @@ export function AttributionPieChart({ positions }: { positions: Position[] }) {
   }, [positions]);
 
   const cardClass =
-    "h-[600px] w-[380px] shrink-0 overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-900/60 p-5 shadow-xl shadow-black/20 backdrop-blur-sm flex flex-col";
+    "h-[560px] w-[340px] shrink-0 overflow-hidden rounded-2xl bg-slate-900/60 p-4 shadow-xl shadow-black/20 backdrop-blur-sm flex flex-col";
 
   if (loading) {
     return (
-      <div className={cardClass}>
+      <div className={cardClass} style={{ border: "3px solid #000" }}>
         <h3 className="mb-4 shrink-0 text-xs font-semibold uppercase tracking-wider text-slate-400">
           Attribution (24h)
         </h3>
         <div className="flex flex-1 items-center justify-center">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-600 border-t-indigo-400" />
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-black border-t-indigo-400" />
         </div>
       </div>
     );
@@ -245,7 +254,7 @@ export function AttributionPieChart({ positions }: { positions: Position[] }) {
 
   if (slices.length === 0) {
     return (
-      <div className={cardClass}>
+      <div className={cardClass} style={{ border: "3px solid #000" }}>
         <h3 className="mb-4 shrink-0 text-xs font-semibold uppercase tracking-wider text-slate-400">
           Attribution (24h)
         </h3>
@@ -259,7 +268,7 @@ export function AttributionPieChart({ positions }: { positions: Position[] }) {
   const totalAbs = slices.reduce((s, sl) => s + sl.absShare, 0);
   if (totalAbs === 0) {
     return (
-      <div className={cardClass}>
+      <div className={cardClass} style={{ border: "3px solid #000" }}>
         <h3 className="mb-4 shrink-0 text-xs font-semibold uppercase tracking-wider text-slate-400">
           Attribution (24h)
         </h3>
@@ -324,7 +333,7 @@ function PieChartInner({
   }
 
   return (
-    <div className="flex h-[600px] w-[380px] shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-900/60 p-6 shadow-xl shadow-black/20 backdrop-blur-sm">
+    <div className="flex h-[560px] w-[340px] shrink-0 flex-col overflow-hidden rounded-2xl bg-slate-900/60 p-5 shadow-xl shadow-black/20 backdrop-blur-sm" style={{ border: "3px solid #000" }}>
       <h3 className="mb-4 shrink-0 text-xs font-semibold uppercase tracking-wider text-slate-400">
         Attribution (24h)
       </h3>
@@ -336,7 +345,7 @@ function PieChartInner({
                 key={i}
                 d={d}
                 fill={color}
-                stroke="#1e293b"
+                stroke={darkenHex(color)}
                 strokeWidth={2}
                 className="cursor-pointer transition-all duration-200"
                 opacity={active != null && active !== i ? 0.35 : 1}
@@ -371,21 +380,6 @@ function PieChartInner({
               <p className="text-sm font-medium text-slate-200 leading-snug">
                 {activeSlice.title}
               </p>
-              {activeSlice.sparkline && (
-                <div className="mt-2 flex h-10 w-full items-center justify-center">
-                  <PriceHistorySparkline
-                    tokenId={activeSlice.sparkline.yesId}
-                    tint="yes"
-                    fill
-                    entryTimestamp={activeSlice.sparkline.entryTimestamp}
-                    entryPrice={
-                      activeSlice.sparkline.outcome.toLowerCase() === "yes"
-                        ? activeSlice.sparkline.avgPrice
-                        : 1 - activeSlice.sparkline.avgPrice
-                    }
-                  />
-                </div>
-              )}
               <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
                 {activeSlice.investedAmount != null && activeSlice.investedAmount > 0 && (
                   <span className="font-mono text-slate-300">
@@ -396,18 +390,6 @@ function PieChartInner({
                   {activeSlice.priceThen != null
                     ? `${formatPrice(activeSlice.priceThen)} → ${formatPrice(activeSlice.priceNow)}`
                     : `${formatPrice(activeSlice.priceNow)} now`}
-                </span>
-                <span className="inline-flex items-center gap-1 text-slate-400">
-                  <MetricTooltip content={METRIC_TOOLTIPS.CROI} trigger="CROI" /> {activeSlice.roi}
-                </span>
-                <span className="inline-flex items-center gap-1 text-slate-400">
-                  <MetricTooltip content={METRIC_TOOLTIPS.CAROI} trigger="CAROI" /> {activeSlice.caroi}
-                </span>
-                <span className="inline-flex items-center gap-1 text-slate-400">
-                  <MetricTooltip content={METRIC_TOOLTIPS.PROI} trigger="PROI" /> {activeSlice.proi}
-                </span>
-                <span className="inline-flex items-center gap-1 text-slate-400">
-                  <MetricTooltip content={METRIC_TOOLTIPS.PAROI} trigger="PAROI" /> {activeSlice.paroi}
                 </span>
               </div>
               <p className="mt-2 text-[10px] uppercase tracking-wider text-slate-500">

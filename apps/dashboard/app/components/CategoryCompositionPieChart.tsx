@@ -2,15 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { loadPositionCategories, UNCategorized_ID } from "@/lib/position-categories";
-import {
-  daysToResolution,
-  formatRoi,
-  computeROINumeric,
-  computePAROINumeric,
-} from "@/lib/position-metrics";
-import { MetricTooltip } from "./MetricTooltip";
-import { PriceHistorySparkline } from "./PriceHistorySparkline";
-import { METRIC_TOOLTIPS } from "@/lib/metric-tooltips";
+import { daysToResolution, computePAROINumeric } from "@/lib/position-metrics";
 
 type Position = {
   asset: string;
@@ -41,22 +33,21 @@ function getPositionValue(pos: Position): number {
   return pos.size * (pos.curPrice ?? 0);
 }
 
-function computeCAROINumeric(
-  avgPrice: number,
-  days: number | null,
-  spread?: number | null
-): number | null {
-  const buyPrice = Math.min(0.99, avgPrice + (spread ?? 0));
-  if (buyPrice <= 0 || days == null || days <= 0) return null;
-  const r = (1 - buyPrice) / buyPrice;
-  return r * (365 / days);
-}
-
 function formatPositionValue(value: number): string {
   const abs = Math.abs(value);
   if (abs >= 1_000_000) return `$${(abs / 1_000_000).toFixed(1)}M`;
   if (abs >= 1_000) return `$${(abs / 1_000).toFixed(1)}k`;
   return `$${abs.toFixed(2)}`;
+}
+
+/** Darken hex color for matching stroke (factor 0.5 = 50% darker) */
+function darkenHex(hex: string, factor = 0.55): string {
+  const m = hex.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+  if (!m) return hex;
+  const r = Math.round(parseInt(m[1], 16) * factor);
+  const g = Math.round(parseInt(m[2], 16) * factor);
+  const b = Math.round(parseInt(m[3], 16) * factor);
+  return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
 }
 
 const CATEGORY_COLORS = [
@@ -79,11 +70,6 @@ type CompositionSlice = {
   positionCount: number;
   color: string;
   icon?: string;
-  roi: string;
-  caroi: string;
-  proi: string;
-  paroi: string;
-  sparkline?: { yesId: string; entryTimestamp?: number; outcome: string; avgPrice: number };
 };
 
 function loadCategoryData(wallet?: string): {
@@ -153,56 +139,7 @@ export function CategoryCompositionPieChart({
           return paroi > bestParoi ? cur : best;
         });
 
-        let totalInvestedCat = 0;
-        let sumRoi = 0;
-        let sumCaroi = 0;
-        let sumProi = 0;
-        let sumParoi = 0;
-        let weightSum = 0;
-        for (const pos of catPositions) {
-          const inv = getPositionValue(pos);
-          totalInvestedCat += inv;
-          if (inv <= 0) continue;
-          const days = daysToResolution(pos.endDate ?? "", pos.title);
-          const roi =
-            pos.avgPrice != null &&
-            Number.isFinite(pos.avgPrice) &&
-            pos.avgPrice > 0 &&
-            pos.avgPrice < 1
-              ? computeROINumeric(pos.avgPrice, pos.spread)
-              : null;
-          const caroi =
-            pos.avgPrice != null &&
-            Number.isFinite(pos.avgPrice) &&
-            pos.avgPrice > 0 &&
-            pos.avgPrice < 1
-              ? computeCAROINumeric(pos.avgPrice, days, pos.spread)
-              : null;
-          const proi = computeROINumeric(pos.curPrice, pos.spread);
-          const paroi = computePAROINumeric(pos.curPrice, days, pos.spread);
-          if (roi != null) {
-            sumRoi += roi * inv;
-            weightSum += inv;
-          }
-          if (caroi != null) sumCaroi += caroi * inv;
-          if (proi != null) sumProi += proi * inv;
-          if (Number.isFinite(paroi) && paroi > -Infinity) sumParoi += paroi * inv;
-        }
-        const wRoi = weightSum > 0 ? sumRoi / weightSum : null;
-        const wCaroi = totalInvestedCat > 0 ? sumCaroi / totalInvestedCat : null;
-        const wProi = totalInvestedCat > 0 ? sumProi / totalInvestedCat : null;
-        const wParoi = totalInvestedCat > 0 ? sumParoi / totalInvestedCat : null;
-
-        const sparkline =
-          bestPos.yesId || bestPos.asset
-            ? {
-                yesId: bestPos.yesId ?? bestPos.asset,
-                entryTimestamp: bestPos.entryTimestamp,
-                outcome: bestPos.outcome,
-                avgPrice: bestPos.avgPrice ?? 0.5,
-              }
-            : undefined;
-
+        const totalInvestedCat = catPositions.reduce((s, pos) => s + getPositionValue(pos), 0);
         const color = CATEGORY_COLORS[idx % CATEGORY_COLORS.length];
 
         return {
@@ -212,12 +149,6 @@ export function CategoryCompositionPieChart({
           positionCount: catPositions.length,
           color,
           icon: bestPos.icon,
-          roi: wRoi != null ? formatRoi(wRoi) : "—",
-          caroi: wCaroi != null ? formatRoi(wCaroi) : "—",
-          proi: wProi != null ? formatRoi(wProi) : "—",
-          paroi:
-            wParoi != null && wParoi > -Infinity ? formatRoi(wParoi) : "—",
-          sparkline,
         };
       });
 
@@ -237,10 +168,7 @@ export function CategoryCompositionPieChart({
               share: otherShare,
               positionCount: belowThreshold.reduce((s, sl) => s + sl.positionCount, 0),
               color: "#475569",
-              roi: "—",
-              caroi: "—",
-              paroi: "—",
-            } as CompositionSlice,
+            },
           ]
         : aboveThreshold.sort((a, b) => b.share - a.share);
 
@@ -250,16 +178,16 @@ export function CategoryCompositionPieChart({
   }, [positions, wallet]);
 
   const cardClass =
-    "h-[460px] w-[380px] shrink-0 overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-900/60 p-5 shadow-xl shadow-black/20 backdrop-blur-sm flex flex-col";
+    "h-[480px] w-[340px] shrink-0 overflow-hidden rounded-2xl bg-slate-900/60 p-4 shadow-xl shadow-black/20 backdrop-blur-sm flex flex-col";
 
   if (loading) {
     return (
-      <div className={cardClass}>
+      <div className={cardClass} style={{ border: "3px solid #000" }}>
         <h3 className="mb-4 shrink-0 text-xs font-semibold uppercase tracking-wider text-slate-400">
           By category (allocation)
         </h3>
         <div className="flex flex-1 items-center justify-center">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-600 border-t-indigo-400" />
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-black border-t-indigo-400" />
         </div>
       </div>
     );
@@ -267,7 +195,7 @@ export function CategoryCompositionPieChart({
 
   if (slices.length === 0) {
     return (
-      <div className={cardClass}>
+      <div className={cardClass} style={{ border: "3px solid #000" }}>
         <h3 className="mb-4 shrink-0 text-xs font-semibold uppercase tracking-wider text-slate-400">
           By category (allocation)
         </h3>
@@ -293,7 +221,7 @@ function CompositionPieChartInner({
   const [selected, setSelected] = useState<number | null>(null);
   const [hovered, setHovered] = useState<number | null>(null);
   const active = selected ?? hovered;
-  const size = 260;
+  const size = 320;
   const cx = size / 2;
   const cy = size / 2;
   const rOuter = size / 2 - 12;
@@ -301,7 +229,7 @@ function CompositionPieChartInner({
 
   let acc = 0;
   const paths = slices.map((sl, i) => {
-    const pct = sl.share;
+    const pct = Math.max(0, Number(sl.share) || 0);
     const startAngle = acc * 2 * Math.PI - Math.PI / 2;
     acc += pct;
     const endAngle = acc * 2 * Math.PI - Math.PI / 2;
@@ -320,12 +248,16 @@ function CompositionPieChartInner({
 
   const activeSlice = active != null ? paths[active] : null;
 
+  function handleSliceClick(i: number) {
+    setSelected((prev) => (prev === i ? null : i));
+  }
+
   return (
-    <div className="flex h-[460px] w-[380px] shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-900/60 p-6 shadow-xl shadow-black/20 backdrop-blur-sm">
+    <div className="flex h-[480px] w-[340px] shrink-0 flex-col overflow-hidden rounded-2xl bg-slate-900/60 p-5 shadow-xl shadow-black/20 backdrop-blur-sm" style={{ border: "3px solid #000" }}>
       <h3 className="mb-4 shrink-0 text-xs font-semibold uppercase tracking-wider text-slate-400">
         By category (allocation)
       </h3>
-      <div className="flex min-h-0 flex-1 flex-col items-center gap-3 overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col items-center gap-4 overflow-hidden">
         <div className="relative shrink-0">
           <svg width={size} height={size} className="overflow-visible">
             {paths.map(({ d, color, i }) => (
@@ -333,18 +265,15 @@ function CompositionPieChartInner({
                 key={i}
                 d={d}
                 fill={color}
-                stroke="#1e293b"
+                stroke={darkenHex(color)}
                 strokeWidth={2}
                 className="cursor-pointer transition-all duration-200"
                 opacity={active != null && active !== i ? 0.35 : 1}
                 onMouseEnter={() => setHovered(i)}
                 onMouseLeave={() => setHovered(null)}
-                onClick={() => setSelected((prev) => (prev === i ? null : i))}
+                onClick={() => handleSliceClick(i)}
                 style={{
-                  filter:
-                    active === i
-                      ? "drop-shadow(0 0 8px rgba(255,255,255,0.3))"
-                      : undefined,
+                  filter: active === i ? "drop-shadow(0 0 8px rgba(255,255,255,0.3))" : undefined,
                 }}
               />
             ))}
@@ -362,63 +291,32 @@ function CompositionPieChartInner({
             </div>
           )}
         </div>
-        <div className="min-h-[5rem] w-full min-w-0 shrink-0 overflow-y-auto">
+        <div className="min-h-[7rem] w-full min-w-0 shrink-0">
           {activeSlice ? (
-            <div className="rounded-lg bg-slate-800/50 px-4 py-3 transition-colors">
-              <p className="text-center text-sm font-medium text-slate-200 leading-snug">
+            <div className="rounded-lg bg-slate-800/50 px-4 py-3 text-center transition-colors">
+              {selected != null && (
+                <p className="mb-1 text-[10px] uppercase tracking-wider text-slate-500">Click again to deselect</p>
+              )}
+              <p className="text-sm font-medium text-slate-200 leading-snug">
                 {activeSlice.title}
               </p>
-              {activeSlice.sparkline && (
-                <div className="mt-2 flex h-10 w-full items-center justify-center">
-                  <PriceHistorySparkline
-                    tokenId={activeSlice.sparkline.yesId}
-                    tint="yes"
-                    fill
-                    entryTimestamp={activeSlice.sparkline.entryTimestamp}
-                    entryPrice={
-                      activeSlice.sparkline.outcome.toLowerCase() === "yes"
-                        ? activeSlice.sparkline.avgPrice
-                        : 1 - activeSlice.sparkline.avgPrice
-                    }
-                  />
-                </div>
-              )}
-              <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
-                {activeSlice.investedAmount > 0 && (
-                  <span className="font-mono text-slate-300">
-                    {formatPositionValue(activeSlice.investedAmount)} value
-                  </span>
-                )}
-                <span className="font-mono text-slate-400">
-                  {activeSlice.positionCount}{" "}
-                  {activeSlice.positionCount === 1 ? "position" : "positions"}
-                </span>
-                <span className="font-mono text-slate-400">
+              <div className="mt-2 flex flex-col items-center gap-1 text-sm">
+                <span className="font-mono text-white font-semibold">
                   {(activeSlice.share * 100).toFixed(1)}%
                 </span>
-                <span className="inline-flex items-center gap-1 text-slate-400">
-                  <MetricTooltip content={METRIC_TOOLTIPS.CROI} trigger="CROI" /> {activeSlice.roi}
-                </span>
-                <span className="inline-flex items-center gap-1 text-slate-400">
-                  <MetricTooltip content={METRIC_TOOLTIPS.CAROI} trigger="CAROI" /> {activeSlice.caroi}
-                </span>
-                <span className="inline-flex items-center gap-1 text-slate-400">
-                  <MetricTooltip content={METRIC_TOOLTIPS.PROI} trigger="PROI" /> {activeSlice.proi}
-                </span>
-                <span className="inline-flex items-center gap-1 text-slate-400">
-                  <MetricTooltip content={METRIC_TOOLTIPS.PAROI} trigger="PAROI" /> {activeSlice.paroi}
+                <span className="font-mono text-slate-300">
+                  {formatPositionValue(activeSlice.investedAmount)} invested
                 </span>
               </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-3 text-center">
+            <div className="flex flex-col items-center justify-center py-4 text-center">
               <p className="text-xs text-slate-500">Positions value</p>
               <p className="mt-0.5 text-xl font-bold text-white">
                 {formatPositionValue(totalInvested)}
               </p>
-              <p className="mt-2 text-xs text-slate-500 leading-relaxed">
-                Slices sized by position allocation. Click or hover to see
-                details.
+              <p className="mt-3 text-xs text-slate-500 leading-relaxed">
+                Click a slice to select it, or hover to preview.
               </p>
             </div>
           )}

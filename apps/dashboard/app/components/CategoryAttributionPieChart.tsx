@@ -2,10 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { loadPositionCategories, UNCategorized_ID } from "@/lib/position-categories";
-import { formatRoi } from "@/lib/position-metrics";
-import { MetricTooltip } from "./MetricTooltip";
-import { PriceHistorySparkline } from "./PriceHistorySparkline";
-import { METRIC_TOOLTIPS } from "@/lib/metric-tooltips";
 
 const CLOB_BASE = "https://clob.polymarket.com";
 
@@ -97,25 +93,21 @@ function computePAROINumeric(curPrice: number, days: number | null, spread?: num
   return r * (365 / days);
 }
 
-function computeROINumeric(avgPrice: number, spread?: number | null): number | null {
-  const buyPrice = Math.min(0.99, avgPrice + (spread ?? 0));
-  if (buyPrice <= 0 || buyPrice >= 1 || !Number.isFinite(buyPrice)) return null;
-  const roi = (1 - buyPrice) / buyPrice;
-  return Number.isFinite(roi) ? roi : null;
-}
-
-function computeCAROINumeric(avgPrice: number, days: number | null, spread?: number | null): number | null {
-  const buyPrice = Math.min(0.99, avgPrice + (spread ?? 0));
-  if (buyPrice <= 0 || days == null || days <= 0) return null;
-  const r = (1 - buyPrice) / buyPrice;
-  return r * (365 / days);
-}
-
 function formatPositionValue(value: number): string {
   const abs = Math.abs(value);
   if (abs >= 1_000_000) return `$${(abs / 1_000_000).toFixed(1)}M`;
   if (abs >= 1_000) return `$${(abs / 1_000).toFixed(1)}k`;
   return `$${abs.toFixed(2)}`;
+}
+
+/** Darken hex for stroke to match slice fill */
+function darkenHex(hex: string, factor = 0.55): string {
+  const m = hex.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+  if (!m) return hex;
+  const r = Math.round(parseInt(m[1], 16) * factor);
+  const g = Math.round(parseInt(m[2], 16) * factor);
+  const b = Math.round(parseInt(m[3], 16) * factor);
+  return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
 }
 
 type CategorySlice = {
@@ -125,11 +117,6 @@ type CategorySlice = {
   color: string;
   icon?: string;
   investedAmount: number;
-  roi: string;
-  caroi: string;
-  proi: string;
-  paroi: string;
-  sparkline?: { yesId: string; entryTimestamp?: number; outcome: string; avgPrice: number };
 };
 
 type CategorySliceRaw = Omit<CategorySlice, "absShare"> & { rawShare: number };
@@ -236,11 +223,6 @@ export function CategoryAttributionPieChart({
             return paroi > bestParoi ? cur : best;
           });
           let totalInvested = 0;
-          let sumRoi = 0;
-          let sumCaroi = 0;
-          let sumProi = 0;
-          let sumParoi = 0;
-          let weightSum = 0;
           for (const { pos } of positions) {
             const inv =
               pos.avgPrice != null &&
@@ -249,39 +231,8 @@ export function CategoryAttributionPieChart({
               pos.avgPrice < 1
                 ? pos.size * pos.avgPrice
                 : 0;
-            if (inv <= 0) continue;
-            const days = daysToResolution(pos.endDate ?? "", pos.title);
-            const roi = computeROINumeric(pos.avgPrice!, pos.spread);
-            const caroi = computeCAROINumeric(pos.avgPrice!, days, pos.spread);
-            const proi = computeROINumeric(pos.curPrice, pos.spread); // simple present
-            const paroi = computePAROINumeric(pos.curPrice, days, pos.spread);
-            totalInvested += inv;
-            if (roi != null) {
-              sumRoi += roi * inv;
-              weightSum += inv;
-            }
-            if (caroi != null) {
-              sumCaroi += caroi * inv;
-            }
-            if (proi != null) sumProi += proi * inv;
-            if (Number.isFinite(paroi) && paroi > -Infinity) {
-              sumParoi += paroi * inv;
-            }
+            if (inv > 0) totalInvested += inv;
           }
-          const wRoi = weightSum > 0 ? sumRoi / weightSum : null;
-          const wCaroi = totalInvested > 0 ? sumCaroi / totalInvested : null;
-          const wProi = totalInvested > 0 ? sumProi / totalInvested : null;
-          const wParoi = totalInvested > 0 ? sumParoi / totalInvested : null;
-          const p = bestPos.pos;
-          const sparkline =
-            p.yesId || p.asset
-              ? {
-                  yesId: p.yesId ?? p.asset,
-                  entryTimestamp: p.entryTimestamp,
-                  outcome: p.outcome,
-                  avgPrice: p.avgPrice ?? 0.5,
-                }
-              : undefined;
           return {
             title: catNames[catId] ?? catId,
             pnl24h: pnl,
@@ -289,11 +240,6 @@ export function CategoryAttributionPieChart({
             color: pnl >= 0 ? "#34D399" : "#F87171",
             icon: bestPos.pos.icon,
             investedAmount: totalInvested,
-            roi: wRoi != null ? formatRoi(wRoi) : "—",
-            caroi: wCaroi != null ? formatRoi(wCaroi) : "—",
-            proi: wProi != null ? formatRoi(wProi) : "—",
-            paroi: wParoi != null && wParoi > -Infinity ? formatRoi(wParoi) : "—",
-            sparkline,
           };
         });
       const MIN_SHARE = 0.02;
@@ -320,11 +266,6 @@ export function CategoryAttributionPieChart({
                 return paroi > bestParoi ? cur : best;
               });
               let totalInvested = 0;
-              let sumRoi = 0;
-              let sumCaroi = 0;
-              let sumProi = 0;
-              let sumParoi = 0;
-              let weightSum = 0;
               for (const { pos } of positions) {
                 const inv =
                   pos.avgPrice != null &&
@@ -333,30 +274,8 @@ export function CategoryAttributionPieChart({
                   pos.avgPrice < 1
                     ? pos.size * pos.avgPrice
                     : 0;
-                if (inv <= 0) continue;
-                const days = daysToResolution(pos.endDate ?? "", pos.title);
-                const roi = computeROINumeric(pos.avgPrice!, pos.spread);
-                const caroi = computeCAROINumeric(pos.avgPrice!, days, pos.spread);
-                const proi = computeROINumeric(pos.curPrice, pos.spread);
-                const paroi = computePAROINumeric(pos.curPrice, days, pos.spread);
-                totalInvested += inv;
-                if (roi != null) {
-                  sumRoi += roi * inv;
-                  weightSum += inv;
-                }
-                if (caroi != null) sumCaroi += caroi * inv;
-                if (proi != null) sumProi += proi * inv;
-                if (Number.isFinite(paroi) && paroi > -Infinity) sumParoi += paroi * inv;
+                if (inv > 0) totalInvested += inv;
               }
-              const wRoi = weightSum > 0 ? sumRoi / weightSum : null;
-              const wCaroi = totalInvested > 0 ? sumCaroi / totalInvested : null;
-              const wProi = totalInvested > 0 ? sumProi / totalInvested : null;
-              const wParoi = totalInvested > 0 ? sumParoi / totalInvested : null;
-              const p = bestPos.pos;
-              const sparkline =
-                p.yesId || p.asset
-                  ? { yesId: p.yesId ?? p.asset, entryTimestamp: p.entryTimestamp, outcome: p.outcome, avgPrice: p.avgPrice ?? 0.5 }
-                  : undefined;
               return {
                 title: catNames[catId] ?? catId,
                 pnl24h: pnl,
@@ -364,11 +283,6 @@ export function CategoryAttributionPieChart({
                 color: "#64748b",
                 icon: bestPos.pos.icon,
                 investedAmount: totalInvested,
-                roi: wRoi != null ? formatRoi(wRoi) : "—",
-                caroi: wCaroi != null ? formatRoi(wCaroi) : "—",
-                proi: wProi != null ? formatRoi(wProi) : "—",
-                paroi: wParoi != null && wParoi > -Infinity ? formatRoi(wParoi) : "—",
-                sparkline,
               };
             })
       );
@@ -381,16 +295,16 @@ export function CategoryAttributionPieChart({
   }, [positions, wallet]);
 
   const cardClass =
-    "h-[460px] w-[380px] shrink-0 overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-900/60 p-5 shadow-xl shadow-black/20 backdrop-blur-sm flex flex-col";
+    "h-[480px] w-[340px] shrink-0 overflow-hidden rounded-2xl bg-slate-900/60 p-4 shadow-xl shadow-black/20 backdrop-blur-sm flex flex-col";
 
   if (loading) {
     return (
-      <div className={cardClass}>
+      <div className={cardClass} style={{ border: "3px solid #000" }}>
         <h3 className="mb-4 shrink-0 text-xs font-semibold uppercase tracking-wider text-slate-400">
           24h attribution by category
         </h3>
         <div className="flex flex-1 items-center justify-center">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-600 border-t-indigo-400" />
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-black border-t-indigo-400" />
         </div>
       </div>
     );
@@ -398,7 +312,7 @@ export function CategoryAttributionPieChart({
 
   if (slices.length === 0) {
     return (
-      <div className={cardClass}>
+      <div className={cardClass} style={{ border: "3px solid #000" }}>
         <h3 className="mb-4 shrink-0 text-xs font-semibold uppercase tracking-wider text-slate-400">
           24h attribution by category
         </h3>
@@ -412,7 +326,7 @@ export function CategoryAttributionPieChart({
   const totalAbs = slices.reduce((s, sl) => s + sl.absShare, 0);
   if (totalAbs === 0) {
     return (
-      <div className={cardClass}>
+      <div className={cardClass} style={{ border: "3px solid #000" }}>
         <h3 className="mb-4 shrink-0 text-xs font-semibold uppercase tracking-wider text-slate-400">
           24h attribution by category
         </h3>
@@ -441,7 +355,7 @@ function CategoryPieChartInner({
   const [selected, setSelected] = useState<number | null>(null);
   const [hovered, setHovered] = useState<number | null>(null);
   const active = selected ?? hovered;
-  const size = 260;
+  const size = 320;
   const cx = size / 2;
   const cy = size / 2;
   const rOuter = size / 2 - 12;
@@ -449,7 +363,7 @@ function CategoryPieChartInner({
 
   let acc = 0;
   const paths = slices.map((sl, i) => {
-    const pct = sl.absShare;
+    const pct = Math.max(0, Number(sl.absShare) || 0);
     const startAngle = acc * 2 * Math.PI - Math.PI / 2;
     acc += pct;
     const endAngle = acc * 2 * Math.PI - Math.PI / 2;
@@ -468,12 +382,16 @@ function CategoryPieChartInner({
 
   const activeSlice = active != null ? paths[active] : null;
 
+  function handleSliceClick(i: number) {
+    setSelected((prev) => (prev === i ? null : i));
+  }
+
   return (
-    <div className="flex h-[460px] w-[380px] shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-900/60 p-6 shadow-xl shadow-black/20 backdrop-blur-sm">
+    <div className="flex h-[480px] w-[340px] shrink-0 flex-col overflow-hidden rounded-2xl bg-slate-900/60 p-5 shadow-xl shadow-black/20 backdrop-blur-sm" style={{ border: "3px solid #000" }}>
       <h3 className="mb-4 shrink-0 text-xs font-semibold uppercase tracking-wider text-slate-400">
         24h attribution by category
       </h3>
-      <div className="flex min-h-0 flex-1 flex-col items-center gap-3 overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col items-center gap-4 overflow-hidden">
         <div className="relative shrink-0">
           <svg width={size} height={size} className="overflow-visible">
             {paths.map(({ d, color, i }) => (
@@ -481,13 +399,13 @@ function CategoryPieChartInner({
                 key={i}
                 d={d}
                 fill={color}
-                stroke="#1e293b"
+                stroke={darkenHex(color)}
                 strokeWidth={2}
                 className="cursor-pointer transition-all duration-200"
                 opacity={active != null && active !== i ? 0.35 : 1}
                 onMouseEnter={() => setHovered(i)}
                 onMouseLeave={() => setHovered(null)}
-                onClick={() => setSelected((prev) => (prev === i ? null : i))}
+                onClick={() => handleSliceClick(i)}
                 style={{
                   filter: active === i ? "drop-shadow(0 0 8px rgba(255,255,255,0.3))" : undefined,
                 }}
@@ -507,103 +425,40 @@ function CategoryPieChartInner({
             </div>
           )}
         </div>
-        <div className="min-h-[5rem] w-full min-w-0 shrink-0 overflow-y-auto">
+        <div className="min-h-[7rem] w-full min-w-0 shrink-0">
           {activeSlice ? (
-            <div className="rounded-lg bg-slate-800/50 px-4 py-3 transition-colors">
-              <p className="text-sm font-medium text-slate-200 leading-snug text-center">
+            <div className="rounded-lg bg-slate-800/50 px-4 py-3 text-center transition-colors">
+              {selected != null && (
+                <p className="mb-1 text-[10px] uppercase tracking-wider text-slate-500">Click again to deselect</p>
+              )}
+              <p className="text-sm font-medium text-slate-200 leading-snug">
                 {activeSlice.title}
               </p>
-              <div className="mt-2 shrink-0 rounded-lg border border-slate-600/60 bg-slate-700/40 px-3 py-2.5 text-center">
-                <p className="text-[10px] uppercase tracking-wider text-slate-400 mb-0.5">
-                  Contributed to 24h P&L
-                </p>
+              <div className="mt-2 flex flex-col items-center gap-1 text-sm">
                 <p
-                  className={`text-xl font-bold ${
-                    (activeSlice.pnl24h ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"
+                  className={`text-base font-semibold ${
+                    activeSlice.pnl24h >= 0 ? "text-emerald-400" : "text-red-400"
                   }`}
                 >
-                  {formatUsd(activeSlice.pnl24h ?? 0)}
-                  {Math.abs(totalPnl) > 0.01 && (
-                    <span className="ml-1.5 text-sm font-normal text-slate-400">
-                      ({(((activeSlice.pnl24h ?? 0) / totalPnl) * 100).toFixed(0)}% of total)
-                    </span>
-                  )}
+                  {formatUsd(activeSlice.pnl24h)}
                 </p>
-              </div>
-              {activeSlice.sparkline && (
-                <div className="mt-2 flex items-center justify-center w-full h-10">
-                  <PriceHistorySparkline
-                    tokenId={activeSlice.sparkline.yesId}
-                    tint="yes"
-                    fill
-                    entryTimestamp={activeSlice.sparkline.entryTimestamp}
-                    entryPrice={
-                      activeSlice.sparkline.outcome.toLowerCase() === "yes"
-                        ? activeSlice.sparkline.avgPrice
-                        : 1 - activeSlice.sparkline.avgPrice
-                    }
-                  />
-                </div>
-              )}
-              <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
-                {activeSlice.investedAmount > 0 && (
-                  <span className="font-mono text-slate-300">
-                    {formatPositionValue(activeSlice.investedAmount)} invested
-                  </span>
-                )}
-                <span className="inline-flex items-center gap-1 text-slate-400">
-                  <MetricTooltip content={METRIC_TOOLTIPS.CROI} trigger="CROI" /> {activeSlice.roi}
-                </span>
-                <span className="inline-flex items-center gap-1 text-slate-400">
-                  <MetricTooltip content={METRIC_TOOLTIPS.CAROI} trigger="CAROI" /> {activeSlice.caroi}
-                </span>
-                <span className="inline-flex items-center gap-1 text-slate-400">
-                  <MetricTooltip content={METRIC_TOOLTIPS.PROI} trigger="PROI" /> {activeSlice.proi}
-                </span>
-                <span className="inline-flex items-center gap-1 text-slate-400">
-                  <MetricTooltip content={METRIC_TOOLTIPS.PAROI} trigger="PAROI" /> {activeSlice.paroi}
+                <span className="font-mono text-slate-300">
+                  {formatPositionValue(activeSlice.investedAmount)} invested
                 </span>
               </div>
             </div>
           ) : (
-            <div className="flex flex-col py-3">
-              <div className="text-center">
-                <p className="text-xs text-slate-500">Total 24h P&L</p>
-                <p
-                  className={`mt-0.5 text-xl font-bold ${
-                    totalPnl >= 0 ? "text-emerald-400" : "text-red-400"
-                  }`}
-                >
-                  {formatUsd(totalPnl)}
-                </p>
-              </div>
-              <div className="mt-3 space-y-1 overflow-y-auto max-h-24">
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 px-1">
-                  Contribution per category
-                </p>
-                {slices.map((sl, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between gap-2 rounded px-2 py-0.5 text-xs hover:bg-slate-700/40 cursor-pointer"
-                    onClick={() => setSelected(i)}
-                    onMouseEnter={() => setHovered(i)}
-                    onMouseLeave={() => setHovered(null)}
-                  >
-                    <span className="truncate text-slate-300" title={sl.title}>
-                      {sl.title}
-                    </span>
-                    <span
-                      className={`shrink-0 font-mono ${
-                        sl.pnl24h >= 0 ? "text-emerald-400" : "text-red-400"
-                      }`}
-                    >
-                      {formatUsd(sl.pnl24h)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <p className="mt-2 text-center text-xs text-slate-500">
-                Click a slice or row to see details.
+            <div className="flex flex-col items-center justify-center py-4 text-center">
+              <p className="text-xs text-slate-500">Total 24h P&L</p>
+              <p
+                className={`mt-0.5 text-xl font-bold ${
+                  totalPnl >= 0 ? "text-emerald-400" : "text-red-400"
+                }`}
+              >
+                {formatUsd(totalPnl)}
+              </p>
+              <p className="mt-3 text-xs text-slate-500 leading-relaxed">
+                Click a slice to select it, or hover to preview.
               </p>
             </div>
           )}
