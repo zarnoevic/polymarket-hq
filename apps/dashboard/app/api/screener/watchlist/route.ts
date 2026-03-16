@@ -18,8 +18,8 @@ export async function POST(req: Request) {
       );
     }
 
-    const event = await prisma.screenerEvent.findUnique({
-      where: { id: eventId },
+    const event = await prisma.screenerEvent.findFirst({
+      where: { id: eventId, deletedAt: null },
     });
     if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });

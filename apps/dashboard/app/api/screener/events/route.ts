@@ -15,6 +15,7 @@ export async function GET(req: Request) {
     now.setUTCHours(0, 0, 0, 0);
     const events = await prisma.screenerEvent.findMany({
       where: {
+        deletedAt: null,
         endDate: { gte: now },
       },
       orderBy: [{ syncedAt: "desc" }, { endDate: "asc" }, { volume: "desc" }],

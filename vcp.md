@@ -1,6 +1,3 @@
-- event comments react to them
-
-
 fix analyses
 
 fix build

@@ -8,7 +8,10 @@ const EVENTS_LIMIT = 10_000;
 
 export default async function ScreenerPage() {
   const events = await prisma.screenerEvent.findMany({
-    where: { endDate: { gte: new Date(new Date().setUTCHours(0, 0, 0, 0)) } },
+    where: {
+      deletedAt: null,
+      endDate: { gte: new Date(new Date().setUTCHours(0, 0, 0, 0)) },
+    },
     orderBy: [{ endDate: "asc" }, { volume: "desc" }, { syncedAt: "desc" }],
     take: EVENTS_LIMIT,
   });

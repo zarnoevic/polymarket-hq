@@ -318,7 +318,7 @@ export async function POST(req: Request) {
     }
 
     const events = await prisma.screenerEvent.findMany({
-      where: { id: { in: ids } },
+      where: { id: { in: ids }, deletedAt: null },
     });
     const eventMap = new Map(events.map((e) => [e.id, e]));
 

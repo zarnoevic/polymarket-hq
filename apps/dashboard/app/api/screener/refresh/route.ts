@@ -356,12 +356,13 @@ export async function POST() {
       await prisma.screenerEvent.upsert({
         where: { externalId: m.id },
         create: base,
-        // For existing: update probabilities, volume, and reclassify status (under_10/under_2k_vol/discovery)
+        // For existing: update probabilities, volume, reclassify status (under_10/under_2k_vol/discovery), and undelete
         update: {
           probabilityYes: probYes,
           probabilityNo: probNo,
           volume: volumeNum,
           syncedAt: new Date(),
+          deletedAt: null, // undelete when market reappears in Gamma
           tags: tags.length > 0 ? (tags as object) : null,
           yesParoi,
           noParoi,
@@ -374,6 +375,14 @@ export async function POST() {
       });
       upserted++;
     }
+
+    // Soft delete events whose end date is in the past
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0);
+    const softDeleted = await prisma.screenerEvent.updateMany({
+      where: { endDate: { lt: todayStart }, deletedAt: null },
+      data: { deletedAt: new Date() },
+    });
 
     const finishedAt = new Date();
     await prisma.syncLog.create({
@@ -391,6 +400,7 @@ export async function POST() {
     return NextResponse.json({
       ok: true,
       count: upserted,
+      softDeleted: softDeleted.count,
       marketsFetched: allMarkets.length,
       filteredCount: filtered.length,
       pagesFetched: Math.ceil(allMarkets.length / PAGE_LIMIT) || 1,

@@ -56,8 +56,10 @@ model ScreenerEvent {
   kellyPosition String?  @map("kelly_position") // "yes" | "no" - which side you're entering (default yes)
   kellyC        Float?   @map("kelly_c") // Kelly scaling factor (fractional Kelly = full Kelly / c)
   kellyCriterion Float?  @map("kelly_criterion") // Calculated Kelly criterion (fractional), displayed as %
+  deletedAt      DateTime? @map("deleted_at") // Soft delete; null = active
 
   @@index([syncedAt])
+  @@index([deletedAt])
   @@index([label])
   @@index([volume])
   @@map("screener_events")
