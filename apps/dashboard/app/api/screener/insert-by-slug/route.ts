@@ -210,10 +210,16 @@ export async function POST(req: Request) {
       const createdAt = m.createdAt ? new Date(m.createdAt) : null;
       const { yes: probYes, no: probNo } = parseProbabilities(m);
       const { yesId, noId } = parseClobTokenIds(m);
-      const [yesSpread, noSpread] = await Promise.all([
+      let [yesSpread, noSpread] = await Promise.all([
         yesId ? fetchSpread(yesId) : Promise.resolve(null),
         noId ? fetchSpread(noId) : Promise.resolve(null),
       ]);
+      // Fallback to Gamma API spread when CLOB returns null (for discovery wide-spread filter)
+      const gammaSpread = typeof m.spread === "number" && m.spread > 0 ? m.spread : parseFloat(String(m.spread ?? ""));
+      if ((yesSpread == null || noSpread == null) && Number.isFinite(gammaSpread) && gammaSpread > 0) {
+        if (yesSpread == null) yesSpread = gammaSpread;
+        if (noSpread == null) noSpread = gammaSpread;
+      }
       const parentEventSlug = m.events?.[0]?.slug ?? null;
       const volumeNum = typeof m.volume === "number" ? m.volume : parseFloat(String(m.volumeNum ?? m.volume ?? 0)) || 0;
       const isUnder10 = (probYes != null && probYes <= 0.1) || (probNo != null && probNo <= 0.1);

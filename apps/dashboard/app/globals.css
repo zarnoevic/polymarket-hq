@@ -24,6 +24,16 @@ html.dark {
   }
 }
 
+@keyframes shimmer {
+  0%,
+  100% {
+    width: 20%;
+  }
+  50% {
+    width: 80%;
+  }
+}
+
 body {
   background: rgb(var(--background-rgb));
   min-height: 100vh;

@@ -85,11 +85,12 @@ export function WealthTabsNav() {
           className="absolute left-1/2 -translate-x-1/2 flex shrink-0 items-center gap-2 text-lg font-semibold tracking-tight text-white transition-opacity hover:opacity-90"
         >
           <Image
-            src="/logo-diamond.svg"
+            src="/diamond.svg"
             alt=""
             width={28}
             height={28}
             className="h-7 w-7 shrink-0 object-contain"
+            unoptimized
           />
           Wealth HQ
         </Link>

@@ -20,10 +20,8 @@ import {
   Percent,
 } from "lucide-react";
 import { CategorizedPositionsList } from "@/app/components/CategorizedPositionsList";
-import { CategoryAttributionPieChart } from "@/app/components/CategoryAttributionPieChart";
-import { CategoryCompositionPieChart } from "@/app/components/CategoryCompositionPieChart";
 import { CopyAddress } from "@/app/components/CopyAddress";
-import { AttributionPieChart } from "@/app/components/AttributionPieChart";
+import { DashboardPieCharts } from "@/app/components/DashboardPieCharts";
 
 type LeaderboardEntry = {
   rank: string;
@@ -684,17 +682,10 @@ export default async function HomePage() {
         {/* Right margin: Pie charts - allocation (aligned with total win), category 24h, positions 24h */}
         <div className="flex flex-1 flex-col items-center justify-start gap-4 min-w-0 pt-4">
           {positions.length > 0 && (
-            <>
-              <CategoryCompositionPieChart
-                positions={positions}
-                wallet={process.env.POLYMARKET_MAIN_WALLET ?? DEFAULT_WALLET}
-              />
-              <CategoryAttributionPieChart
-                positions={positions}
-                wallet={process.env.POLYMARKET_MAIN_WALLET ?? DEFAULT_WALLET}
-              />
-              <AttributionPieChart positions={positions} />
-            </>
+            <DashboardPieCharts
+              positions={positions}
+              wallet={process.env.POLYMARKET_MAIN_WALLET ?? DEFAULT_WALLET}
+            />
           )}
         </div>
       </div>

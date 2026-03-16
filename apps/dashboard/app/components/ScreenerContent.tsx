@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { RefreshCw, Filter, Calendar, CalendarPlus, BarChart3, ExternalLink, Loader2, RotateCw, X, Brain, Star, Compass, HelpCircle, BadgeCheck, TrendingUp, ClipboardList, ChevronDown, AlertTriangle, StickyNote, BookOpen, Percent, Copy, ScrollText, Clock, Search, Tag, Plus, DollarSign } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { RefreshCw, Filter, Calendar, CalendarPlus, BarChart3, ExternalLink, Loader2, RotateCw, X, Brain, Star, Compass, HelpCircle, BadgeCheck, TrendingUp, ClipboardList, ChevronDown, ChevronLeft, ChevronRight, AlertTriangle, StickyNote, BookOpen, Percent, Copy, ScrollText, Clock, Search, Tag, Plus, DollarSign, ArrowLeftRight } from "lucide-react";
 
 /** Icon: one circle with smaller circles sprouting (tree/siblings) */
 function SiblingsIcon({ className }: { className?: string }) {
@@ -129,6 +129,15 @@ function formatDurationSeconds(seconds: number | null | undefined): string {
   return r > 0 ? `${m}m ${r}s` : `${m}m`;
 }
 
+function formatTimeAgo(isoDate: string): string {
+  const d = new Date(isoDate);
+  const s = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+}
+
 /** ROI as "Xx" for large values; K/M/B/T for very large. */
 function formatRoiAsX(roi: number): string {
   if (roi < 0 || !Number.isFinite(roi)) return "—";
@@ -248,6 +257,11 @@ export function ScreenerContent({
     }))
   );
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshElapsedSec, setRefreshElapsedSec] = useState(0);
+  const [refreshStartTime, setRefreshStartTime] = useState<number | null>(null);
+  const [lastRefreshAt, setLastRefreshAt] = useState<string | null>(null);
+  const [lastRefreshDurationSec, setLastRefreshDurationSec] = useState<number | null>(null);
+  const [, setRefreshTick] = useState(0);
   const [appraisingIds, setAppraisingIds] = useState<Set<string>>(new Set());
   const [appraiseStartTimes, setAppraiseStartTimes] = useState<Map<string, number>>(new Map());
   const [, setElapsedTick] = useState(0);
@@ -257,7 +271,10 @@ export function ScreenerContent({
   const [savingKellyId, setSavingKellyId] = useState<string | null>(null);
   const [kellyDrafts, setKellyDrafts] = useState<Record<string, { p: string; c: string; position: "yes" | "no" }>>({});
   const kellySaveTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const [activeTab, setActiveTab] = useState<"discovery" | "evaluating" | "vetted" | "traded" | "unknowable" | "well_priced" | "disputed" | "uninformed" | "under_10" | "under_2k_vol">("discovery");
+  const [activeTab, setActiveTab] = useState<"discovery" | "evaluating" | "vetted" | "traded" | "unknowable" | "well_priced" | "disputed" | "uninformed" | "under_10" | "under_2k_vol" | "spread_gt_5c">("discovery");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchPage, setSearchPage] = useState(1);
+  const EVENTS_PER_PAGE = 10;
   const [categoryOpen, setCategoryOpen] = useState(false);
   const categoryRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -278,7 +295,9 @@ export function ScreenerContent({
   const [savingTagPrefs, setSavingTagPrefs] = useState(false);
   const [insertSlugInput, setInsertSlugInput] = useState("");
   const [insertSlugLoading, setInsertSlugLoading] = useState(false);
+  const [addBySlugOpen, setAddBySlugOpen] = useState(false);
   const tagsRef = useRef<HTMLDivElement>(null);
+  const addBySlugRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -287,6 +306,9 @@ export function ScreenerContent({
       }
       if (tagsRef.current && !tagsRef.current.contains(e.target as Node)) {
         setTagsOpen(false);
+      }
+      if (addBySlugRef.current && !addBySlugRef.current.contains(e.target as Node)) {
+        setAddBySlugOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -303,13 +325,35 @@ export function ScreenerContent({
       .catch(() => {});
   }, []);
 
-  // Load tags when dropdown opens
+  // Load last refresh status from SyncLog (stored in database)
+  const fetchLastRefreshStatus = useCallback(() => {
+    fetch("/api/screener/refresh-status")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.lastRefreshAt) setLastRefreshAt(data.lastRefreshAt);
+        if (data.durationMs != null) setLastRefreshDurationSec(Math.round(data.durationMs / 1000));
+      })
+      .catch(() => {});
+  }, []);
+  useEffect(() => {
+    fetchLastRefreshStatus();
+  }, [fetchLastRefreshStatus]);
+
+  // Refresh elapsed timer when refreshing (updates every 500ms for smooth progress bar)
+  useEffect(() => {
+    if (!refreshing || !refreshStartTime) return;
+    const id = setInterval(() => {
+      setRefreshElapsedSec(Math.floor((Date.now() - refreshStartTime) / 1000));
+      setRefreshTick((t) => t + 1);
+    }, 500);
+    return () => clearInterval(id);
+  }, [refreshing, refreshStartTime]);
+
+  // Load tags from DB once when dropdown opens (no refetch on search typing)
   useEffect(() => {
     if (!tagsOpen) return;
     setLoadingTags(true);
-    const q = tagSearchInput.trim();
-    const url = q ? `/api/screener/tags?q=${encodeURIComponent(q)}` : "/api/screener/tags";
-    fetch(url)
+    fetch("/api/screener/tags")
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) setAllTags(data);
@@ -317,7 +361,7 @@ export function ScreenerContent({
       })
       .catch(() => toast.error("Failed to load tags"))
       .finally(() => setLoadingTags(false));
-  }, [tagsOpen, tagSearchInput]);
+  }, [tagsOpen]);
 
   // Timer tick for appraise elapsed time
   useEffect(() => {
@@ -344,8 +388,20 @@ export function ScreenerContent({
       .catch(() => {});
   }, [activeTab]);
 
+  // Reset page when tab or search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab]);
+  useEffect(() => {
+    setSearchPage(1);
+  }, [searchQuery]);
+
+  /** Exclude from discovery when any spread is >5¢ (poor liquidity). */
+  const hasWideSpread = (e: ScreenerEvent) =>
+    (e.yesSpread != null && e.yesSpread > 0.05) ||
+    (e.noSpread != null && e.noSpread > 0.05);
   const discoveryEvents = events
-    .filter((e) => e.label === null)
+    .filter((e) => e.label === null && !hasWideSpread(e))
     .sort((a, b) => {
       const distA = a.probabilityYes != null ? Math.abs(a.probabilityYes - 0.5) : Infinity;
       const distB = b.probabilityYes != null ? Math.abs(b.probabilityYes - 0.5) : Infinity;
@@ -371,7 +427,17 @@ export function ScreenerContent({
       const distB = b.probabilityYes != null ? Math.abs(b.probabilityYes - 0.5) : Infinity;
       return distA - distB;
     });
-  const tabToLabel: Record<Exclude<typeof activeTab, "discovery" | "under_10" | "under_2k_vol">, LabelType> = {
+  const spreadGt5cEvents = events
+    .filter((e) => e.noSpread != null && e.noSpread > 0.05)
+    .sort((a, b) => {
+      const spreadA = a.noSpread ?? 0;
+      const spreadB = b.noSpread ?? 0;
+      if (spreadA !== spreadB) return spreadB - spreadA;
+      const syncedA = a.syncedAt ? new Date(a.syncedAt).getTime() : 0;
+      const syncedB = b.syncedAt ? new Date(b.syncedAt).getTime() : 0;
+      return syncedB - syncedA;
+    });
+  const tabToLabel: Record<Exclude<typeof activeTab, "discovery" | "under_10" | "under_2k_vol" | "spread_gt_5c">, LabelType> = {
     evaluating: "evaluating",
     vetted: "vetted",
     traded: "traded",
@@ -387,7 +453,9 @@ export function ScreenerContent({
         ? under10Events
         : activeTab === "under_2k_vol"
           ? under2kVolEvents
-          : activeTab === "evaluating"
+          : activeTab === "spread_gt_5c"
+            ? spreadGt5cEvents
+            : activeTab === "evaluating"
         ? [...events.filter((e) => e.label === "evaluating")].sort((a, b) => {
             const at = a.labelUpdatedAt ? new Date(a.labelUpdatedAt).getTime() : 0;
             const bt = b.labelUpdatedAt ? new Date(b.labelUpdatedAt).getTime() : 0;
@@ -410,6 +478,17 @@ export function ScreenerContent({
 
   /** Search results from ALL categories (not just current tab) - shown in div above. */
   const searchResultsEvents = q ? events.filter(matchesSearch) : [];
+
+  const totalTabPages = Math.max(1, Math.ceil(displayedEvents.length / EVENTS_PER_PAGE));
+  const totalSearchPages = Math.max(1, Math.ceil(searchResultsEvents.length / EVENTS_PER_PAGE));
+  const paginatedDisplayedEvents = displayedEvents.slice(
+    (currentPage - 1) * EVENTS_PER_PAGE,
+    currentPage * EVENTS_PER_PAGE
+  );
+  const paginatedSearchResults = searchResultsEvents.slice(
+    (searchPage - 1) * EVENTS_PER_PAGE,
+    searchPage * EVENTS_PER_PAGE
+  );
 
   function getSiblingIds(eventId: string): string[] {
     const ev = events.find((x) => x.id === eventId);
@@ -662,6 +741,8 @@ export function ScreenerContent({
   }
 
   async function handleRefresh() {
+    setRefreshStartTime(Date.now());
+    setRefreshElapsedSec(0);
     setRefreshing(true);
     toast.info("Fetching events from Gamma API…");
     try {
@@ -672,6 +753,8 @@ export function ScreenerContent({
         throw new Error(data?.error ?? "Refresh failed");
       }
 
+      if (data.finishedAt) setLastRefreshAt(data.finishedAt);
+      if (typeof data.durationMs === "number") setLastRefreshDurationSec(Math.round(data.durationMs / 1000));
       toast.success(`Synced ${data.count} events to database`);
       const listRes = await fetch("/api/screener/events?limit=10000");
       const list = await listRes.json();
@@ -681,13 +764,31 @@ export function ScreenerContent({
       toast.error(msg);
     } finally {
       setRefreshing(false);
+      setRefreshStartTime(null);
+      setRefreshElapsedSec(0);
     }
   }
 
+  function extractSlugFromInput(input: string): string {
+    const trimmed = input.trim();
+    if (!trimmed) return "";
+    try {
+      const url = new URL(trimmed);
+      if (url.hostname?.includes("polymarket.com")) {
+        const segs = url.pathname.split("/").filter(Boolean);
+        const last = segs[segs.length - 1];
+        return last ?? trimmed;
+      }
+    } catch {
+      /* not a URL */
+    }
+    return trimmed;
+  }
+
   async function handleInsertBySlug() {
-    const slug = insertSlugInput.trim();
+    const slug = extractSlugFromInput(insertSlugInput);
     if (!slug) {
-      toast.error("Enter a slug");
+      toast.error("Enter a slug or Polymarket URL");
       return;
     }
     setInsertSlugLoading(true);
@@ -701,6 +802,7 @@ export function ScreenerContent({
       if (!res.ok) throw new Error(data?.error ?? "Insert failed");
       toast.success(`Added ${data.count} market${data.count !== 1 ? "s" : ""} to discovery`);
       setInsertSlugInput("");
+      setAddBySlugOpen(false);
       const listRes = await fetch("/api/screener/events?limit=10000");
       const list = await listRes.json();
       if (Array.isArray(list)) setEvents(list);
@@ -809,7 +911,7 @@ export function ScreenerContent({
               <button
                 onClick={() => setCategoryOpen(!categoryOpen)}
                 className={`flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
-                  activeTab === "unknowable" || activeTab === "well_priced" || activeTab === "disputed" || activeTab === "uninformed" || activeTab === "under_10" || activeTab === "under_2k_vol"
+                  activeTab === "unknowable" || activeTab === "well_priced" || activeTab === "disputed" || activeTab === "uninformed" || activeTab === "under_10" || activeTab === "under_2k_vol" || activeTab === "spread_gt_5c"
                     ? "bg-slate-700/60 text-white"
                     : "text-slate-500 hover:text-slate-400"
                 }`}
@@ -822,6 +924,7 @@ export function ScreenerContent({
                   {[
                     { tab: "under_10" as const, icon: Percent, label: "<10%", count: events.filter((e) => e.label === "under_10").length },
                     { tab: "under_2k_vol" as const, icon: DollarSign, label: "<2k VOL", count: events.filter((e) => e.label === "under_2k_vol").length },
+                    { tab: "spread_gt_5c" as const, icon: ArrowLeftRight, label: ">5¢ spread", count: events.filter((e) => e.noSpread != null && e.noSpread > 0.05).length },
                     { tab: "unknowable" as const, icon: HelpCircle, label: "Unknowable", count: events.filter((e) => e.label === "unknowable").length },
                     { tab: "well_priced" as const, icon: BadgeCheck, label: "Well-priced", count: events.filter((e) => e.label === "well_priced").length },
                     { tab: "disputed" as const, icon: AlertTriangle, label: "Disputed", count: events.filter((e) => e.label === "disputed").length },
@@ -884,9 +987,7 @@ export function ScreenerContent({
                           const data = await r.json();
                           if (!r.ok) throw new Error(data.error ?? "Sync failed");
                           toast.success(`Synced ${data.count ?? 0} tags from Gamma`);
-                          const q = tagSearchInput.trim();
-                          const url = q ? `/api/screener/tags?q=${encodeURIComponent(q)}` : "/api/screener/tags";
-                          const res = await fetch(url);
+                          const res = await fetch("/api/screener/tags");
                           const tags = await res.json();
                           if (Array.isArray(tags)) setAllTags(tags);
                         } catch (e) {
@@ -908,27 +1009,63 @@ export function ScreenerContent({
                         <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
                       </div>
                     ) : (
-                      <div className="space-y-0.5">
-                        {allTags.map((tag) => {
-                          const isSelected = selectedTagPrefs.some((p) => p.tagId === tag.id);
-                          return (
-                            <button
-                              key={tag.id}
-                              type="button"
-                              onClick={() => handleToggleTagPreference(tag)}
-                              disabled={savingTagPrefs}
-                              className={`flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors ${
-                                isSelected ? "bg-indigo-500/20 text-indigo-300" : "text-slate-300 hover:bg-slate-700/60 hover:text-white"
-                              } disabled:opacity-50`}
-                            >
-                              <span className="truncate">{tag.label}</span>
-                              {isSelected && <span className="shrink-0 text-indigo-400">✓</span>}
-                            </button>
-                          );
-                        })}
-                        {!loadingTags && allTags.length === 0 && (
-                          <p className="py-4 text-center text-sm text-slate-500">No tags found</p>
+                      <div className="space-y-2">
+                        {selectedTagPrefs.length > 0 && (
+                          <div className="space-y-0.5">
+                            <p className="px-2 py-1 text-xs font-medium text-slate-500 uppercase tracking-wider">Selected</p>
+                            {selectedTagPrefs.map((p) => (
+                              <button
+                                key={p.tagId}
+                                type="button"
+                                onClick={() =>
+                                  handleToggleTagPreference({ id: p.tagId, label: p.label, slug: p.slug })
+                                }
+                                disabled={savingTagPrefs}
+                                className="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 disabled:opacity-50"
+                              >
+                                <span className="truncate">{p.label}</span>
+                                <span className="shrink-0 text-indigo-400">✓</span>
+                              </button>
+                            ))}
+                          </div>
                         )}
+                        <div className="space-y-0.5">
+                          <p className="px-2 py-1 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                            {tagSearchInput.trim() ? "Search results" : "All tags"}
+                          </p>
+                          {(function () {
+                            const q = tagSearchInput.trim();
+                            const selectedIds = new Set(selectedTagPrefs.map((p) => p.tagId));
+                            const filtered = !q
+                              ? allTags.filter((t) => !selectedIds.has(t.id))
+                              : (() => {
+                                  const tokens = q.toLowerCase().split(/\s+/).filter(Boolean);
+                                  return allTags.filter((t) => {
+                                    if (selectedIds.has(t.id)) return false;
+                                    const searchable = `${(t.label ?? "").toLowerCase()} ${(t.slug ?? "").toLowerCase()} ${t.id}`;
+                                    return tokens.every((token) => searchable.includes(token));
+                                  });
+                                })();
+                            if (filtered.length === 0) {
+                              return (
+                                <p className="py-4 text-center text-sm text-slate-500">
+                                  {q ? "No tags found" : "No other tags"}
+                                </p>
+                              );
+                            }
+                            return filtered.map((tag) => (
+                              <button
+                                key={tag.id}
+                                type="button"
+                                onClick={() => handleToggleTagPreference(tag)}
+                                disabled={savingTagPrefs}
+                                className="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors text-slate-300 hover:bg-slate-700/60 hover:text-white disabled:opacity-50"
+                              >
+                                <span className="truncate">{tag.label}</span>
+                              </button>
+                            ));
+                          })()}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -940,37 +1077,101 @@ export function ScreenerContent({
                 </div>
               )}
             </div>
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="flex items-center gap-2 rounded-xl border border-slate-700/60 bg-slate-800/60 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-700/60 disabled:opacity-50"
-            >
-              {refreshing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              Refresh
-            </button>
-            <div className="flex items-center gap-1.5">
-              <input
-                type="text"
-                value={insertSlugInput}
-                onChange={(e) => setInsertSlugInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleInsertBySlug()}
-                placeholder="Add by slug…"
-                className="w-36 rounded-lg border border-slate-700/60 bg-slate-800/60 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-slate-600 focus:outline-none"
-                disabled={insertSlugLoading}
-              />
+            <div className="relative inline-flex flex-col items-end shrink-0">
               <button
-                onClick={handleInsertBySlug}
-                disabled={insertSlugLoading || !insertSlugInput.trim()}
-                className="flex items-center gap-1.5 rounded-lg border border-slate-700/60 bg-slate-800/60 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700/60 disabled:opacity-50"
-                title="Insert event(s) into discovery by Polymarket slug"
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="flex items-center gap-2 rounded-xl border border-slate-700/60 bg-slate-800/60 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-700/60 disabled:opacity-50"
               >
-                {insertSlugLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                Add
+                {refreshing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Refresh
               </button>
+              {(refreshing || lastRefreshAt) && (
+                <div className="absolute right-0 top-full mt-1 flex flex-col items-end gap-1">
+                  <div className="flex items-center gap-2 text-xs text-slate-500 min-w-[140px] justify-end">
+                    {refreshing ? (
+                      <>
+                        <Clock className="h-3 w-3 shrink-0" />
+                        <span>Elapsed: {formatDurationSeconds(refreshElapsedSec)}</span>
+                      </>
+                    ) : lastRefreshAt ? (
+                      <>
+                        <Clock className="h-3 w-3 shrink-0" />
+                        <span>
+                          Last: {formatTimeAgo(lastRefreshAt)}
+                          {lastRefreshDurationSec != null && lastRefreshDurationSec > 0
+                            ? ` (took ${formatDurationSeconds(lastRefreshDurationSec)})`
+                            : ""}
+                        </span>
+                      </>
+                    ) : null}
+                  </div>
+                  {refreshing && (
+                    <div
+                      className="h-1.5 w-24 rounded-full bg-slate-700/80 overflow-hidden"
+                      role="progressbar"
+                      aria-valuenow={
+                        lastRefreshDurationSec != null && lastRefreshDurationSec > 0
+                          ? Math.min(95, Math.round((refreshElapsedSec / lastRefreshDurationSec) * 100))
+                          : undefined
+                      }
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                    >
+                      <div
+                        className={`h-full rounded-full ${
+                          lastRefreshDurationSec != null && lastRefreshDurationSec > 0
+                            ? "bg-indigo-500 transition-all duration-300"
+                            : "bg-indigo-500 animate-[shimmer_1.5s_ease-in-out_infinite]"
+                        }`}
+                        style={
+                          lastRefreshDurationSec != null && lastRefreshDurationSec > 0
+                            ? { width: `${Math.min(95, (refreshElapsedSec / lastRefreshDurationSec) * 100)}%` }
+                            : undefined
+                        }
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="relative" ref={addBySlugRef}>
+              <button
+                onClick={() => setAddBySlugOpen(!addBySlugOpen)}
+                className="flex items-center gap-2 rounded-xl border border-slate-700/60 bg-slate-800/60 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-700/60"
+                title="Add event(s) by Polymarket slug"
+              >
+                <Plus className="h-4 w-4" />
+                Add by slug
+                <ChevronDown className={`h-4 w-4 transition-transform ${addBySlugOpen ? "rotate-180" : ""}`} />
+              </button>
+              {addBySlugOpen && (
+                <div className="absolute right-0 top-full z-20 mt-1 flex w-80 flex-col gap-2 rounded-lg border border-slate-700/60 bg-slate-800 p-3 shadow-xl">
+                  <input
+                    type="text"
+                    value={insertSlugInput}
+                    onChange={(e) => setInsertSlugInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleInsertBySlug()}
+                    placeholder="Enter Polymarket slug or event URL…"
+                    className="w-full rounded-lg border border-slate-700/60 bg-slate-800/60 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-slate-600 focus:outline-none"
+                    disabled={insertSlugLoading}
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleInsertBySlug}
+                    disabled={insertSlugLoading || !insertSlugInput.trim()}
+                    className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-700/60 bg-slate-800/60 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700/60 disabled:opacity-50"
+                    title="Insert event(s) into discovery by Polymarket slug"
+                  >
+                    {insertSlugLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                    Add
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1009,7 +1210,7 @@ export function ScreenerContent({
                 <span>Search results: {searchResultsEvents.length} markets (all categories)</span>
               </div>
               <div className="space-y-4">
-                {searchResultsEvents.map((e) => {
+                {paginatedSearchResults.map((e) => {
                   const rightContent = e.appraisalExplanation
                     ? { title: "Appraisal explanation", text: e.appraisalExplanation }
                     : e.description
@@ -1249,6 +1450,27 @@ export function ScreenerContent({
                   );
                 })}
               </div>
+              {totalSearchPages > 1 && (
+                <div className="flex items-center justify-center gap-3 py-4">
+                  <button
+                    onClick={() => setSearchPage((p) => Math.max(1, p - 1))}
+                    disabled={searchPage <= 1}
+                    className="rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-sm text-slate-300 transition-colors hover:bg-slate-700/60 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="text-sm text-slate-400 tabular-nums">
+                    Page {searchPage} of {totalSearchPages}
+                  </span>
+                  <button
+                    onClick={() => setSearchPage((p) => Math.min(totalSearchPages, p + 1))}
+                    disabled={searchPage >= totalSearchPages}
+                    className="rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-sm text-slate-300 transition-colors hover:bg-slate-700/60 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -1267,6 +1489,8 @@ export function ScreenerContent({
               <Percent className="h-8 w-8" />
             ) : activeTab === "under_2k_vol" ? (
               <DollarSign className="h-8 w-8" />
+            ) : activeTab === "spread_gt_5c" ? (
+              <ArrowLeftRight className="h-8 w-8" />
             ) : activeTab === "unknowable" ? (
               <HelpCircle className="h-8 w-8" />
             ) : activeTab === "disputed" ? (
@@ -1284,6 +1508,8 @@ export function ScreenerContent({
                 ? "No <10% markets"
                 : activeTab === "under_2k_vol"
                   ? "No <2k VOL markets"
+                  : activeTab === "spread_gt_5c"
+                    ? "No >5¢ spread (NO) markets"
                   : activeTab === "evaluating"
                   ? "No evaluating markets"
                   : activeTab === "vetted"
@@ -1305,6 +1531,8 @@ export function ScreenerContent({
                 ? "Markets with Yes or No probability ≤10%. Low priority (limited upside). Use Refresh to ingest new events."
                 : activeTab === "under_2k_vol"
                   ? "Markets with volume <$2k. Low liquidity. Use Refresh to ingest new events."
+                  : activeTab === "spread_gt_5c"
+                    ? "Markets with NO order book spread >5¢. Wide spreads reduce effective ROI."
                   : activeTab === "evaluating"
                   ? "Use the Evaluating button in Discovery to move markets here."
                   : activeTab === "vetted"
@@ -1346,6 +1574,7 @@ export function ScreenerContent({
                 {activeTab === "discovery" && " · sorted by probability closest to 50%"}
                 {activeTab === "under_10" && " <10% (low priority)"}
                 {activeTab === "under_2k_vol" && " <2k VOL (low volume)"}
+                {activeTab === "spread_gt_5c" && " >5¢ spread (NO order book)"}
                 {activeTab === "evaluating" && " evaluating"}
                 {activeTab === "vetted" && " vetted"}
                 {activeTab === "traded" && " traded"}
@@ -1370,7 +1599,7 @@ export function ScreenerContent({
           </div>
 
           <div className="space-y-4">
-            {displayedEvents.map((e) => {
+            {paginatedDisplayedEvents.map((e) => {
               const rightContent = e.appraisalExplanation
                 ? { title: "Appraisal explanation", text: e.appraisalExplanation }
                 : e.description
@@ -1934,6 +2163,27 @@ export function ScreenerContent({
             );
             })}
           </div>
+          {totalTabPages > 1 && (
+            <div className="flex items-center justify-center gap-3 py-4">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+                className="rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-sm text-slate-300 transition-colors hover:bg-slate-700/60 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="text-sm text-slate-400 tabular-nums">
+                Page {currentPage} of {totalTabPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalTabPages, p + 1))}
+                disabled={currentPage >= totalTabPages}
+                className="rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-sm text-slate-300 transition-colors hover:bg-slate-700/60 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
         </div>
       )}
         </div>

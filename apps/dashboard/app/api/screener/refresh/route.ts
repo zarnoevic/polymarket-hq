@@ -289,10 +289,16 @@ export async function POST() {
       const createdAt = m.createdAt ? new Date(m.createdAt) : null;
       const { yes: probYes, no: probNo } = parseProbabilities(m);
       const { yesId, noId } = parseClobTokenIds(m);
-      const [yesSpread, noSpread] = await Promise.all([
+      let [yesSpread, noSpread] = await Promise.all([
         yesId ? fetchSpread(yesId) : Promise.resolve(null),
         noId ? fetchSpread(noId) : Promise.resolve(null),
       ]);
+      // Fallback to Gamma API spread when CLOB returns null (e.g. empty order book) so discovery can filter wide spreads
+      const gammaSpread = typeof m.spread === "number" && m.spread > 0 ? m.spread : parseFloat(String(m.spread ?? ""));
+      if ((yesSpread == null || noSpread == null) && Number.isFinite(gammaSpread) && gammaSpread > 0) {
+        if (yesSpread == null) yesSpread = gammaSpread;
+        if (noSpread == null) noSpread = gammaSpread;
+      }
       const parentEventSlug = m.events?.[0]?.slug ?? null;
       const volumeNum = typeof m.volume === "number" ? m.volume : parseFloat(String(m.volumeNum ?? m.volume ?? 0)) || 0;
       // Category status: under_10 if yes or no <= 10% (low priority), else under_2k_vol if volume < 2k, else discovery (null)
@@ -360,15 +366,18 @@ export async function POST() {
       upserted++;
     }
 
+    const finishedAt = new Date();
     await prisma.syncLog.create({
       data: {
         source: "gamma-screener",
         status: "success",
         recordCount: upserted,
         startedAt,
-        finishedAt: new Date(),
+        finishedAt,
       },
     });
+
+    const durationMs = finishedAt.getTime() - startedAt.getTime();
 
     return NextResponse.json({
       ok: true,
@@ -376,6 +385,8 @@ export async function POST() {
       marketsFetched: allMarkets.length,
       filteredCount: filtered.length,
       pagesFetched: Math.ceil(allMarkets.length / PAGE_LIMIT) || 1,
+      durationMs,
+      finishedAt: finishedAt.toISOString(),
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

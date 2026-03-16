@@ -13,9 +13,6 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "Wealth HQ",
   description: "Wealth dashboard: Polymarket, stocks, gold, and FX insights",
-  icons: {
-    icon: "/logo-diamond.svg",
-  },
 };
 
 export default function RootLayout({
