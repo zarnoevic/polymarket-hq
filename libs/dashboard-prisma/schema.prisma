@@ -63,6 +63,33 @@ model ScreenerEvent {
   @@map("screener_events")
 }
 
+// Tags from Gamma API (GET https://gamma-api.polymarket.com/tags)
+model GammaTag {
+  id                 String   @id @map("id") // Gamma API tag id
+  label              String   @map("label")
+  slug               String   @map("slug")
+  requiresTranslation Boolean @default(false) @map("requires_translation")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  preferences ScreenerTagPreference[]
+
+  @@map("gamma_tags")
+}
+
+// Selected tag IDs for screener refresh (user preferences)
+model ScreenerTagPreference {
+  id        String   @id @default(uuid()) @map("id")
+  tagId     String   @map("tag_id") // References GammaTag.id
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tag GammaTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([tagId])
+  @@map("screener_tag_preferences")
+}
+
 // Placeholder for future Polymarket data sync
 model SyncLog {
   id         String   @id @default(uuid()) @map("id")

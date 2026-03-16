@@ -4,10 +4,13 @@ import { ScreenerContent } from "../../components/ScreenerContent";
 
 export const dynamic = "force-dynamic";
 
+const EVENTS_LIMIT = 10_000;
+
 export default async function ScreenerPage() {
   const events = await prisma.screenerEvent.findMany({
+    where: { endDate: { gte: new Date(new Date().setUTCHours(0, 0, 0, 0)) } },
     orderBy: [{ endDate: "asc" }, { volume: "desc" }, { syncedAt: "desc" }],
-    take: 500,
+    take: EVENTS_LIMIT,
   });
   // Sort by max(YEV, NEV) descending; events without appraisal go last
   const sorted = [...events].sort((a, b) => {

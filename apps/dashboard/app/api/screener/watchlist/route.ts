@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@polymarket-hq/dashboard-prisma";
 
-const LABELS = ["vetted", "unknowable", "well_priced", "traded", "evaluating", "disputed", "uninformed", "under_5"] as const;
+const LABELS = ["vetted", "unknowable", "well_priced", "traded", "evaluating", "disputed", "uninformed", "under_10", "under_2k_vol"] as const;
 type Label = (typeof LABELS)[number] | null;
 
 export async function POST(req: Request) {

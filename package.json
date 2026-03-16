@@ -29,6 +29,7 @@
     "db:docker:logs": "docker-compose logs -f postgres",
     "db:migrate": "prisma migrate dev --schema=./libs/dashboard-prisma/schema.prisma",
     "db:migrate:deploy": "prisma migrate deploy --schema=./libs/dashboard-prisma/schema.prisma",
+    "sync-tags": "tsx scripts/sync-gamma-tags.ts",
     "test": "pnpm --filter @polymarket-hq/dashboard test"
   },
   "devDependencies": {

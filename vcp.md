@@ -1,3 +1,5 @@
+- event comments react to them
+
 fix analyses
 
 fix build
@@ -5,9 +7,6 @@ fix build
 fx screener
 gold price gram
 Rolices
-
-add politics
-
 
 
 cutoffs

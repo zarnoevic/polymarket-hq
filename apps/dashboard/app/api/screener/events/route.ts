@@ -1,17 +1,24 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@polymarket-hq/dashboard-prisma";
 
-export async function GET() {
+const DEFAULT_LIMIT = 10_000;
+const MAX_LIMIT = 20_000;
+
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const limit = Math.min(
+      Math.max(1, parseInt(searchParams.get("limit") ?? String(DEFAULT_LIMIT), 10) || DEFAULT_LIMIT),
+      MAX_LIMIT
+    );
     const now = new Date();
     now.setUTCHours(0, 0, 0, 0);
     const events = await prisma.screenerEvent.findMany({
       where: {
         endDate: { gte: now },
       },
-      // Prioritize recently synced so newly ingested events are included in the 500
       orderBy: [{ syncedAt: "desc" }, { endDate: "asc" }, { volume: "desc" }],
-      take: 500,
+      take: limit,
     });
     // Appraised events first; among those, sort by quoted probability closest to 50%, then max(YEV, NEV)
     const sorted = [...events].sort((a, b) => {

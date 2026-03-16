@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from "react";
 
-const CLOB_BASE = "https://clob.polymarket.com";
-
 type OrderBookEntry = { price: string; size: string };
 
 type OrderBookResponse = {
@@ -26,10 +24,13 @@ export function OrderBookLabel({ tokenId, probabilityYes, probabilityNo }: Order
     if (!tokenId?.trim()) return;
     let cancelled = false;
     setLoading(true);
-    fetch(`${CLOB_BASE}/book?token_id=${encodeURIComponent(tokenId)}`)
-      .then((r) => r.json())
-      .then((res: OrderBookResponse) => {
-        if (!cancelled) setData(res);
+    fetch(`/api/clob/book?token_id=${encodeURIComponent(tokenId)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res: OrderBookResponse | null) => {
+        if (!cancelled && res) setData(res);
+      })
+      .catch(() => {
+        if (!cancelled) setData(null);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

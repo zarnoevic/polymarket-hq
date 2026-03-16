@@ -1,16 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@polymarket-hq/dashboard-prisma";
 
-/** Allow long-running refresh (2000+ markets = many spread fetches). */
-export const maxDuration = 600;
-
 const GAMMA_BASE = "https://gamma-api.polymarket.com/markets";
+const GAMMA_EVENTS = "https://gamma-api.polymarket.com/events";
 const CLOB_BASE = "https://clob.polymarket.com";
 
 type OrderBookEntry = { price: string; size: string };
 type OrderBookResponse = { bids?: OrderBookEntry[]; asks?: OrderBookEntry[] };
 
-/** Fetch ask-bid spread for a token. Returns null on error or missing data. */
 async function fetchSpread(tokenId: string): Promise<number | null> {
   try {
     const res = await fetch(`${CLOB_BASE}/book?token_id=${encodeURIComponent(tokenId)}`, {
@@ -28,76 +25,25 @@ async function fetchSpread(tokenId: string): Promise<number | null> {
     return null;
   }
 }
-const PAGE_LIMIT = 100;
-const TAGS_CONCURRENCY = 5;
-const TAGS_RETRIES = 3;
-const TAGS_RETRY_DELAY_MS = 500;
 
-type GammaTag = {
-  id?: string;
-  label?: string;
-  slug?: string;
-  [k: string]: unknown;
-};
+type GammaTag = { id?: string; label?: string; slug?: string; [k: string]: unknown };
 
 async function fetchTagsForMarket(marketId: string): Promise<GammaTag[]> {
-  for (let attempt = 1; attempt <= TAGS_RETRIES; attempt++) {
-    try {
-      const res = await fetch(`${GAMMA_BASE}/${marketId}/tags`, {
-        headers: { Accept: "application/json" },
-        cache: "no-store",
-      });
-      if (res.ok) {
-        const data = await res.json();
-        return Array.isArray(data) ? data : [];
-      }
-      // Retry on rate limit or server errors
-      if ((res.status === 429 || res.status >= 500) && attempt < TAGS_RETRIES) {
-        await new Promise((r) => setTimeout(r, TAGS_RETRY_DELAY_MS * attempt));
-        continue;
-      }
-      return [];
-    } catch {
-      if (attempt < TAGS_RETRIES) {
-        await new Promise((r) => setTimeout(r, TAGS_RETRY_DELAY_MS * attempt));
-      } else {
-        return [];
-      }
+  try {
+    const res = await fetch(`${GAMMA_BASE}/${marketId}/tags`, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
     }
+  } catch {
+    // ignore
   }
   return [];
 }
 
-/** Fetch tags for multiple markets in parallel with concurrency limit */
-async function fetchTagsBatch(
-  marketIds: string[],
-  concurrency: number
-): Promise<Map<string, GammaTag[]>> {
-  const result = new Map<string, GammaTag[]>();
-  const uniqueIds = [...new Set(marketIds.filter(Boolean))];
-
-  for (let i = 0; i < uniqueIds.length; i += concurrency) {
-    const batch = uniqueIds.slice(i, i + concurrency);
-    const settled = await Promise.allSettled(
-      batch.map(async (id) => {
-        const tags = await fetchTagsForMarket(id);
-        return { id, tags };
-      })
-    );
-    for (const s of settled) {
-      if (s.status === "fulfilled") {
-        result.set(s.value.id, s.value.tags);
-      }
-    }
-    // Small delay between batches to reduce rate-limit risk
-    if (i + concurrency < uniqueIds.length) {
-      await new Promise((r) => setTimeout(r, 100));
-    }
-  }
-  return result;
-}
-
-/** Days until resolution; null if endDate missing or in the past. */
 function daysToResolution(endDate: Date | null): number | null {
   if (!endDate) return null;
   const d = endDate instanceof Date ? endDate : new Date(endDate);
@@ -109,7 +55,6 @@ function daysToResolution(endDate: Date | null): number | null {
   return days > 0 ? Math.max(1, days) : null;
 }
 
-/** Numeric PAROI: r = (1-P)/P, annualized = r * (365/days). Returns null if invalid. */
 function computeParoiNumeric(curPrice: number | null, days: number | null): number | null {
   if (curPrice == null || curPrice > 1 || curPrice <= 0 || curPrice < 1e-9 || !Number.isFinite(curPrice))
     return null;
@@ -120,7 +65,7 @@ function computeParoiNumeric(curPrice: number | null, days: number | null): numb
 function getEndDateMax(): Date {
   const d = new Date();
   d.setMonth(d.getMonth() + 3);
-  d.setHours(23, 59, 59, 999); // End of day
+  d.setHours(23, 59, 59, 999);
   return d;
 }
 
@@ -140,7 +85,6 @@ type GammaMarket = {
   liquidityNum?: number;
   active?: boolean;
   closed?: boolean;
-  ready?: boolean;
   restricted?: boolean;
   outcomePrices?: string | string[];
   outcomes?: string | string[];
@@ -181,93 +125,75 @@ function parseProbabilities(m: GammaMarket): { yes: number | null; no: number | 
   }
 }
 
-/** Fetch all markets for a given tag_id (paginated). */
-async function fetchMarketsForTag(tagId: string): Promise<GammaMarket[]> {
-  const out: GammaMarket[] = [];
-  let offset = 0;
-  const MAX_PAGES = 200;
-  const params = `tag_id=${tagId}&closed=false`;
+/** Fetch markets by slug. Tries market slug first, then event slug. */
+async function fetchMarketsBySlug(slug: string): Promise<GammaMarket[]> {
+  const trimmed = slug.trim().toLowerCase();
+  if (!trimmed) return [];
 
-  for (let pageNum = 0; pageNum < MAX_PAGES; pageNum++) {
-    const url = `${GAMMA_BASE}?${params}&limit=${PAGE_LIMIT}&offset=${offset}`;
-    const res = await fetch(url, {
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-    });
-    if (!res.ok) throw new Error(`Gamma API returned ${res.status}`);
-    const markets: GammaMarket[] = await res.json();
-    if (!Array.isArray(markets)) throw new Error("Invalid API response: expected array");
-    out.push(...markets);
-    if (markets.length < PAGE_LIMIT) break;
-    offset += PAGE_LIMIT;
+  // 1. Try markets API by slug (market slug)
+  const marketsRes = await fetch(
+    `${GAMMA_BASE}?slug=${encodeURIComponent(trimmed)}&limit=20&closed=false`,
+    { headers: { Accept: "application/json" }, cache: "no-store" }
+  );
+  if (marketsRes.ok) {
+    const data: GammaMarket[] = await marketsRes.json();
+    if (Array.isArray(data) && data.length > 0) return data;
   }
-  return out;
+
+  // 2. Try events API by slug (event slug) - event has markets array
+  const eventsRes = await fetch(
+    `${GAMMA_EVENTS}?slug=${encodeURIComponent(trimmed)}&closed=false`,
+    { headers: { Accept: "application/json" }, cache: "no-store" }
+  );
+  if (eventsRes.ok) {
+    const events: Array<{ markets?: GammaMarket[] }> = await eventsRes.json();
+    if (Array.isArray(events) && events.length > 0) {
+      const all: GammaMarket[] = [];
+      for (const ev of events) {
+        if (ev?.markets && Array.isArray(ev.markets)) all.push(...ev.markets);
+      }
+      if (all.length > 0) return all;
+    }
+  }
+
+  return [];
 }
 
-export async function POST() {
-  const startedAt = new Date();
-
+export async function POST(req: Request) {
   try {
-    const prefs = await prisma.screenerTagPreference.findMany({
-      orderBy: { sortOrder: "asc" },
-      select: { tagId: true },
-    });
-    let tagIds = prefs.map((p) => p.tagId);
-    if (tagIds.length === 0) {
-      // Seed default preferences (100265, 1628) from DB only. Run sync first if tags empty.
-      const defaultIds = ["100265", "1628"];
-      for (let i = 0; i < defaultIds.length; i++) {
-        const tagId = defaultIds[i];
-        const exists = await prisma.gammaTag.findUnique({ where: { id: tagId } });
-        if (exists) {
-          await prisma.screenerTagPreference.create({
-            data: { tagId, sortOrder: i },
-          });
-        }
-      }
-      const after = await prisma.screenerTagPreference.findMany({
-        orderBy: { sortOrder: "asc" },
-        select: { tagId: true },
-      });
-      tagIds = after.map((p) => p.tagId);
-      if (tagIds.length === 0) {
-        return NextResponse.json(
-          { ok: false, error: "No tag preferences. Run sync first: pnpm sync-tags, or POST /api/screener/tags/sync" },
-          { status: 400 }
-        );
-      }
+    const body = await req.json();
+    const slug = typeof body?.slug === "string" ? body.slug : null;
+    if (!slug) {
+      return NextResponse.json({ error: "Missing slug" }, { status: 400 });
     }
 
-    const tagResults = await Promise.all(
-      tagIds.map((tagId) => fetchMarketsForTag(tagId))
-    );
-    const byId = new Map<string, GammaMarket>();
-    for (const markets of tagResults) {
-      for (const m of markets) {
-        if (m?.id && !byId.has(m.id)) byId.set(m.id, m);
-      }
+    const allMarkets = await fetchMarketsBySlug(slug);
+    if (allMarkets.length === 0) {
+      return NextResponse.json(
+        { error: `No market or event found for slug: ${slug}` },
+        { status: 404 }
+      );
     }
-    const allMarkets = Array.from(byId.values());
 
     const endDateMax = getEndDateMax();
     const endDateMin = new Date();
     endDateMin.setUTCHours(0, 0, 0, 0);
 
-    // Do NOT delete or touch events that exist in DB but are not in this API response.
-    // Only upsert markets we fetched; preserve all existing events.
-
-    // Process each market directly (child-level); no parent event aggregation
-    // Filter: active + closed + end date (API returns ready:false for all; filter after fetch)
-    let upserted = 0;
     const filtered = allMarkets.filter((m) => {
       if (m.active !== true || m.closed !== false) return false;
       const raw = (m.endDate ?? m.end_date) ?? null;
-      if (!raw) return false; // no end date = exclude (can't verify it's not past)
+      if (!raw) return false;
       const d = new Date(raw);
       return !isNaN(d.getTime()) && d >= endDateMin && d <= endDateMax;
     });
 
-    // Fetch existing labels so we can reclassify under_10/discovery when updating probabilities
+    if (filtered.length === 0) {
+      return NextResponse.json(
+        { error: "No active markets with valid end date found for this slug" },
+        { status: 404 }
+      );
+    }
+
     const existingExternalIds = filtered.map((m) => m.id).filter(Boolean);
     const existingEvents = await prisma.screenerEvent.findMany({
       where: { externalId: { in: existingExternalIds } },
@@ -277,12 +203,7 @@ export async function POST() {
       existingEvents.map((e) => [e.externalId, e.label])
     );
 
-    // Fetch tags for all filtered markets (parallel with concurrency limit)
-    const tagsByMarketId = await fetchTagsBatch(
-      filtered.map((m) => m.id).filter(Boolean),
-      TAGS_CONCURRENCY
-    );
-
+    let upserted = 0;
     for (const m of filtered) {
       if (!m?.id) continue;
       const endDate = (m.endDate ?? m.end_date) ? new Date((m.endDate ?? m.end_date) as string) : null;
@@ -295,15 +216,14 @@ export async function POST() {
       ]);
       const parentEventSlug = m.events?.[0]?.slug ?? null;
       const volumeNum = typeof m.volume === "number" ? m.volume : parseFloat(String(m.volumeNum ?? m.volume ?? 0)) || 0;
-      // Category status: under_10 if yes or no <= 10% (low priority), else under_2k_vol if volume < 2k, else discovery (null)
       const isUnder10 = (probYes != null && probYes <= 0.1) || (probNo != null && probNo <= 0.1);
       const isUnder2kVol = volumeNum < 2_000;
-      const statusLabel =
-        isUnder10 ? "under_10" : isUnder2kVol ? "under_2k_vol" : null;
-      const tags = tagsByMarketId.get(m.id) ?? [];
+      const statusLabel = isUnder10 ? "under_10" : isUnder2kVol ? "under_2k_vol" : null;
+      const tags = await fetchTagsForMarket(m.id);
       const days = daysToResolution(endDate);
       const yesParoi = computeParoiNumeric(probYes ?? (probNo != null ? 1 - probNo : null), days);
       const noParoi = computeParoiNumeric(probNo ?? (probYes != null ? 1 - probYes : null), days);
+
       const base = {
         externalId: m.id,
         slug: m.slug ?? m.id,
@@ -331,6 +251,7 @@ export async function POST() {
         yesSpread,
         noSpread,
       };
+
       const currentLabel = existingLabelByExternalId.get(m.id);
       const isStatusCategory =
         currentLabel === null ||
@@ -341,7 +262,6 @@ export async function POST() {
       await prisma.screenerEvent.upsert({
         where: { externalId: m.id },
         create: base,
-        // For existing: update probabilities, volume, and reclassify status (under_10/under_2k_vol/discovery)
         update: {
           probabilityYes: probYes,
           probabilityNo: probNo,
@@ -360,37 +280,14 @@ export async function POST() {
       upserted++;
     }
 
-    await prisma.syncLog.create({
-      data: {
-        source: "gamma-screener",
-        status: "success",
-        recordCount: upserted,
-        startedAt,
-        finishedAt: new Date(),
-      },
-    });
-
     return NextResponse.json({
       ok: true,
       count: upserted,
-      marketsFetched: allMarkets.length,
-      filteredCount: filtered.length,
-      pagesFetched: Math.ceil(allMarkets.length / PAGE_LIMIT) || 1,
+      slug: slug.trim(),
+      titles: filtered.map((m) => m.question ?? m.slug ?? m.id),
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    await prisma.syncLog
-      .create({
-        data: {
-          source: "gamma-screener",
-          status: "failed",
-          error: msg,
-          startedAt,
-          finishedAt: new Date(),
-        },
-      })
-      .catch(() => {});
-
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

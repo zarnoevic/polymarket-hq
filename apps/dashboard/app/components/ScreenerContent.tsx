@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { RefreshCw, Filter, Calendar, CalendarPlus, BarChart3, ExternalLink, Loader2, RotateCw, X, Brain, Star, Compass, HelpCircle, BadgeCheck, TrendingUp, ClipboardList, ChevronDown, AlertTriangle, StickyNote, BookOpen, Percent, Copy, ScrollText, Clock, Search } from "lucide-react";
+import { RefreshCw, Filter, Calendar, CalendarPlus, BarChart3, ExternalLink, Loader2, RotateCw, X, Brain, Star, Compass, HelpCircle, BadgeCheck, TrendingUp, ClipboardList, ChevronDown, AlertTriangle, StickyNote, BookOpen, Percent, Copy, ScrollText, Clock, Search, Tag, Plus, DollarSign } from "lucide-react";
 
 /** Icon: one circle with smaller circles sprouting (tree/siblings) */
 function SiblingsIcon({ className }: { className?: string }) {
@@ -27,7 +27,7 @@ import { MarketFees } from "./MarketFees";
 import { SpreadLabel } from "./SpreadLabel";
 import { computeKellyCriterion } from "@/lib/kelly";
 
-type LabelType = "vetted" | "unknowable" | "well_priced" | "traded" | "evaluating" | "disputed" | "uninformed" | "under_5" | null;
+type LabelType = "vetted" | "unknowable" | "well_priced" | "traded" | "evaluating" | "disputed" | "uninformed" | "under_10" | "under_2k_vol" | null;
 
 const VALID_LABELS: ReadonlySet<string> = new Set([
   "vetted",
@@ -37,7 +37,8 @@ const VALID_LABELS: ReadonlySet<string> = new Set([
   "evaluating",
   "disputed",
   "uninformed",
-  "under_5",
+  "under_10",
+  "under_2k_vol",
 ]);
 
 function toLabelType(s: string | null | undefined): LabelType {
@@ -256,7 +257,7 @@ export function ScreenerContent({
   const [savingKellyId, setSavingKellyId] = useState<string | null>(null);
   const [kellyDrafts, setKellyDrafts] = useState<Record<string, { p: string; c: string; position: "yes" | "no" }>>({});
   const kellySaveTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const [activeTab, setActiveTab] = useState<"discovery" | "evaluating" | "vetted" | "traded" | "unknowable" | "well_priced" | "disputed" | "uninformed" | "under_5">("discovery");
+  const [activeTab, setActiveTab] = useState<"discovery" | "evaluating" | "vetted" | "traded" | "unknowable" | "well_priced" | "disputed" | "uninformed" | "under_10" | "under_2k_vol">("discovery");
   const [categoryOpen, setCategoryOpen] = useState(false);
   const categoryRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -268,16 +269,55 @@ export function ScreenerContent({
     cash: number;
     cashPct: number;
   } | null>(null);
+  const [allTags, setAllTags] = useState<Array<{ id: string; label: string; slug: string }>>([]);
+  const [selectedTagPrefs, setSelectedTagPrefs] = useState<Array<{ tagId: string; label: string; slug: string }>>([]);
+  const [tagsOpen, setTagsOpen] = useState(false);
+  const [tagSearchInput, setTagSearchInput] = useState("");
+  const [loadingTags, setLoadingTags] = useState(false);
+  const [syncingTags, setSyncingTags] = useState(false);
+  const [savingTagPrefs, setSavingTagPrefs] = useState(false);
+  const [insertSlugInput, setInsertSlugInput] = useState("");
+  const [insertSlugLoading, setInsertSlugLoading] = useState(false);
+  const tagsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (categoryRef.current && !categoryRef.current.contains(e.target as Node)) {
         setCategoryOpen(false);
       }
+      if (tagsRef.current && !tagsRef.current.contains(e.target as Node)) {
+        setTagsOpen(false);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Load tag preferences on mount
+  useEffect(() => {
+    fetch("/api/screener/tag-preferences")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setSelectedTagPrefs(data);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Load tags when dropdown opens
+  useEffect(() => {
+    if (!tagsOpen) return;
+    setLoadingTags(true);
+    const q = tagSearchInput.trim();
+    const url = q ? `/api/screener/tags?q=${encodeURIComponent(q)}` : "/api/screener/tags";
+    fetch(url)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setAllTags(data);
+        else if (data && typeof data === "object" && "error" in data) toast.error(String(data.error));
+      })
+      .catch(() => toast.error("Failed to load tags"))
+      .finally(() => setLoadingTags(false));
+  }, [tagsOpen, tagSearchInput]);
 
   // Timer tick for appraise elapsed time
   useEffect(() => {
@@ -311,8 +351,8 @@ export function ScreenerContent({
       const distB = b.probabilityYes != null ? Math.abs(b.probabilityYes - 0.5) : Infinity;
       return distA - distB;
     });
-  const under5Events = events
-    .filter((e) => e.label === "under_5")
+  const under10Events = events
+    .filter((e) => e.label === "under_10")
     .sort((a, b) => {
       const syncedA = a.syncedAt ? new Date(a.syncedAt).getTime() : 0;
       const syncedB = b.syncedAt ? new Date(b.syncedAt).getTime() : 0;
@@ -321,7 +361,17 @@ export function ScreenerContent({
       const distB = b.probabilityYes != null ? Math.abs(b.probabilityYes - 0.5) : Infinity;
       return distA - distB;
     });
-  const tabToLabel: Record<Exclude<typeof activeTab, "discovery" | "under_5">, LabelType> = {
+  const under2kVolEvents = events
+    .filter((e) => e.label === "under_2k_vol")
+    .sort((a, b) => {
+      const syncedA = a.syncedAt ? new Date(a.syncedAt).getTime() : 0;
+      const syncedB = b.syncedAt ? new Date(b.syncedAt).getTime() : 0;
+      if (syncedA !== syncedB) return syncedB - syncedA;
+      const distA = a.probabilityYes != null ? Math.abs(a.probabilityYes - 0.5) : Infinity;
+      const distB = b.probabilityYes != null ? Math.abs(b.probabilityYes - 0.5) : Infinity;
+      return distA - distB;
+    });
+  const tabToLabel: Record<Exclude<typeof activeTab, "discovery" | "under_10" | "under_2k_vol">, LabelType> = {
     evaluating: "evaluating",
     vetted: "vetted",
     traded: "traded",
@@ -333,9 +383,11 @@ export function ScreenerContent({
   const baseDisplayedEvents =
     activeTab === "discovery"
       ? discoveryEvents
-      : activeTab === "under_5"
-        ? under5Events
-        : activeTab === "evaluating"
+      : activeTab === "under_10"
+        ? under10Events
+        : activeTab === "under_2k_vol"
+          ? under2kVolEvents
+          : activeTab === "evaluating"
         ? [...events.filter((e) => e.label === "evaluating")].sort((a, b) => {
             const at = a.labelUpdatedAt ? new Date(a.labelUpdatedAt).getTime() : 0;
             const bt = b.labelUpdatedAt ? new Date(b.labelUpdatedAt).getTime() : 0;
@@ -427,11 +479,15 @@ export function ScreenerContent({
                       ? idsToUpdate.length > 1
                         ? `Marked ${idsToUpdate.length} markets as uninformed`
                         : "Marked as uninformed"
-                      : label === "under_5"
+                      : label === "under_10"
                         ? idsToUpdate.length > 1
-                          ? `Moved ${idsToUpdate.length} markets to <5%`
-                          : "Moved to <5%"
-                        : idsToUpdate.length > 1
+                          ? `Moved ${idsToUpdate.length} markets to <10%`
+                          : "Moved to <10%"
+                        : label === "under_2k_vol"
+                          ? idsToUpdate.length > 1
+                            ? `Moved ${idsToUpdate.length} markets to <2k VOL`
+                            : "Moved to <2k VOL"
+                          : idsToUpdate.length > 1
                           ? `Marked ${idsToUpdate.length} markets as evaluating`
                           : "Marked as evaluating";
       toast.success(msg);
@@ -617,7 +673,7 @@ export function ScreenerContent({
       }
 
       toast.success(`Synced ${data.count} events to database`);
-      const listRes = await fetch("/api/screener/events");
+      const listRes = await fetch("/api/screener/events?limit=10000");
       const list = await listRes.json();
       if (Array.isArray(list)) setEvents(list);
     } catch (e) {
@@ -625,6 +681,57 @@ export function ScreenerContent({
       toast.error(msg);
     } finally {
       setRefreshing(false);
+    }
+  }
+
+  async function handleInsertBySlug() {
+    const slug = insertSlugInput.trim();
+    if (!slug) {
+      toast.error("Enter a slug");
+      return;
+    }
+    setInsertSlugLoading(true);
+    try {
+      const res = await fetch("/api/screener/insert-by-slug", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Insert failed");
+      toast.success(`Added ${data.count} market${data.count !== 1 ? "s" : ""} to discovery`);
+      setInsertSlugInput("");
+      const listRes = await fetch("/api/screener/events?limit=10000");
+      const list = await listRes.json();
+      if (Array.isArray(list)) setEvents(list);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Insert failed");
+    } finally {
+      setInsertSlugLoading(false);
+    }
+  }
+
+  async function handleToggleTagPreference(tag: { id: string; label: string; slug: string }) {
+    const isSelected = selectedTagPrefs.some((p) => p.tagId === tag.id);
+    const newPrefs = isSelected
+      ? selectedTagPrefs.filter((p) => p.tagId !== tag.id)
+      : [...selectedTagPrefs, { tagId: tag.id, label: tag.label, slug: tag.slug }];
+    setSavingTagPrefs(true);
+    try {
+      const res = await fetch("/api/screener/tag-preferences", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tagIds: newPrefs.map((p) => p.tagId) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Failed to save");
+      if (Array.isArray(data)) setSelectedTagPrefs(data);
+      else setSelectedTagPrefs(newPrefs);
+      toast.success(isSelected ? "Tag removed" : "Tag added");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to save tags");
+    } finally {
+      setSavingTagPrefs(false);
     }
   }
 
@@ -702,7 +809,7 @@ export function ScreenerContent({
               <button
                 onClick={() => setCategoryOpen(!categoryOpen)}
                 className={`flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
-                  activeTab === "unknowable" || activeTab === "well_priced" || activeTab === "disputed" || activeTab === "uninformed" || activeTab === "under_5"
+                  activeTab === "unknowable" || activeTab === "well_priced" || activeTab === "disputed" || activeTab === "uninformed" || activeTab === "under_10" || activeTab === "under_2k_vol"
                     ? "bg-slate-700/60 text-white"
                     : "text-slate-500 hover:text-slate-400"
                 }`}
@@ -713,7 +820,8 @@ export function ScreenerContent({
               {categoryOpen && (
                 <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-slate-700/60 bg-slate-800 py-1 shadow-xl">
                   {[
-                    { tab: "under_5" as const, icon: Percent, label: "<5%", count: events.filter((e) => e.label === "under_5").length },
+                    { tab: "under_10" as const, icon: Percent, label: "<10%", count: events.filter((e) => e.label === "under_10").length },
+                    { tab: "under_2k_vol" as const, icon: DollarSign, label: "<2k VOL", count: events.filter((e) => e.label === "under_2k_vol").length },
                     { tab: "unknowable" as const, icon: HelpCircle, label: "Unknowable", count: events.filter((e) => e.label === "unknowable").length },
                     { tab: "well_priced" as const, icon: BadgeCheck, label: "Well-priced", count: events.filter((e) => e.label === "well_priced").length },
                     { tab: "disputed" as const, icon: AlertTriangle, label: "Disputed", count: events.filter((e) => e.label === "disputed").length },
@@ -741,6 +849,97 @@ export function ScreenerContent({
                 </div>
               )}
             </div>
+            <div className="relative" ref={tagsRef}>
+              <button
+                onClick={() => setTagsOpen(!tagsOpen)}
+                className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
+                  selectedTagPrefs.length > 0 ? "bg-slate-700/60 text-white" : "text-slate-500 hover:text-slate-400"
+                }`}
+                title="Select tags for refresh (Refresh fetches markets for selected tags only)"
+              >
+                <Tag className="h-4 w-4" />
+                <span className="hidden sm:inline">Tags</span>
+                {selectedTagPrefs.length > 0 && (
+                  <span className="rounded bg-slate-600/50 px-1.5 py-0.5 text-xs">{selectedTagPrefs.length}</span>
+                )}
+                <ChevronDown className={`h-4 w-4 transition-transform ${tagsOpen ? "rotate-180" : ""}`} />
+              </button>
+              {tagsOpen && (
+                <div className="absolute right-0 top-full z-20 mt-1 w-80 max-h-96 rounded-lg border border-slate-700/60 bg-slate-800 shadow-xl flex flex-col overflow-hidden">
+                  <div className="p-2 border-b border-slate-700/60 space-y-2">
+                    <input
+                      type="search"
+                      value={tagSearchInput}
+                      onChange={(e) => setTagSearchInput(e.target.value)}
+                      placeholder="Search tags (from DB)…"
+                      className="w-full rounded border border-slate-600/60 bg-slate-900/50 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-slate-500 focus:outline-none"
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setSyncingTags(true);
+                        try {
+                          const r = await fetch("/api/screener/tags/sync", { method: "POST" });
+                          const data = await r.json();
+                          if (!r.ok) throw new Error(data.error ?? "Sync failed");
+                          toast.success(`Synced ${data.count ?? 0} tags from Gamma`);
+                          const q = tagSearchInput.trim();
+                          const url = q ? `/api/screener/tags?q=${encodeURIComponent(q)}` : "/api/screener/tags";
+                          const res = await fetch(url);
+                          const tags = await res.json();
+                          if (Array.isArray(tags)) setAllTags(tags);
+                        } catch (e) {
+                          toast.error(e instanceof Error ? e.message : "Sync failed");
+                        } finally {
+                          setSyncingTags(false);
+                        }
+                      }}
+                      disabled={syncingTags}
+                      className="flex w-full items-center justify-center gap-2 rounded border border-slate-600/60 bg-slate-800/60 px-2 py-1.5 text-xs text-slate-300 hover:bg-slate-700/60 disabled:opacity-50"
+                    >
+                      {syncingTags ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                      Sync from Gamma
+                    </button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto min-h-[120px] max-h-64 p-1">
+                    {loadingTags ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
+                      </div>
+                    ) : (
+                      <div className="space-y-0.5">
+                        {allTags.map((tag) => {
+                          const isSelected = selectedTagPrefs.some((p) => p.tagId === tag.id);
+                          return (
+                            <button
+                              key={tag.id}
+                              type="button"
+                              onClick={() => handleToggleTagPreference(tag)}
+                              disabled={savingTagPrefs}
+                              className={`flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors ${
+                                isSelected ? "bg-indigo-500/20 text-indigo-300" : "text-slate-300 hover:bg-slate-700/60 hover:text-white"
+                              } disabled:opacity-50`}
+                            >
+                              <span className="truncate">{tag.label}</span>
+                              {isSelected && <span className="shrink-0 text-indigo-400">✓</span>}
+                            </button>
+                          );
+                        })}
+                        {!loadingTags && allTags.length === 0 && (
+                          <p className="py-4 text-center text-sm text-slate-500">No tags found</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {selectedTagPrefs.length > 0 && (
+                    <div className="border-t border-slate-700/60 p-2 text-xs text-slate-400">
+                      {selectedTagPrefs.length} tag{selectedTagPrefs.length !== 1 ? "s" : ""} selected · Refresh uses these only
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             <button
               onClick={handleRefresh}
               disabled={refreshing}
@@ -753,6 +952,26 @@ export function ScreenerContent({
               )}
               Refresh
             </button>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="text"
+                value={insertSlugInput}
+                onChange={(e) => setInsertSlugInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleInsertBySlug()}
+                placeholder="Add by slug…"
+                className="w-36 rounded-lg border border-slate-700/60 bg-slate-800/60 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-slate-600 focus:outline-none"
+                disabled={insertSlugLoading}
+              />
+              <button
+                onClick={handleInsertBySlug}
+                disabled={insertSlugLoading || !insertSlugInput.trim()}
+                className="flex items-center gap-1.5 rounded-lg border border-slate-700/60 bg-slate-800/60 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700/60 disabled:opacity-50"
+                title="Insert event(s) into discovery by Polymarket slug"
+              >
+                {insertSlugLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                Add
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -1044,8 +1263,10 @@ export function ScreenerContent({
               <Star className="h-8 w-8" />
             ) : activeTab === "traded" ? (
               <TrendingUp className="h-8 w-8" />
-            ) : activeTab === "under_5" ? (
+            ) : activeTab === "under_10" ? (
               <Percent className="h-8 w-8" />
+            ) : activeTab === "under_2k_vol" ? (
+              <DollarSign className="h-8 w-8" />
             ) : activeTab === "unknowable" ? (
               <HelpCircle className="h-8 w-8" />
             ) : activeTab === "disputed" ? (
@@ -1059,9 +1280,11 @@ export function ScreenerContent({
           <h3 className="mt-4 text-lg font-semibold text-white">
             {activeTab === "discovery"
               ? "No events in discovery"
-              : activeTab === "under_5"
-                ? "No <5% markets"
-                : activeTab === "evaluating"
+              : activeTab === "under_10"
+                ? "No <10% markets"
+                : activeTab === "under_2k_vol"
+                  ? "No <2k VOL markets"
+                  : activeTab === "evaluating"
                   ? "No evaluating markets"
                   : activeTab === "vetted"
                     ? "No vetted markets yet"
@@ -1078,9 +1301,11 @@ export function ScreenerContent({
           <p className="mt-2 text-slate-400">
             {activeTab === "discovery"
               ? "All events are labeled. Clear labels to add events to discovery."
-              : activeTab === "under_5"
-                ? "Markets with Yes or No probability <5%. Low priority (limited upside). Use Refresh to ingest new events."
-                : activeTab === "evaluating"
+              : activeTab === "under_10"
+                ? "Markets with Yes or No probability ≤10%. Low priority (limited upside). Use Refresh to ingest new events."
+                : activeTab === "under_2k_vol"
+                  ? "Markets with volume <$2k. Low liquidity. Use Refresh to ingest new events."
+                  : activeTab === "evaluating"
                   ? "Use the Evaluating button in Discovery to move markets here."
                   : activeTab === "vetted"
                     ? "Click the star on any market in Discovery to add it to vetted."
@@ -1119,7 +1344,8 @@ export function ScreenerContent({
               <span>
                 {displayedEvents.length} markets
                 {activeTab === "discovery" && " · sorted by probability closest to 50%"}
-                {activeTab === "under_5" && " <5% (low priority)"}
+                {activeTab === "under_10" && " <10% (low priority)"}
+                {activeTab === "under_2k_vol" && " <2k VOL (low volume)"}
                 {activeTab === "evaluating" && " evaluating"}
                 {activeTab === "vetted" && " vetted"}
                 {activeTab === "traded" && " traded"}

@@ -44,9 +44,9 @@ export function WealthTabsNav() {
 
   return (
     <nav className="border-b border-slate-800/60 bg-slate-900/40 backdrop-blur-sm">
-      <div className="flex w-full items-center justify-between gap-6 px-6 py-3 flex-nowrap overflow-x-auto">
+      <div className="relative flex w-full items-center justify-between gap-6 px-6 py-3 flex-nowrap overflow-x-auto">
         {/* Left: big categories — flush left */}
-        <div className="flex shrink-0 gap-1 whitespace-nowrap">
+        <div className="flex flex-1 shrink-0 gap-1 whitespace-nowrap">
           {BIG_CATEGORIES.map((tab) => {
             const active =
               tab.href === "/"
@@ -79,17 +79,23 @@ export function WealthTabsNav() {
           })}
         </div>
 
-        {/* Center: Wealth HQ */}
+        {/* Center: Wealth HQ — absolutely centered */}
         <Link
           href="/"
-          className="flex shrink-0 items-center gap-2 text-lg font-semibold tracking-tight text-white transition-opacity hover:opacity-90"
+          className="absolute left-1/2 -translate-x-1/2 flex shrink-0 items-center gap-2 text-lg font-semibold tracking-tight text-white transition-opacity hover:opacity-90"
         >
-          <Image src="/logo.svg" alt="" width={28} height={28} className="rounded-lg" />
+          <Image
+            src="/logo-diamond.svg"
+            alt=""
+            width={28}
+            height={28}
+            className="h-7 w-7 shrink-0 object-contain"
+          />
           Wealth HQ
         </Link>
 
         {/* Right: category-specific sub-nav — flush right, no wrap */}
-        <div className="flex shrink-0 gap-1 whitespace-nowrap">
+        <div className="flex flex-1 shrink-0 justify-end gap-1 whitespace-nowrap">
           {rightNavItems.map(({ href, label, icon: Icon }) => {
             const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
             return (

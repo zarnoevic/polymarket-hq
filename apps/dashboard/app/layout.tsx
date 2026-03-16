@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   title: "Wealth HQ",
   description: "Wealth dashboard: Polymarket, stocks, gold, and FX insights",
   icons: {
-    icon: "/logo.svg",
+    icon: "/logo-diamond.svg",
   },
 };
 
