@@ -105,6 +105,37 @@ model ScreenerTagExclusion {
   @@unique([tagId])
   @@map("screener_tag_exclusions")
 }
+// User-defined position categories (dashboard) - scoped by wallet
+model PositionCategory {
+  wallet    String   @map("wallet")
+  id        String   @map("id") // Client-generated id (e.g. cat_xxx)
+  name      String   @map("name")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  assignments PositionCategoryAssignment[]
+
+  @@id([wallet, id])
+  @@index([wallet])
+  @@map("position_categories")
+}
+
+// Position-to-category assignments (asset = token/position ID)
+model PositionCategoryAssignment {
+  id         String   @id @default(uuid()) @map("id")
+  wallet     String   @map("wallet")
+  asset      String   @map("asset")
+  categoryId String   @map("category_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  category PositionCategory @relation(fields: [wallet, categoryId], references: [wallet, id], onDelete: Cascade)
+
+  @@unique([wallet, asset])
+  @@index([wallet])
+  @@map("position_category_assignments")
+}
+
 
 // Placeholder for future Polymarket data sync
 model SyncLog {

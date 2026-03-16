@@ -339,7 +339,7 @@ function PieChartInner({
       </h3>
       <div className="flex min-h-0 flex-1 flex-col items-center gap-4 overflow-hidden">
         <div className="relative shrink-0">
-          <svg width={size} height={size} className="overflow-visible">
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="overflow-visible">
             {paths.map(({ d, color, i }) => (
               <path
                 key={i}

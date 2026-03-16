@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { loadPositionCategories, UNCategorized_ID } from "@/lib/position-categories";
+import { fetchPositionCategories, UNCategorized_ID } from "@/lib/position-categories";
 
 const CLOB_BASE = "https://clob.polymarket.com";
 
@@ -121,11 +121,11 @@ type CategorySlice = {
 
 type CategorySliceRaw = Omit<CategorySlice, "absShare"> & { rawShare: number };
 
-function loadCategoryData(wallet?: string): {
+async function loadCategoryData(wallet?: string): Promise<{
   positionToCategory: Record<string, string>;
   catNames: Record<string, string>;
-} {
-  const { categories, positionToCategory } = loadPositionCategories(wallet);
+}> {
+  const { categories, positionToCategory } = await fetchPositionCategories(wallet);
   const catNames: Record<string, string> = { [UNCategorized_ID]: "Uncategorized" };
   for (const c of categories) catNames[c.id] = c.name;
   return { positionToCategory, catNames };
@@ -152,7 +152,16 @@ export function CategoryAttributionPieChart({
     let cancelled = false;
     setLoading(true);
     const run = async () => {
-      const { positionToCategory, catNames } = loadCategoryData(wallet);
+      let positionToCategory: Record<string, string> = {};
+      let catNames: Record<string, string> = { [UNCategorized_ID]: "Uncategorized" };
+      try {
+        const data = await loadCategoryData(wallet);
+        positionToCategory = data.positionToCategory;
+        catNames = data.catNames;
+      } catch {
+        if (cancelled) return;
+        // On API failure: fall back to all Uncategorized so chart still renders
+      }
 
       const now = Math.floor(Date.now() / 1000);
       const SECONDS_24H = 24 * 60 * 60;
@@ -191,7 +200,10 @@ export function CategoryAttributionPieChart({
           pnl24h = pos.size * (priceNow - priceThen);
         }
 
-        const categoryId = positionToCategory[pos.asset] ?? UNCategorized_ID;
+        const categoryId =
+          positionToCategory[pos.asset] ??
+          positionToCategory[pos.yesId ?? ""] ??
+          UNCategorized_ID;
         return { categoryId, pnl24h, pos };
       });
 
@@ -361,9 +373,11 @@ function CategoryPieChartInner({
   const rOuter = size / 2 - 12;
   const rInner = rOuter * 0.55;
 
+  // Match working AttributionPieChart: use absShare directly. Avoid degenerate arc when pct=1 (SVG arc A→A renders as line)
   let acc = 0;
   const paths = slices.map((sl, i) => {
-    const pct = Math.max(0, Number(sl.absShare) || 0);
+    let pct = sl.absShare;
+    if (pct >= 0.9999) pct = 0.9999; // full circle arc is degenerate (same start/end)
     const startAngle = acc * 2 * Math.PI - Math.PI / 2;
     acc += pct;
     const endAngle = acc * 2 * Math.PI - Math.PI / 2;
@@ -393,7 +407,7 @@ function CategoryPieChartInner({
       </h3>
       <div className="flex min-h-0 flex-1 flex-col items-center gap-4 overflow-hidden">
         <div className="relative shrink-0">
-          <svg width={size} height={size} className="overflow-visible">
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="overflow-visible" preserveAspectRatio="xMidYMid meet">
             {paths.map(({ d, color, i }) => (
               <path
                 key={i}

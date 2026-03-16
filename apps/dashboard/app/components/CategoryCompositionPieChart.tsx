@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { loadPositionCategories, UNCategorized_ID } from "@/lib/position-categories";
+import { fetchPositionCategories, UNCategorized_ID } from "@/lib/position-categories";
 import { daysToResolution, computePAROINumeric } from "@/lib/position-metrics";
 
 type Position = {
@@ -67,16 +67,18 @@ type CompositionSlice = {
   title: string;
   investedAmount: number;
   share: number;
+  /** Normalized for rendering - each slice gets at least MIN_SHARE like working Attribution chart */
+  absShare: number;
   positionCount: number;
   color: string;
   icon?: string;
 };
 
-function loadCategoryData(wallet?: string): {
+async function loadCategoryData(wallet?: string): Promise<{
   positionToCategory: Record<string, string>;
   catNames: Record<string, string>;
-} {
-  const { categories, positionToCategory } = loadPositionCategories(wallet);
+}> {
+  const { categories, positionToCategory } = await fetchPositionCategories(wallet);
   const catNames: Record<string, string> = { [UNCategorized_ID]: "Uncategorized" };
   for (const c of categories) catNames[c.id] = c.name;
   return { positionToCategory, catNames };
@@ -100,81 +102,99 @@ export function CategoryCompositionPieChart({
       setLoading(false);
       return;
     }
-    const { positionToCategory, catNames } = loadCategoryData(wallet);
-
-    const byCategory = new Map<
-      string,
-      {
-        invested: number;
-        positions: Position[];
-      }
-    >();
-
-    for (const pos of positions) {
-      const categoryId = positionToCategory[pos.asset] ?? UNCategorized_ID;
-      const invested = getPositionValue(pos);
-
-      const cur = byCategory.get(categoryId);
-      if (!cur) {
-        byCategory.set(categoryId, { invested, positions: [pos] });
-      } else {
-        cur.invested += invested;
-        cur.positions.push(pos);
-      }
-    }
-
-    const computedTotal = Array.from(byCategory.values()).reduce(
-      (s, c) => s + c.invested,
-      0
-    );
-
-    const slicesArray: CompositionSlice[] = Array.from(byCategory.entries())
-      .map(([catId, { invested, positions: catPositions }], idx) => {
-        const share = computedTotal > 0 ? invested / computedTotal : 0;
-        const bestPos = catPositions.reduce((best, cur) => {
-          const days = daysToResolution(cur.endDate ?? "", cur.title);
-          const paroi = computePAROINumeric(cur.curPrice, days, cur.spread);
-          const bestDays = daysToResolution(best.endDate ?? "", best.title);
-          const bestParoi = computePAROINumeric(best.curPrice, bestDays, best.spread);
-          return paroi > bestParoi ? cur : best;
-        });
-
-        const totalInvestedCat = catPositions.reduce((s, pos) => s + getPositionValue(pos), 0);
-        const color = CATEGORY_COLORS[idx % CATEGORY_COLORS.length];
-
-        return {
-          title: catNames[catId] ?? catId,
-          investedAmount: totalInvestedCat,
-          share,
-          positionCount: catPositions.length,
-          color,
-          icon: bestPos.icon,
-        };
+    let cancelled = false;
+    loadCategoryData(wallet)
+      .then(({ positionToCategory, catNames }) => {
+        if (cancelled) return;
+        const byCategory = new Map<string, { invested: number; positions: Position[] }>();
+        for (const pos of positions) {
+          const categoryId =
+            positionToCategory[pos.asset] ??
+            positionToCategory[pos.yesId ?? ""] ??
+            UNCategorized_ID;
+          const invested = getPositionValue(pos);
+          const cur = byCategory.get(categoryId);
+          if (!cur) {
+            byCategory.set(categoryId, { invested, positions: [pos] });
+          } else {
+            cur.invested += invested;
+            cur.positions.push(pos);
+          }
+        }
+        const computedTotal = Array.from(byCategory.values()).reduce((s, c) => s + c.invested, 0);
+        const slicesRaw = Array.from(byCategory.entries()).map(
+          ([catId, { invested, positions: catPositions }], idx) => {
+            const share = computedTotal > 0 ? invested / computedTotal : 0;
+            const bestPos = catPositions.reduce((best, cur) => {
+              const days = daysToResolution(cur.endDate ?? "", cur.title);
+              const paroi = computePAROINumeric(cur.curPrice, days, cur.spread);
+              const bestDays = daysToResolution(best.endDate ?? "", best.title);
+              const bestParoi = computePAROINumeric(best.curPrice, bestDays, best.spread);
+              return paroi > bestParoi ? cur : best;
+            });
+            const totalInvestedCat = catPositions.reduce((s, pos) => s + getPositionValue(pos), 0);
+            const color = CATEGORY_COLORS[idx % CATEGORY_COLORS.length];
+            return {
+              title: catNames[catId] ?? catId,
+              investedAmount: totalInvestedCat,
+              share,
+              positionCount: catPositions.length,
+              color,
+              icon: bestPos.icon,
+            };
+          }
+        );
+        // Same logic as working AttributionPieChart: MIN_SHARE per slice, no bundling
+        const MIN_SHARE = 0.02;
+        const totalAdjusted = slicesRaw.reduce(
+          (s, sl) => s + Math.max(sl.share, MIN_SHARE),
+          0
+        );
+        const finalSlices: CompositionSlice[] = slicesRaw.map((sl) => ({
+          ...sl,
+          absShare:
+            totalAdjusted > 0
+              ? Math.max(sl.share, MIN_SHARE) / totalAdjusted
+              : 1 / slicesRaw.length,
+        })).sort((a, b) => b.share - a.share);
+        setSlices(finalSlices);
+        setTotalInvested(computedTotal);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          const catNames: Record<string, string> = { [UNCategorized_ID]: "Uncategorized" };
+          const byCategory = new Map<string, { invested: number; positions: Position[] }>();
+          for (const pos of positions) {
+            const invested = getPositionValue(pos);
+            const cur = byCategory.get(UNCategorized_ID);
+            if (!cur) {
+              byCategory.set(UNCategorized_ID, { invested, positions: [pos] });
+            } else {
+              cur.invested += invested;
+              cur.positions.push(pos);
+            }
+          }
+          const total = Array.from(byCategory.values()).reduce((s, c) => s + c.invested, 0);
+          setSlices(
+            Array.from(byCategory.entries()).map(([catId, { invested, positions: catPositions }], idx) => {
+              const share = total > 0 ? invested / total : 1;
+              return {
+                title: catNames[catId] ?? catId,
+                investedAmount: catPositions.reduce((s, p) => s + getPositionValue(p), 0),
+                share,
+                absShare: share,
+                positionCount: catPositions.length,
+                color: CATEGORY_COLORS[idx % CATEGORY_COLORS.length],
+                icon: catPositions[0]?.icon,
+              };
+            })
+          );
+          setTotalInvested(total);
+          setLoading(false);
+        }
       });
-
-    const MIN_SHARE = 0.001;
-    const aboveThreshold = slicesArray.filter((s) => s.share > MIN_SHARE);
-    const belowThreshold = slicesArray.filter((s) => s.share <= MIN_SHARE);
-    const otherInvested = belowThreshold.reduce((s, sl) => s + sl.investedAmount, 0);
-    const otherShare = computedTotal > 0 ? otherInvested / computedTotal : 0;
-
-    const slicesFinal =
-      otherInvested > 0 && belowThreshold.length > 0
-        ? [
-            ...aboveThreshold.sort((a, b) => b.share - a.share),
-            {
-              title: "Other",
-              investedAmount: otherInvested,
-              share: otherShare,
-              positionCount: belowThreshold.reduce((s, sl) => s + sl.positionCount, 0),
-              color: "#475569",
-            },
-          ]
-        : aboveThreshold.sort((a, b) => b.share - a.share);
-
-    setSlices(slicesFinal);
-    setTotalInvested(computedTotal);
-    setLoading(false);
+    return () => { cancelled = true; };
   }, [positions, wallet]);
 
   const cardClass =
@@ -227,9 +247,11 @@ function CompositionPieChartInner({
   const rOuter = size / 2 - 12;
   const rInner = rOuter * 0.55;
 
+  // Match working AttributionPieChart: use absShare directly. Avoid degenerate arc when pct=1 (SVG arc A→A renders as line)
   let acc = 0;
   const paths = slices.map((sl, i) => {
-    const pct = Math.max(0, Number(sl.share) || 0);
+    let pct = sl.absShare;
+    if (pct >= 0.9999) pct = 0.9999; // full circle arc is degenerate (same start/end)
     const startAngle = acc * 2 * Math.PI - Math.PI / 2;
     acc += pct;
     const endAngle = acc * 2 * Math.PI - Math.PI / 2;
@@ -259,7 +281,7 @@ function CompositionPieChartInner({
       </h3>
       <div className="flex min-h-0 flex-1 flex-col items-center gap-4 overflow-hidden">
         <div className="relative shrink-0">
-          <svg width={size} height={size} className="overflow-visible">
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="overflow-visible" preserveAspectRatio="xMidYMid meet">
             {paths.map(({ d, color, i }) => (
               <path
                 key={i}

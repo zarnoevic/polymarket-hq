@@ -7,42 +7,13 @@ import { formatRoi, computeROINumeric } from "@/lib/position-metrics";
 import { MetricTooltip } from "./MetricTooltip";
 import { METRIC_TOOLTIPS } from "@/lib/metric-tooltips";
 import { FolderPlus, GripVertical, Pencil, Trash2, RefreshCw } from "lucide-react";
-
-const UNCategorized_ID = "__uncategorized__";
-const STORAGE_KEY = "polymarket-position-categories";
+import {
+  fetchPositionCategories,
+  savePositionCategories,
+  UNCategorized_ID,
+} from "@/lib/position-categories";
 
 type Category = { id: string; name: string };
-type StoredData = {
-  categories: Category[];
-  positionToCategory: Record<string, string>;
-};
-
-function loadStored(wallet?: string): StoredData {
-  if (typeof window === "undefined")
-    return { categories: [], positionToCategory: {} };
-  try {
-    const key = wallet ? `${STORAGE_KEY}-${wallet}` : STORAGE_KEY;
-    const raw = localStorage.getItem(key);
-    if (!raw) return { categories: [], positionToCategory: {} };
-    const parsed = JSON.parse(raw) as StoredData;
-    return {
-      categories: Array.isArray(parsed.categories) ? parsed.categories : [],
-      positionToCategory: parsed.positionToCategory && typeof parsed.positionToCategory === "object" ? parsed.positionToCategory : {},
-    };
-  } catch {
-    return { categories: [], positionToCategory: {} };
-  }
-}
-
-function saveStored(data: StoredData, wallet?: string) {
-  if (typeof window === "undefined") return;
-  try {
-    const key = wallet ? `${STORAGE_KEY}-${wallet}` : STORAGE_KEY;
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch {
-    // ignore
-  }
-}
 
 function daysToResolution(endDateStr: string, title?: string): number | null {
   let d: Date | null = null;
@@ -196,14 +167,32 @@ export function CategorizedPositionsList({
   };
 
   useEffect(() => {
-    const stored = loadStored(wallet);
-    setCategories(stored.categories);
-    setPositionToCategory(stored.positionToCategory);
+    let cancelled = false;
+    fetchPositionCategories(wallet)
+      .then((stored) => {
+        if (!cancelled) {
+          setCategories(stored.categories);
+          setPositionToCategory(stored.positionToCategory);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCategories([]);
+          setPositionToCategory({});
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [wallet]);
 
   const persist = useCallback(
-    (cats: Category[], map: Record<string, string>) => {
-      saveStored({ categories: cats, positionToCategory: map }, wallet);
+    async (cats: Category[], map: Record<string, string>) => {
+      try {
+        await savePositionCategories({ categories: cats, positionToCategory: map }, wallet);
+      } catch {
+        // ignore save errors
+      }
     },
     [wallet]
   );
@@ -289,7 +278,10 @@ export function CategorizedPositionsList({
 
   const posByCategory = new Map<string, Position[]>();
   for (const pos of positions) {
-    const catId = positionToCategory[pos.asset] ?? UNCategorized_ID;
+    const catId =
+      positionToCategory[pos.asset] ??
+      positionToCategory[pos.yesId ?? ""] ??
+      UNCategorized_ID;
     const list = posByCategory.get(catId) ?? [];
     list.push(pos);
     posByCategory.set(catId, list);
