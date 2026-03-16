@@ -540,9 +540,10 @@ export function ScreenerContent({
   }
 
   async function handleSetLabel(eventId: string, label: LabelType) {
-    const idsToUpdate = alsoClassifySiblingsIds.has(eventId)
-      ? getSiblingIds(eventId)
-      : [eventId];
+    const idsToUpdate =
+      label !== "evaluating" && alsoClassifySiblingsIds.has(eventId)
+        ? getSiblingIds(eventId)
+        : [eventId];
     try {
       const results = await Promise.all(
         idsToUpdate.map((id) =>
@@ -1035,8 +1036,8 @@ export function ScreenerContent({
                 <ChevronDown className={`h-4 w-4 transition-transform ${categoryOpen ? "rotate-180" : ""}`} />
               </button>
               {categoryOpen && (
-                <div className="absolute right-0 top-full z-20 mt-1 w-52 rounded-lg border border-slate-700/60 bg-slate-800 py-1 shadow-xl">
-                  <div className="grid grid-cols-2 gap-0.5 px-1">
+                <div className="absolute right-0 top-full z-20 mt-1 max-h-[min(400px,80vh)] w-64 overflow-y-auto rounded-lg border border-slate-700/60 bg-slate-800 py-2 shadow-xl">
+                  <div className="grid grid-cols-1 gap-0.5 px-2">
                     {[
                       { tab: "under_10" as const, icon: Percent, label: "<10%", count: events.filter((e) => e.label === "under_10").length },
                       { tab: "under_2k_vol" as const, icon: DollarSign, label: "<2k VOL", count: events.filter((e) => e.label === "under_2k_vol").length },
@@ -1052,14 +1053,14 @@ export function ScreenerContent({
                           setActiveTab(tab);
                           setCategoryOpen(false);
                         }}
-                        className={`flex items-center gap-1.5 px-2 py-1 text-left text-xs ${
+                        className={`flex items-center gap-2 px-3 py-2 text-left text-sm ${
                           activeTab === tab ? "bg-slate-700/60 text-white rounded" : "text-slate-300 hover:bg-slate-700/60 hover:text-white rounded"
                         }`}
                       >
-                        <Icon className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate">{label}</span>
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span>{label}</span>
                         {count > 0 && (
-                          <span className="ml-auto shrink-0 rounded bg-slate-600/50 px-1 py-px text-[10px]">
+                          <span className="ml-auto shrink-0 rounded bg-slate-600/50 px-1.5 py-0.5 text-xs">
                             {count}
                           </span>
                         )}

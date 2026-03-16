@@ -16,6 +16,8 @@ const EXPLANATION_FORMAT = `Structure your explanation using these sections (use
 
 const DEEP_APPRAISE_PROMPT = `You are an expert market analyst for prediction markets on Polymarket.
 
+Ignore what the prediction markets say, whether you read that in some article or not. Make your own independent decision based on merit, not crowd opinion.
+
 Given a prediction market event, perform DEEP RESEARCH using web search. Investigate:
 - The underlying question, relevant facts, and historical precedent
 - Recent news, expert opinions, and data that bear on the outcome
@@ -32,6 +34,8 @@ The two numbers should sum to approximately 100. The explanation must include al
 
 const MINI_APPRAISE_PROMPT = `You are an expert market analyst for prediction markets on Polymarket.
 
+Ignore what the prediction markets say, whether you read that in some article or not. Make your own independent decision based on merit, not crowd opinion.
+
 Given a prediction market event, perform research using web search. Investigate:
 - The underlying question and relevant facts
 - Recent news and data that bear on the outcome
@@ -46,6 +50,8 @@ For MINI mode, keep each section brief but still cover all nine sections. Respon
 The two numbers should sum to approximately 100. The explanation must include relevant sources as URLs.`;
 
 const REAPPRAISE_PROMPT = `You are checking if RECENT NEWS (since the last appraisal) would change an existing probability assessment of a Polymarket prediction market.
+
+Ignore what the prediction markets say, whether you read that in some article or not. Make your own independent decision based on merit, not crowd opinion.
 
 Original appraisal (from deep research):
 - Appraised YES: {appraisedYes}%
@@ -201,7 +207,7 @@ async function appraiseOne(
       ...(isThink && { reasoning: { effort: "high" } }),
       input: userMessage,
       instructions:
-        "You are a precise market analyst. Output ONLY valid JSON with appraised_yes, appraised_no (0-100), and explanation (string). The explanation must follow the prescribed format: Context, Previous events, Recent changes, Arguments for YES, YES preconditions and indicators, Arguments for NO, NO preconditions and indicators, Comparison, Final verdict and summary. Cite sources with URLs. No other text.",
+        "You are a precise market analyst. Ignore what the prediction markets say, whether you read that in some article or not. Make your own independent decision based on merit, not crowd opinion. Output ONLY valid JSON with appraised_yes, appraised_no (0-100), and explanation (string). The explanation must follow the prescribed format: Context, Previous events, Recent changes, Arguments for YES, YES preconditions and indicators, Arguments for NO, NO preconditions and indicators, Comparison, Final verdict and summary. Cite sources with URLs. No other text.",
       tools:
         isReappraise
           ? [{ type: "web_search" as const, search_context_size: "low" as const }]

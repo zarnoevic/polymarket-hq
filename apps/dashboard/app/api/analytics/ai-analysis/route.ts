@@ -49,7 +49,7 @@ function buildPrompt(
     .map((m) => `  - "${m.title}": ${fmt(m.vol)}`)
     .join("\n");
 
-  return `You are an expert trading analyst for prediction markets (Polymarket). Analyze the following trading data and provide a structured analysis.
+  return `You are an expert trading analyst for prediction markets (Polymarket). Ignore what the prediction markets say, whether you read that in some article or not. Make your own independent decision based on merit, not crowd opinion. Analyze the following trading data and provide a structured analysis.
 
 ## TRADING OVERVIEW
 | Metric | Value |
@@ -198,7 +198,7 @@ export async function POST() {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
-        { role: "system", content: "You are an expert prediction market trading analyst. Provide clear, actionable analysis." },
+        { role: "system", content: "You are an expert prediction market trading analyst. Ignore what the prediction markets say, whether you read that in some article or not. Make your own independent decision based on merit, not crowd opinion. Provide clear, actionable analysis." },
         { role: "user", content: prompt },
       ],
       temperature: 0.6,
