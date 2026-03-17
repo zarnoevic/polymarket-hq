@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 
 const CLOB_BASE = "https://clob.polymarket.com";
 const HISTORY_DAYS = 7;
@@ -63,6 +64,24 @@ export function PriceHistorySparkline({
   entryPrice,
 }: SparklineProps) {
   const { history, loading, error } = usePriceHistory(tokenId);
+  const [hover, setHover] = useState<{ clientX: number; clientY: number; point: HistoryPoint; idx: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (history.length < 2 || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      if (rect.width < 2) return;
+      const x = e.clientX - rect.left;
+      const pct = Math.max(0, Math.min(1, x / rect.width));
+      const idx = Math.min(Math.floor(pct * (history.length - 1)), history.length - 1);
+      const point = history[Math.max(0, idx)]!;
+      setHover({ clientX: e.clientX, clientY: e.clientY, point, idx });
+    },
+    [history]
+  );
+
+  const handleMouseLeave = useCallback(() => setHover(null), []);
 
   if (!tokenId) return null;
   const sizeStyle = fill ? {} : { width: 72, height: 20 };
@@ -138,18 +157,25 @@ export function PriceHistorySparkline({
     entryDot = { cx: xScale(bestI), cy: yScale(history[bestI]!.p) };
   }
 
-  const tooltip = `${label} price: ${(prices[prices.length - 1]! * 100).toFixed(1)}%`;
+  const formatShortDate = (ts: number) =>
+    new Date(ts * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
   return (
-    <div className={`relative ${fill ? "w-full h-full" : ""}`} style={fill ? {} : { width: w, height: h }}>
+    <div
+      ref={containerRef}
+      className={`relative ${fill ? "w-full h-full" : ""}`}
+      style={fill ? {} : { width: w, height: h }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+    >
       <svg
         {...(fill ? { width: "100%", height: "100%" } : { width: w, height: h })}
         className={`rounded block ${className ?? ""}`}
         viewBox={`0 0 ${w} ${h}`}
         preserveAspectRatio="none"
-        aria-label={tooltip}
+        aria-label={`${label} price history`}
         role="img"
       >
-        <title>{tooltip}</title>
         <path
           d={pathD}
           fill="none"
@@ -161,6 +187,38 @@ export function PriceHistorySparkline({
           className={strokeClass}
         />
       </svg>
+      {hover &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className="pointer-events-none fixed z-[9999] px-2.5 py-1.5 rounded-md bg-slate-800/95 border border-slate-600 shadow-xl text-xs whitespace-nowrap backdrop-blur-sm"
+            style={{
+              left: hover.clientX,
+              top: hover.clientY - 10,
+              transform: "translate(-50%, -100%)",
+            }}
+          >
+            <span className="text-slate-400">{formatShortDate(hover.point.t)}</span>
+            <span className="mx-1.5 text-slate-600">·</span>
+            <span className="font-medium text-white">{(hover.point.p * 100).toFixed(1)}%</span>
+          </div>,
+          document.body
+        )}
+      {hover && (
+        <div
+          className="absolute rounded-full bg-yellow-400 border-2 border-yellow-300 pointer-events-none shadow-sm"
+          style={{
+            width: 8,
+            height: 8,
+            minWidth: 8,
+            minHeight: 8,
+            left: `${(xScale(hover.idx) / w) * 100}%`,
+            top: `${(yScale(hover.point.p) / h) * 100}%`,
+            transform: "translate(-50%, -50%)",
+          }}
+          aria-hidden
+        />
+      )}
       {entryDot != null && (
         <div
           className="absolute rounded-full bg-yellow-500 border border-yellow-700 pointer-events-none"

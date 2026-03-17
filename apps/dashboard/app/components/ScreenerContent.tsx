@@ -1533,7 +1533,21 @@ export function ScreenerContent({
                           )}
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <h3 className="font-medium text-white">{e.title}</h3>
+                              <h3 className="min-w-0 flex-1 font-medium text-white">{e.title}</h3>
+                              <button
+                                type="button"
+                                onClick={(ev) => {
+                                  ev.stopPropagation();
+                                  ev.preventDefault();
+                                  navigator.clipboard.writeText(e.title ?? "");
+                                  toast.success("Market name copied");
+                                }}
+                                className="inline-flex shrink-0 rounded p-0.5 text-slate-500 transition-colors hover:bg-slate-700/60 hover:text-slate-300"
+                                title="Copy market name"
+                                aria-label="Copy market name"
+                              >
+                                <Copy className="h-3.5 w-3.5" />
+                              </button>
                               {e.label != null && (
                                 <span className="rounded bg-slate-700/60 px-1.5 py-0.5 text-xs text-slate-400">
                                   {e.label.replace("_", "-")}
@@ -1969,7 +1983,23 @@ export function ScreenerContent({
                     />
                   )}
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-medium text-white">{e.title}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="min-w-0 flex-1 font-medium text-white">{e.title}</h3>
+                      <button
+                        type="button"
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                          ev.preventDefault();
+                          navigator.clipboard.writeText(e.title ?? "");
+                          toast.success("Market name copied");
+                        }}
+                        className="inline-flex shrink-0 rounded p-0.5 text-slate-500 transition-colors hover:bg-slate-700/60 hover:text-slate-300"
+                        title="Copy market name"
+                        aria-label="Copy market name"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                     {e.tags && Array.isArray(e.tags) && e.tags.length > 0 && (
                       <div className="mt-1 flex flex-wrap gap-1">
                         {(e.tags as Array<{ id?: string; label?: string; slug?: string }>).map((t, i) => {
@@ -1977,25 +2007,27 @@ export function ScreenerContent({
                           return (
                             <span
                               key={t.id ?? t.slug ?? `tag-${i}`}
-                              className="group/tag relative inline-flex rounded bg-slate-700/60 px-1.5 py-px text-[10px] text-slate-300"
+                              className={`group/tag relative inline-flex rounded bg-slate-700/60 px-1.5 py-px text-[10px] text-slate-300 ${tagId ? "cursor-pointer" : ""}`}
                             >
-                              {t.label ?? t.slug ?? t.id ?? "—"}
+                              <span
+                                className="block"
+                                onClick={
+                                  tagId
+                                    ? (ev) => {
+                                        ev.stopPropagation();
+                                        ev.preventDefault();
+                                        navigator.clipboard.writeText(tagId);
+                                        toast.success("Tag ID copied");
+                                      }
+                                    : undefined
+                                }
+                                title={tagId ? "Click to copy tag ID" : undefined}
+                              >
+                                {t.label ?? t.slug ?? t.id ?? "—"}
+                              </span>
                               {tagId && (
-                                <span className="absolute bottom-full left-1/2 z-10 mb-1 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-md bg-slate-800 px-2 py-1.5 text-xs text-slate-300 shadow-lg ring-1 ring-slate-700 opacity-0 transition-opacity group-hover/tag:opacity-100">
+                                <span className="absolute top-full left-1/2 z-10 mt-1 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-md bg-slate-800 px-2 py-1.5 text-xs text-slate-300 shadow-lg ring-1 ring-slate-700 opacity-0 transition-opacity group-hover/tag:opacity-100 pointer-events-none">
                                   <span className="font-mono">{tagId}</span>
-                                  <button
-                                    type="button"
-                                    onClick={(ev) => {
-                                      ev.stopPropagation();
-                                      ev.preventDefault();
-                                      navigator.clipboard.writeText(tagId);
-                                      toast.success("Tag ID copied");
-                                    }}
-                                    className="inline-flex rounded p-0.5 text-slate-400 hover:bg-slate-600 hover:text-white"
-                                    title="Copy ID"
-                                  >
-                                    <Copy className="h-3 w-3" />
-                                  </button>
                                 </span>
                               )}
                             </span>
