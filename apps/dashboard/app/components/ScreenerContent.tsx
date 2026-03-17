@@ -264,6 +264,7 @@ export function ScreenerContent({
   const [, setRefreshTick] = useState(0);
   const [appraisingIds, setAppraisingIds] = useState<Set<string>>(new Set());
   const [appraiseStartTimes, setAppraiseStartTimes] = useState<Map<string, number>>(new Map());
+  const appraiseAbortRef = useRef<Map<string, AbortController>>(new Map());
   const [, setElapsedTick] = useState(0);
   const [noteEditingId, setNoteEditingId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
@@ -715,12 +716,34 @@ export function ScreenerContent({
   const canReappraise = (e: ScreenerEvent) =>
     e.lastAppraised != null && e.appraisedYes != null && e.appraisedNo != null;
 
+  function handleCancelAppraise(eventId: string) {
+    const ac = appraiseAbortRef.current.get(eventId);
+    if (ac) {
+      ac.abort();
+      appraiseAbortRef.current.delete(eventId);
+    }
+    setAppraisingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(eventId);
+      return next;
+    });
+    setAppraiseStartTimes((prev) => {
+      const next = new Map(prev);
+      next.delete(eventId);
+      return next;
+    });
+    toast.info("Appraisal cancelled");
+  }
+
   async function handleAppraise(eventId: string, mode: "deep" | "mini" | "reappraise" | "think") {
     const ev = events.find((x) => x.id === eventId);
     if (mode === "reappraise" && ev && !canReappraise(ev)) {
       toast.error("Reappraise requires a previous appraisal");
       return;
     }
+
+    const ac = new AbortController();
+    appraiseAbortRef.current.set(eventId, ac);
 
     setAppraisingIds((prev) => new Set(prev).add(eventId));
     setAppraiseStartTimes((prev) => new Map(prev).set(eventId, Date.now()));
@@ -736,6 +759,7 @@ export function ScreenerContent({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ eventIds: [eventId], mode }),
+        signal: ac.signal,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Appraise failed");
@@ -750,9 +774,11 @@ export function ScreenerContent({
       const list = await listRes.json();
       if (Array.isArray(list)) setEvents(list);
     } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") return;
       const msg = e instanceof Error ? e.message : "Appraise failed";
       toast.error(msg);
     } finally {
+      appraiseAbortRef.current.delete(eventId);
       setAppraisingIds((prev) => {
         const next = new Set(prev);
         next.delete(eventId);
@@ -1596,6 +1622,15 @@ export function ScreenerContent({
                                   {appraisingIds.has(e.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCw className="h-3 w-3" />}
                                   Reappraise
                                 </button>
+                                {appraisingIds.has(e.id) && (
+                                  <button
+                                    onClick={() => handleCancelAppraise(e.id)}
+                                    className="flex items-center gap-1.5 rounded-lg border border-red-500/60 bg-red-500/20 px-3 py-1.5 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/30"
+                                  >
+                                    <X className="h-3 w-3" />
+                                    Cancel
+                                  </button>
+                                )}
                                 {e.description && (
                                   <button
                                     onClick={() => setRulesPopupEventId(e.id)}
@@ -2279,10 +2314,19 @@ export function ScreenerContent({
                         </span>
                       )}
                       {appraisingIds.has(e.id) && (
-                        <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/40 px-2.5 py-1.5 text-xs text-slate-400 tabular-nums">
-                          <Clock className="h-3 w-3 shrink-0" />
-                          {formatElapsed(e.id)}
-                        </span>
+                        <>
+                          <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/40 px-2.5 py-1.5 text-xs text-slate-400 tabular-nums">
+                            <Clock className="h-3 w-3 shrink-0" />
+                            {formatElapsed(e.id)}
+                          </span>
+                          <button
+                            onClick={() => handleCancelAppraise(e.id)}
+                            className="flex items-center gap-1.5 rounded-lg border border-red-500/60 bg-red-500/20 px-3 py-1.5 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/30"
+                          >
+                            <X className="h-3 w-3" />
+                            Cancel
+                          </button>
+                        </>
                       )}
                       {e.description && (
                         <button
