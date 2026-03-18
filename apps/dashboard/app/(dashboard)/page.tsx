@@ -20,6 +20,7 @@ import {
   Percent,
 } from "lucide-react";
 import { CategorizedPositionsList } from "@/app/components/CategorizedPositionsList";
+import { CategoryCompositionPieChart } from "@/app/components/CategoryCompositionPieChart";
 import { CopyAddress } from "@/app/components/CopyAddress";
 import { DashboardPieCharts } from "@/app/components/DashboardPieCharts";
 
@@ -312,10 +313,11 @@ export default async function HomePage() {
       />
 
       <div className="relative z-10 flex w-full flex-nowrap pt-4 pb-2">
-        {/* Left margin: total win (aligned with category by allocation), averages beneath */}
+        {/* Left margin: total win, averages, and by-category allocation */}
         <div className="flex flex-1 flex-col items-center justify-start gap-4 min-w-0 pt-4">
           {positions.length > 0 && (
-            <div className="inline-flex flex-col items-stretch gap-4">
+            <div className="flex flex-col items-center gap-4">
+              <div className="inline-flex flex-row flex-wrap items-stretch justify-center gap-4">
               <div className="overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 p-4 shadow-lg shadow-black/10">
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Total Win
@@ -372,7 +374,7 @@ export default async function HomePage() {
                       <BarChart3 className="h-4 w-4" strokeWidth={1.75} />
                     </div>
                     <div>
-                      <p className="text-xs text-slate-400">Chance of Total Win</p>
+                      <p className="text-xs text-slate-400">Odds of Total Win</p>
                       <p className="font-semibold text-beige">
                         {chanceTotalWin != null
                           ? `${(chanceTotalWin * 100).toFixed(2)}%`
@@ -385,7 +387,7 @@ export default async function HomePage() {
                       <BarChart3 className="h-4 w-4" strokeWidth={1.75} />
                     </div>
                     <div>
-                      <p className="text-xs text-slate-400">Initial Chance of Total Win</p>
+                      <p className="text-xs text-slate-400">Init Odds of Total Win</p>
                       <p className="font-semibold text-beige">
                         {initialChanceTotalWin != null
                           ? `${(initialChanceTotalWin * 100).toFixed(2)}%`
@@ -405,7 +407,7 @@ export default async function HomePage() {
                       <BarChart3 className="h-4 w-4" strokeWidth={1.75} />
                     </div>
                     <div>
-                      <p className="text-xs text-slate-400">Avg Betted Chance</p>
+                      <p className="text-xs text-slate-400">Avg Betted Odds</p>
                       <p className="font-semibold text-beige">
                         {avgBettedChance != null
                           ? `${(avgBettedChance * 100).toFixed(1)}%`
@@ -418,7 +420,7 @@ export default async function HomePage() {
                       <BarChart3 className="h-4 w-4" strokeWidth={1.75} />
                     </div>
                     <div>
-                      <p className="text-xs text-slate-400">Avg Current Chance</p>
+                      <p className="text-xs text-slate-400">Avg Current Odds</p>
                       <p className="font-semibold text-beige">
                         {avgCurrentChance != null
                           ? `${(avgCurrentChance * 100).toFixed(1)}%`
@@ -481,6 +483,11 @@ export default async function HomePage() {
                   </div>
                 </div>
               </div>
+              </div>
+              <CategoryCompositionPieChart
+                positions={positions}
+                wallet={process.env.POLYMARKET_MAIN_WALLET ?? DEFAULT_WALLET}
+              />
             </div>
           )}
         </div>

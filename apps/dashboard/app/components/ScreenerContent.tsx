@@ -1442,7 +1442,7 @@ export function ScreenerContent({
                 <Search className="h-4 w-4" />
                 <span>Search results: {searchResultsEvents.length} markets (all categories)</span>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {paginatedSearchResults.map((e) => {
                   const rightContent = e.appraisalExplanation
                     ? { title: "Appraisal explanation", text: e.appraisalExplanation }
@@ -1453,10 +1453,10 @@ export function ScreenerContent({
                   const displayCreatedAt = e.createdAt ?? (rawCreated || null);
                   const showAppraise = e.label != null;
                   return (
-                    <div key={`search-${e.id}`} className="flex w-full gap-4 items-stretch">
+                    <div key={`search-${e.id}`} className="flex w-full gap-3 items-stretch">
                       <div className="w-1/2 min-w-0 shrink-0 overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-700/60">
-                        <div className="flex gap-4 p-5">
-                          <div className="flex shrink-0 flex-col items-center gap-0.5 pt-1">
+                        <div className="flex gap-3 p-3">
+                          <div className="flex shrink-0 flex-col items-center gap-0.5">
                             <button
                               onClick={() => handleSetLabel(e.id, "evaluating")}
                               className={`rounded p-0.5 transition-colors ${e.label === "evaluating" ? "text-violet-400" : "text-slate-500 hover:text-violet-400/70"}`}
@@ -1538,7 +1538,7 @@ export function ScreenerContent({
                             )}
                           </div>
                           {(e.image ?? e.icon) && (
-                            <img src={e.image ?? e.icon ?? ""} alt="" className="h-14 w-14 shrink-0 rounded-lg object-cover" />
+                            <img src={e.image ?? e.icon ?? ""} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
                           )}
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
@@ -1572,7 +1572,7 @@ export function ScreenerContent({
                                 ))}
                               </div>
                             )}
-                            <div className="mt-1.5 flex w-full items-center gap-2 text-xs">
+                            <div className="mt-1 flex w-full items-center gap-2 text-xs">
                               <div className="flex shrink-0 flex-wrap items-center gap-2">
                                 <a
                                   href={`https://polymarket.com/event/${e.parentEventSlug ?? e.slug}`}
@@ -1608,23 +1608,23 @@ export function ScreenerContent({
                                 <PriceHistorySparkline tokenId={e.yesId ?? null} tint="yes" fill />
                               </div>
                             </div>
-                            <div className="mt-3 flex flex-wrap items-center gap-4">
+                            <div className="mt-2 flex flex-wrap items-center gap-3">
                               {(() => {
                                 const days = daysToResolution(e.endDate);
                                 return days != null ? (
-                                  <div>
-                                    <p className="text-xs text-slate-500">Days left</p>
-                                    <p className="font-mono font-medium text-slate-300">{days} {days === 1 ? "day" : "days"}</p>
+                                  <div className="leading-tight">
+                                    <p className="text-[11px] text-slate-500">Days left</p>
+                                    <p className="font-mono text-sm font-medium text-slate-300">{days} {days === 1 ? "day" : "days"}</p>
                                   </div>
                                 ) : null;
                               })()}
-                              <div>
-                                <p className="text-xs text-slate-500">Volume</p>
-                                <p className="font-mono font-medium text-beige">{formatCompact(e.volume)}</p>
+                              <div className="leading-tight">
+                                <p className="text-[11px] text-slate-500">Volume</p>
+                                <p className="font-mono text-sm font-medium text-beige">{formatCompact(e.volume)}</p>
                               </div>
-                              <div>
-                                <p className="text-xs text-slate-500">Liquidity</p>
-                                <p className="font-mono font-medium text-slate-300">{formatCompact(e.liquidity)}</p>
+                              <div className="leading-tight">
+                                <p className="text-[11px] text-slate-500">Liquidity</p>
+                                <p className="font-mono text-sm font-medium text-slate-300">{formatCompact(e.liquidity)}</p>
                               </div>
                             </div>
                             {showAppraise && (
@@ -1696,9 +1696,9 @@ export function ScreenerContent({
                           </div>
                         </div>
                       </div>
-                      <div className="w-1/2 min-w-0 shrink-0 rounded-xl border border-slate-700/60 bg-slate-800/30 p-5">
-                        <p className="mb-3 text-sm font-medium text-slate-400">{rightContent ? rightContent.title : "Market description"}</p>
-                        <div className="max-h-80 overflow-y-auto pr-2 text-sm leading-relaxed">
+                      <div className="w-1/2 min-w-0 shrink-0 rounded-xl border border-slate-700/60 bg-slate-800/30 p-3">
+                        <p className="mb-2 text-sm font-medium text-slate-400">{rightContent ? rightContent.title : "Market description"}</p>
+                        <div className="max-h-56 overflow-y-auto pr-2 text-sm leading-relaxed">
                           {rightContent ? <ExplanationText text={rightContent.text} /> : <span className="text-slate-500">No description available</span>}
                         </div>
                       </div>
@@ -1854,7 +1854,7 @@ export function ScreenerContent({
             )}
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-2">
             {paginatedDisplayedEvents.map((e) => {
               const rightContent = e.appraisalExplanation
                 ? { title: "Appraisal explanation", text: e.appraisalExplanation }
@@ -1874,10 +1874,10 @@ export function ScreenerContent({
                   })
                 : null;
               return (
-              <div key={e.id} className="flex w-full gap-4 items-stretch">
+              <div key={e.id} className="flex w-full gap-3 items-stretch">
                 <div className="w-1/2 min-w-0 shrink-0 overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-700/60">
-                <div className="flex gap-4 p-5">
-                  <div className="flex shrink-0 flex-col items-center gap-0.5 pt-1">
+                <div className="flex gap-3 p-3">
+                  <div className="flex shrink-0 flex-col items-center gap-0.5">
                     <button
                       onClick={() => handleSetLabel(e.id, "evaluating")}
                       className={`rounded p-0.5 transition-colors ${
@@ -1998,7 +1998,7 @@ export function ScreenerContent({
                     <img
                       src={e.image ?? e.icon ?? ""}
                       alt=""
-                      className="h-14 w-14 shrink-0 rounded-lg object-cover"
+                      className="h-10 w-10 shrink-0 rounded-lg object-cover"
                     />
                   )}
                   <div className="min-w-0 flex-1">
@@ -2020,7 +2020,7 @@ export function ScreenerContent({
                       </button>
                     </div>
                     {e.tags && Array.isArray(e.tags) && e.tags.length > 0 && (
-                      <div className="mt-1 flex flex-wrap gap-1">
+                      <div className="mt-0.5 flex flex-wrap gap-1">
                         {(e.tags as Array<{ id?: string; label?: string; slug?: string }>).map((t, i) => {
                           const tagId = t.id ?? t.slug ?? null;
                           return (
@@ -2054,7 +2054,7 @@ export function ScreenerContent({
                         })}
                       </div>
                     )}
-                    <div className="mt-1.5 flex w-full items-center gap-2 text-xs">
+                    <div className="mt-1 flex w-full items-center gap-2 text-xs">
                       <div className="flex shrink-0 flex-wrap items-center gap-2">
                         <a
                           href={`https://polymarket.com/event/${e.parentEventSlug ?? e.slug}`}
@@ -2094,47 +2094,47 @@ export function ScreenerContent({
                         <PriceHistorySparkline tokenId={e.yesId ?? null} tint="yes" fill />
                       </div>
                     </div>
-                    <div className="mt-3 flex flex-col gap-3">
-                      <div className="flex flex-wrap items-center gap-4">
+                    <div className="mt-2 flex flex-col gap-2">
+                      <div className="flex flex-wrap items-center gap-3">
                         {(() => {
                           const days = daysToResolution(e.endDate);
                           return days != null ? (
-                            <div>
-                              <p className="text-xs text-slate-500">Days left</p>
-                              <p className="font-mono font-medium text-slate-300">
+                            <div className="leading-tight">
+                              <p className="text-[11px] text-slate-500">Days left</p>
+                              <p className="font-mono text-sm font-medium text-slate-300">
                                 {days} {days === 1 ? "day" : "days"}
                               </p>
                             </div>
                           ) : null;
                         })()}
-                        <div>
-                          <p className="text-xs text-slate-500">Volume</p>
-                          <p className="font-mono font-medium text-beige">
+                        <div className="leading-tight">
+                          <p className="text-[11px] text-slate-500">Volume</p>
+                          <p className="font-mono text-sm font-medium text-beige">
                             {formatCompact(e.volume)}
                           </p>
                         </div>
-                        <div>
-                          <p className="text-xs text-slate-500">Liquidity</p>
-                          <p className="font-mono font-medium text-slate-300">
+                        <div className="leading-tight">
+                          <p className="text-[11px] text-slate-500">Liquidity</p>
+                          <p className="font-mono text-sm font-medium text-slate-300">
                             {formatCompact(e.liquidity)}
                           </p>
                         </div>
                         {e.yesId && (
-                          <div>
-                            <p className="text-xs text-slate-500">Spread</p>
+                          <div className="leading-tight">
+                            <p className="text-[11px] text-slate-500">Spread</p>
                             <SpreadLabel tokenId={e.noId} />
                           </div>
                         )}
                         {(e.yesId || e.noId) && (
-                          <div>
-                            <p className="text-xs text-slate-500">Fees</p>
+                          <div className="leading-tight">
+                            <p className="text-[11px] text-slate-500">Fees</p>
                             <MarketFees yesId={e.yesId ?? null} noId={e.noId ?? null} />
                           </div>
                         )}
                       </div>
                       {(e.probabilityYes != null || e.probabilityNo != null) && (
-                        <div className="flex items-center gap-3">
-                          <div className="min-w-[140px] flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className="min-w-[120px] flex flex-col gap-1.5">
                             <OrderBookLabel
                               tokenId={e.yesId ?? null}
                               probabilityYes={e.probabilityYes ?? null}
@@ -2160,7 +2160,7 @@ export function ScreenerContent({
                               </div>
                             )}
                           </div>
-                          <div className="flex shrink-0 gap-8">
+                          <div className="flex shrink-0 gap-5">
                             <div className="flex flex-col gap-0.5">
                               {(e.yev != null || e.nev != null) && (
                                 <div className="flex items-baseline gap-2">
@@ -2239,7 +2239,7 @@ export function ScreenerContent({
                         }, 400);
                       };
                       return (
-                    <div className="mt-2 flex flex-wrap items-center gap-3 rounded-lg border border-slate-700/60 bg-slate-800/30 px-3 py-2">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-3 rounded-lg border border-slate-700/60 bg-slate-800/30 px-2.5 py-1.5">
                       <button
                         type="button"
                         role="switch"
@@ -2459,9 +2459,9 @@ export function ScreenerContent({
                   </div>
                 </div>
                 </div>
-                <div className="w-1/2 min-w-0 shrink-0 rounded-xl border border-slate-700/60 bg-slate-800/30 p-5">
-                  <p className="mb-3 text-sm font-medium text-slate-400">{rightContent ? rightContent.title : "Market description"}</p>
-                  <div className="max-h-80 overflow-y-auto pr-2 text-sm leading-relaxed">
+                <div className="w-1/2 min-w-0 shrink-0 rounded-xl border border-slate-700/60 bg-slate-800/30 p-3">
+                  <p className="mb-2 text-sm font-medium text-slate-400">{rightContent ? rightContent.title : "Market description"}</p>
+                  <div className="max-h-56 overflow-y-auto pr-2 text-sm leading-relaxed">
                     {rightContent ? (
                       <ExplanationText text={rightContent.text} />
                     ) : (

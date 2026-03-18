@@ -1,7 +1,6 @@
 "use client";
 
 import type { Position } from "./PositionsList";
-import { CategoryCompositionPieChart } from "./CategoryCompositionPieChart";
 import { CategoryAttributionPieChart } from "./CategoryAttributionPieChart";
 import { AttributionPieChart } from "./AttributionPieChart";
 
@@ -14,9 +13,8 @@ export function DashboardPieCharts({
 }) {
   return (
     <div className="flex flex-col items-center gap-4">
-      <CategoryCompositionPieChart positions={positions} wallet={wallet} />
-      <CategoryAttributionPieChart positions={positions} wallet={wallet} />
       <AttributionPieChart positions={positions} />
+      <CategoryAttributionPieChart positions={positions} wallet={wallet} />
     </div>
   );
 }

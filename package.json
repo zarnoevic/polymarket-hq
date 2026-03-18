@@ -10,18 +10,9 @@
   "scripts": {
     "dev": "pnpm --filter @polymarket-hq/dashboard dev",
     "build": "pnpm --filter @polymarket-hq/dashboard build",
-    "start": "pnpm --filter @polymarket-hq/dashboard start",
-    "start:prod": "pnpm build && pnpm --filter @polymarket-hq/dashboard exec next start --port 4213",
-    "build:start": "pnpm build && pnpm --filter @polymarket-hq/dashboard exec next start --port 4213",
-    "prod": "pnpm build && pnpm --filter @polymarket-hq/dashboard exec next start --port 4213",
-    "gen": "prisma generate --schema=./libs/dashboard-prisma/schema.prisma",
-    "db:docker:up": "docker-compose up -d",
-    "db:docker:down": "docker-compose down",
-    "db:docker:logs": "docker-compose logs -f postgres",
-    "db:migrate": "prisma migrate dev --schema=./libs/dashboard-prisma/schema.prisma",
-    "db:migrate:deploy": "prisma migrate deploy --schema=./libs/dashboard-prisma/schema.prisma",
-    "sync-tags": "tsx scripts/sync-gamma-tags.ts",
-    "test": "pnpm --filter @polymarket-hq/dashboard test"
+    "prod": "rm -rf apps/dashboard/.next && pnpm build && pnpm --filter @polymarket-hq/dashboard exec next start --port 4213",
+    "test": "pnpm --filter @polymarket-hq/dashboard test",
+    "sync-tags": "tsx scripts/sync-gamma-tags.ts"
   },
   "devDependencies": {
     "@prisma/config": "6.19.2",
