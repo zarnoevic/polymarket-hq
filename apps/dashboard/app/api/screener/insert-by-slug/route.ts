@@ -62,13 +62,6 @@ function computeParoiNumeric(curPrice: number | null, days: number | null): numb
   return days == null || days <= 0 ? r : r * (365 / days);
 }
 
-function getEndDateMax(): Date {
-  const d = new Date();
-  d.setMonth(d.getMonth() + 3);
-  d.setHours(23, 59, 59, 999);
-  return d;
-}
-
 type GammaMarket = {
   id: string;
   question?: string;
@@ -175,16 +168,17 @@ export async function POST(req: Request) {
       );
     }
 
-    const endDateMax = getEndDateMax();
     const endDateMin = new Date();
     endDateMin.setUTCHours(0, 0, 0, 0);
 
+    // When adding by slug, include all active markets with valid future end date
+    // (no upper date limit—user explicitly requested this slug)
     const filtered = allMarkets.filter((m) => {
       if (m.active !== true || m.closed !== false) return false;
       const raw = (m.endDate ?? m.end_date) ?? null;
       if (!raw) return false;
       const d = new Date(raw);
-      return !isNaN(d.getTime()) && d >= endDateMin && d <= endDateMax;
+      return !isNaN(d.getTime()) && d >= endDateMin;
     });
 
     if (filtered.length === 0) {
