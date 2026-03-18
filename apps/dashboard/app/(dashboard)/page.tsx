@@ -15,7 +15,6 @@ import {
   Briefcase,
   ExternalLink,
   Brain,
-  Target,
   PiggyBank,
   Percent,
 } from "lucide-react";
@@ -287,14 +286,26 @@ export default async function HomePage() {
   const positionsSize = positions.reduce((s, p) => s + p.size, 0);
   const totalWinValue = (deployableCapital ?? 0) + positionsSize;
 
+  // 90c Value: total portfolio value if all NO positions are cashed out at $0.90 per share
+  const valueAt90c =
+    (deployableCapital ?? 0) +
+    positions.reduce((acc, p) => {
+      if (p.outcome?.toLowerCase() === "no") return acc + p.size * 0.9;
+      return acc + Math.abs(p.currentValue);
+    }, 0);
+
   const portfolioValue = (deployableCapital ?? 0) + (totalValue ?? 0);
   const positionsPct =
     portfolioValue > 0 && totalValue != null
       ? ((totalValue / portfolioValue) * 100)
       : null;
-  const totalWinROI =
+  const roi100c =
     portfolioValue > 0
       ? (totalWinValue - portfolioValue) / portfolioValue
+      : null;
+  const roi90c =
+    portfolioValue > 0
+      ? (valueAt90c - portfolioValue) / portfolioValue
       : null;
 
   const { chanceTotalWin, initialChanceTotalWin } =
@@ -328,9 +339,30 @@ export default async function HomePage() {
                       <Trophy className="h-4 w-4" strokeWidth={1.75} />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs text-slate-400">Value</p>
+                      <p className="text-xs text-slate-400">100¢ Value</p>
                       <p className="font-semibold text-emerald-400">
                         {formatCompact(totalWinValue)}
+                        {roi100c != null && (
+                          <span className="ml-1 font-normal text-emerald-400/90">
+                            ({formatRoi(roi100c)})
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400">
+                      <CircleDollarSign className="h-4 w-4" strokeWidth={1.75} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">90¢ Value</p>
+                      <p className="font-semibold text-emerald-400">
+                        {formatCompact(valueAt90c)}
+                        {roi90c != null && (
+                          <span className="ml-1 font-normal text-emerald-400/90">
+                            ({formatRoi(roi90c)})
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -355,17 +387,6 @@ export default async function HomePage() {
                         {positionsPct != null
                           ? `${positionsPct.toFixed(1)}%`
                           : "—"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400">
-                      <TrendingUp className="h-4 w-4" strokeWidth={1.75} />
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-400">Total Win ROI</p>
-                      <p className="font-semibold text-emerald-400">
-                        {totalWinROI != null ? formatRoi(totalWinROI) : "—"}
                       </p>
                     </div>
                   </div>

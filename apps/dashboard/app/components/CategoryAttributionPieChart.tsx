@@ -150,7 +150,8 @@ export function CategoryAttributionPieChart({
       return;
     }
     let cancelled = false;
-    setLoading(true);
+    const isInitialLoad = slices.length === 0;
+    if (isInitialLoad) setLoading(true);
     const run = async () => {
       let positionToCategory: Record<string, string> = {};
       let catNames: Record<string, string> = { [UNCategorized_ID]: "Uncategorized" };

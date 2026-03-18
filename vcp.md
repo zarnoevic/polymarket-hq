@@ -1,3 +1,5 @@
+volatility proxy
+
 rename to wealth hq everything
 
 fix analyses

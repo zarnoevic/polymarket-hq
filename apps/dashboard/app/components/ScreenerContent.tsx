@@ -832,14 +832,6 @@ export function ScreenerContent({
     }
   }
 
-  const handleRefreshRef = useRef(handleRefresh);
-  handleRefreshRef.current = handleRefresh;
-  useEffect(() => {
-    const handler = () => handleRefreshRef.current();
-    window.addEventListener("dashboard:refresh-on-visibility", handler);
-    return () => window.removeEventListener("dashboard:refresh-on-visibility", handler);
-  }, []);
-
   function extractSlugFromInput(input: string): string {
     const trimmed = input.trim();
     if (!trimmed) return "";

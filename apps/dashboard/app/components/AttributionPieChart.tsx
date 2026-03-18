@@ -124,7 +124,8 @@ export function AttributionPieChart({ positions }: { positions: Position[] }) {
       return;
     }
     let cancelled = false;
-    setLoading(true);
+    const isInitialLoad = slices.length === 0;
+    if (isInitialLoad) setLoading(true);
     const run = async () => {
       const now = Math.floor(Date.now() / 1000);
       const SECONDS_24H = 24 * 60 * 60;
