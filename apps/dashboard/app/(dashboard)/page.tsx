@@ -305,8 +305,8 @@ export default async function HomePage() {
       <div
         className="pointer-events-none fixed inset-0 opacity-[0.03]"
         style={{
-          backgroundImage: `linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px)`,
+          backgroundImage: `linear-gradient(rgba(230,230,225,.08) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(230,230,225,.08) 1px, transparent 1px)`,
           backgroundSize: "60px 60px",
         }}
       />
@@ -338,7 +338,7 @@ export default async function HomePage() {
                     </div>
                     <div>
                       <p className="text-xs text-slate-400">Positions</p>
-                      <p className="font-semibold text-white">
+                      <p className="font-semibold text-beige">
                         {positions.length}
                       </p>
                     </div>
@@ -349,7 +349,7 @@ export default async function HomePage() {
                     </div>
                     <div>
                       <p className="text-xs text-slate-400">Positions %</p>
-                      <p className="font-semibold text-white">
+                      <p className="font-semibold text-beige">
                         {positionsPct != null
                           ? `${positionsPct.toFixed(1)}%`
                           : "—"}
@@ -373,7 +373,7 @@ export default async function HomePage() {
                     </div>
                     <div>
                       <p className="text-xs text-slate-400">Chance of Total Win</p>
-                      <p className="font-semibold text-white">
+                      <p className="font-semibold text-beige">
                         {chanceTotalWin != null
                           ? `${(chanceTotalWin * 100).toFixed(2)}%`
                           : "—"}
@@ -386,7 +386,7 @@ export default async function HomePage() {
                     </div>
                     <div>
                       <p className="text-xs text-slate-400">Initial Chance of Total Win</p>
-                      <p className="font-semibold text-white">
+                      <p className="font-semibold text-beige">
                         {initialChanceTotalWin != null
                           ? `${(initialChanceTotalWin * 100).toFixed(2)}%`
                           : "—"}
@@ -406,7 +406,7 @@ export default async function HomePage() {
                     </div>
                     <div>
                       <p className="text-xs text-slate-400">Avg Betted Chance</p>
-                      <p className="font-semibold text-white">
+                      <p className="font-semibold text-beige">
                         {avgBettedChance != null
                           ? `${(avgBettedChance * 100).toFixed(1)}%`
                           : "—"}
@@ -419,7 +419,7 @@ export default async function HomePage() {
                     </div>
                     <div>
                       <p className="text-xs text-slate-400">Avg Current Chance</p>
-                      <p className="font-semibold text-white">
+                      <p className="font-semibold text-beige">
                         {avgCurrentChance != null
                           ? `${(avgCurrentChance * 100).toFixed(1)}%`
                           : "—"}
@@ -432,7 +432,7 @@ export default async function HomePage() {
                     </div>
                     <div>
                       <p className="text-xs text-slate-400">Avg CROI</p>
-                      <p className="font-semibold text-white">
+                      <p className="font-semibold text-beige">
                         {avgRoi != null ? formatRoi(avgRoi) : "—"}
                       </p>
                     </div>
@@ -443,7 +443,7 @@ export default async function HomePage() {
                     </div>
                     <div>
                       <p className="text-xs text-slate-400">Avg PROI</p>
-                      <p className="font-semibold text-white">
+                      <p className="font-semibold text-beige">
                         {avgProi != null ? formatRoi(avgProi) : "—"}
                       </p>
                     </div>
@@ -454,7 +454,7 @@ export default async function HomePage() {
                     </div>
                     <div>
                       <p className="text-xs text-slate-400">Avg Position Size</p>
-                      <p className="font-semibold text-white">
+                      <p className="font-semibold text-beige">
                         {formatCompact(avgPositionSize)}
                       </p>
                     </div>
@@ -497,12 +497,12 @@ export default async function HomePage() {
                         <Wallet className="h-7 w-7" strokeWidth={1.75} />
                       </div>
                       <div>
-                        <h2 className="text-xl font-semibold text-white">
+                        <h2 className="text-xl font-semibold text-beige">
                           <a
                             href={`https://polymarketanalytics.com/traders/${account.proxyWallet}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-white hover:text-indigo-300 transition-colors"
+                            className="text-beige hover:text-indigo-300 transition-colors"
                           >
                             {account.userName || "Anonymous"}
                           </a>
@@ -527,7 +527,7 @@ export default async function HomePage() {
                       </a>
                       <div className="flex items-center gap-2 rounded-lg bg-slate-800/80 px-4 py-2">
                         <Trophy className="h-5 w-5 text-amber-400" />
-                        <span className="font-mono text-lg font-bold text-white">
+                        <span className="font-mono text-lg font-bold text-beige">
                           #{Number(account.rank).toLocaleString()}
                         </span>
                       </div>
@@ -552,7 +552,7 @@ export default async function HomePage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-slate-400">Portfolio</p>
-                    <p className="text-2xl font-bold text-white">
+                    <p className="text-2xl font-bold text-beige">
                       {formatCompact(
                         (deployableCapital ?? 0) + (totalValue ?? 0)
                       )}
@@ -567,7 +567,7 @@ export default async function HomePage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-slate-400">Cash</p>
-                    <p className="text-2xl font-bold text-white">
+                    <p className="text-2xl font-bold text-beige">
                       {deployableCapital != null
                         ? formatCompact(deployableCapital)
                         : "—"}
@@ -582,7 +582,7 @@ export default async function HomePage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-slate-400">Positions</p>
-                    <p className="text-2xl font-bold text-white">
+                    <p className="text-2xl font-bold text-beige">
                       {totalValue != null
                         ? formatCompact(totalValue)
                         : "—"}
@@ -615,7 +615,7 @@ export default async function HomePage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-slate-400">Volume</p>
-                    <p className="text-2xl font-bold text-white">
+                    <p className="text-2xl font-bold text-beige">
                       {formatCompact(account.vol)}
                     </p>
                   </div>
@@ -637,7 +637,7 @@ export default async function HomePage() {
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-700/50 text-slate-500">
               <Wallet className="h-8 w-8" />
             </div>
-            <h3 className="mt-4 text-lg font-semibold text-white">
+            <h3 className="mt-4 text-lg font-semibold text-beige">
               No account data found
             </h3>
             <p className="mt-2 text-slate-400">

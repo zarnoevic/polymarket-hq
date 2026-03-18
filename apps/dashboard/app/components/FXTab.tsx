@@ -70,7 +70,7 @@ export function FXTab() {
     <div className="mx-auto max-w-xl px-6 py-8">
       <div className="rounded-2xl border border-slate-800/60 bg-slate-900/50 shadow-xl">
         <div className="border-b border-slate-700/50 px-6 py-4">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-beige">
             <ArrowLeftRight className="h-5 w-5 text-indigo-400" />
             EUR / RSD
           </h2>
@@ -85,7 +85,7 @@ export function FXTab() {
             <div className="space-y-6">
               <div className="rounded-xl border border-slate-700/50 bg-slate-800/30 p-6 text-center">
                 <p className="text-sm text-slate-500">Current rate</p>
-                <p className="mt-1 text-3xl font-bold text-white">
+                <p className="mt-1 text-3xl font-bold text-beige">
                   1 EUR = {data.rate.toFixed(2)} RSD
                 </p>
               </div>

@@ -126,11 +126,11 @@ export function PositionCard({
               className="inline-flex max-w-full shrink-0 items-center gap-1.5 text-sm hover:opacity-90"
               onClick={(e) => e.stopPropagation()}
             >
-              <span className="min-w-0 truncate font-medium text-white">{pos.title}</span>
+              <span className="min-w-0 truncate font-medium text-beige">{pos.title}</span>
               <ExternalLink className="h-3 w-3 shrink-0 text-indigo-400" />
             </a>
           ) : (
-            <h3 className="min-w-0 truncate text-sm font-medium text-white">{pos.title}</h3>
+            <h3 className="min-w-0 truncate text-sm font-medium text-beige">{pos.title}</h3>
           )}
           <span
             className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-medium ${

@@ -80,7 +80,7 @@ export function GoldTab() {
     <div className="mx-auto max-w-2xl px-6 py-8">
       <div className="rounded-2xl border border-slate-800/60 bg-slate-900/50 shadow-xl">
         <div className="border-b border-slate-700/50 px-6 py-4">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-beige">
             <Coins className="h-5 w-5 text-amber-400" />
             Gold Portfolio
           </h2>
@@ -98,7 +98,7 @@ export function GoldTab() {
                     value={grams}
                     onChange={(e) => setGrams(e.target.value)}
                     placeholder="e.g. 10"
-                    className="w-full rounded-lg border border-slate-700 bg-slate-800/80 px-4 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                    className="w-full rounded-lg border border-slate-700 bg-slate-800/80 px-4 py-2 text-beige placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
                   />
                 </div>
                 <div>
@@ -110,7 +110,7 @@ export function GoldTab() {
                     value={pricePerGram}
                     onChange={(e) => setPricePerGram(e.target.value)}
                     placeholder={currentGoldPrice ? currentGoldPrice.toFixed(2) : "e.g. 66"}
-                    className="w-full rounded-lg border border-slate-700 bg-slate-800/80 px-4 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                    className="w-full rounded-lg border border-slate-700 bg-slate-800/80 px-4 py-2 text-beige placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
                   />
                 </div>
                 <div>
@@ -119,13 +119,13 @@ export function GoldTab() {
                     type="date"
                     value={dateBought}
                     onChange={(e) => setDateBought(e.target.value)}
-                    className="w-full rounded-lg border border-slate-700 bg-slate-800/80 px-4 py-2 text-white focus:border-indigo-500 focus:outline-none"
+                    className="w-full rounded-lg border border-slate-700 bg-slate-800/80 px-4 py-2 text-beige focus:border-indigo-500 focus:outline-none"
                   />
                 </div>
                 <div className="flex items-end">
                   <button
                     type="submit"
-                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500"
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-beige hover:bg-amber-500"
                   >
                     <Plus className="h-4 w-4" />
                     Add
@@ -142,13 +142,13 @@ export function GoldTab() {
                   <div className="mb-6 grid gap-4 sm:grid-cols-3">
                     <div className="rounded-xl border border-slate-700/50 bg-slate-800/30 p-4">
                       <p className="text-xs text-slate-500">Cost basis</p>
-                      <p className="text-xl font-semibold text-white">
+                      <p className="text-xl font-semibold text-beige">
                         €{costBasis.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                       </p>
                     </div>
                     <div className="rounded-xl border border-slate-700/50 bg-slate-800/30 p-4">
                       <p className="text-xs text-slate-500">Current value</p>
-                      <p className="text-xl font-semibold text-white">
+                      <p className="text-xl font-semibold text-beige">
                         {currentValue != null
                           ? `€${currentValue.toLocaleString("en-US", { minimumFractionDigits: 2 })}`
                           : "—"}
@@ -193,7 +193,7 @@ export function GoldTab() {
                           <div className="flex items-center gap-3">
                             <Coins className="h-5 w-5 text-amber-400" />
                             <div>
-                              <p className="font-medium text-white">
+                              <p className="font-medium text-beige">
                                 {h.grams} g @ €{h.pricePerGram.toFixed(2)}/g
                               </p>
                               <p className="text-xs text-slate-500">
@@ -202,7 +202,7 @@ export function GoldTab() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="text-sm text-white">
+                            <p className="text-sm text-beige">
                               {curVal != null
                                 ? `€${curVal.toFixed(2)}`
                                 : "—"}

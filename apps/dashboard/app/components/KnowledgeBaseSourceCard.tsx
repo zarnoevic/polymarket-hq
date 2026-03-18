@@ -93,7 +93,7 @@ export function KnowledgeBaseSourceCard({
                 <ExternalLink className="h-3.5 w-3.5 opacity-70" />
               </a>
             ) : (
-              <span className={`font-medium ${read ? "text-slate-400 line-through" : "text-white"}`}>
+              <span className={`font-medium ${read ? "text-slate-400 line-through" : "text-beige"}`}>
                 {source.title}
               </span>
             )}

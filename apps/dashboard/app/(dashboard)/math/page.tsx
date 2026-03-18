@@ -50,7 +50,7 @@ function Section({
   return (
     <div className="overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50">
       <div className="border-b border-slate-700/50 px-6 py-4">
-        <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
+        <h2 className="flex items-center gap-2 text-lg font-semibold text-beige">
           <Icon className="h-5 w-5 text-indigo-400" />
           {title}
         </h2>
@@ -101,15 +101,15 @@ export default function MathPage() {
       <div
         className="pointer-events-none fixed inset-0 opacity-[0.03]"
         style={{
-          backgroundImage: `linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px)`,
+          backgroundImage: `linear-gradient(rgba(230,230,225,.08) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(230,230,225,.08) 1px, transparent 1px)`,
           backgroundSize: "60px 60px",
         }}
       />
 
       <div className="relative z-10 mx-auto max-w-4xl px-6 py-8">
         <div className="mb-8">
-          <h1 className="flex items-center gap-3 text-2xl font-semibold text-white">
+          <h1 className="flex items-center gap-3 text-2xl font-semibold text-beige">
             Polymarket Math Reference
           </h1>
           <p className="mt-2 text-slate-400">

@@ -185,7 +185,7 @@ export function VolatilityDaysEstimate({
           step={1}
           value={targetInput}
           onChange={(e) => setTargetInput(e.target.value)}
-          className="w-14 rounded border border-slate-600/60 bg-slate-900/50 px-2 py-1 text-xs font-mono text-white"
+          className="w-14 rounded border border-slate-600/60 bg-slate-900/50 px-2 py-1 text-xs font-mono text-beige"
         />
         <span className="text-xs text-slate-400">¢</span>
       </div>

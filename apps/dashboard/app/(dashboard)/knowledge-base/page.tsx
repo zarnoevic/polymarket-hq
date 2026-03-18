@@ -60,15 +60,15 @@ export default function KnowledgeBasePage() {
       <div
         className="pointer-events-none fixed inset-0 opacity-[0.03]"
         style={{
-          backgroundImage: `linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px)`,
+          backgroundImage: `linear-gradient(rgba(230,230,225,.08) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(230,230,225,.08) 1px, transparent 1px)`,
           backgroundSize: "60px 60px",
         }}
       />
 
       <div className="relative z-10 mx-auto max-w-5xl px-6 py-8">
         <div className="mb-6">
-          <h1 className="text-2xl font-semibold text-white">Knowledge Base</h1>
+          <h1 className="text-2xl font-semibold text-beige">Knowledge Base</h1>
           <p className="mt-1 text-slate-400">
             Information wars: Ukrainian war, Iran/Middle East, Taiwan. Wikipedia & books with read tracking and notes.
           </p>
@@ -81,8 +81,8 @@ export default function KnowledgeBasePage() {
               onClick={() => setActiveTab(tab)}
               className={`flex items-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-colors ${
                 activeTab === tab
-                  ? "bg-slate-700/60 text-white"
-                  : "text-slate-400 hover:bg-slate-700/60 hover:text-white"
+                  ? "bg-slate-700/60 text-beige"
+                  : "text-slate-400 hover:bg-slate-700/60 hover:text-beige"
               }`}
             >
               <span className="text-lg leading-none">{label.match(emojiPrefix)?.[0] ?? ""}</span>
@@ -94,7 +94,7 @@ export default function KnowledgeBasePage() {
         <div className="mt-6 overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-xl shadow-black/20 backdrop-blur-sm">
           <div className="border-b border-slate-700/50 px-6 py-4">
             <div>
-                <h2 className="text-lg font-semibold text-white">
+                <h2 className="text-lg font-semibold text-beige">
                   {theaterTabs.find((t) => t.tab === activeTab)?.label ?? activeTab}
                 </h2>
                 <p className="text-sm text-slate-400">

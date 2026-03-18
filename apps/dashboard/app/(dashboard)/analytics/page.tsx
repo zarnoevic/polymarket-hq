@@ -124,7 +124,7 @@ function MetricCard({
           <div className="flex items-center gap-1.5 truncate text-xs font-medium uppercase tracking-wider text-slate-500">
             {tooltip ? <MetricTooltip content={tooltip} trigger={titleEl} /> : titleEl}
           </div>
-          <p className="truncate font-semibold text-white">{value}</p>
+          <p className="truncate font-semibold text-beige">{value}</p>
           {sub && <p className="text-xs text-slate-500">{sub}</p>}
         </div>
       </div>
@@ -144,7 +144,7 @@ function MetricSection({
   return (
     <div className="overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50">
       <div className="border-b border-slate-700/50 px-5 py-4">
-        <h3 className="flex items-center gap-2 font-semibold text-white">
+        <h3 className="flex items-center gap-2 font-semibold text-beige">
           <Icon className="h-5 w-5 text-indigo-400" />
           {title}
         </h3>
@@ -196,8 +196,8 @@ export default async function AnalyticsPage() {
       <div
         className="pointer-events-none fixed inset-0 opacity-[0.03]"
         style={{
-          backgroundImage: `linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px)`,
+          backgroundImage: `linear-gradient(rgba(230,230,225,.08) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(230,230,225,.08) 1px, transparent 1px)`,
           backgroundSize: "60px 60px",
         }}
       />
@@ -382,7 +382,7 @@ export default async function AnalyticsPage() {
             {/* Top markets */}
             <div className="overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50">
               <div className="border-b border-slate-700/50 px-6 py-4">
-                <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
+                <h3 className="flex items-center gap-2 text-lg font-semibold text-beige">
                   <Layers className="h-5 w-5 text-indigo-400" />
                   Top markets by volume
                 </h3>
@@ -394,7 +394,7 @@ export default async function AnalyticsPage() {
                   .slice(0, 10)
                   .map((m, i) => (
                     <div key={m.title} className="flex items-center justify-between px-6 py-3">
-                      <span className="font-medium text-white">{m.title}</span>
+                      <span className="font-medium text-beige">{m.title}</span>
                       <span className="font-mono text-slate-400">{formatUsdOrCompact(m.vol, 0)}</span>
                     </div>
                   ))}
@@ -406,7 +406,7 @@ export default async function AnalyticsPage() {
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-700/50 text-slate-500">
               <BarChart3 className="h-8 w-8" />
             </div>
-            <h3 className="mt-4 text-lg font-semibold text-white">
+            <h3 className="mt-4 text-lg font-semibold text-beige">
               No trading activity found
             </h3>
             <p className="mt-2 text-slate-400">

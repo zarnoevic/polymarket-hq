@@ -93,7 +93,7 @@ export function AiAnalysisSection() {
     <div className="mb-8 overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-xl shadow-black/20">
       <div className="border-b border-slate-700/50 px-5 py-4">
         <div className="flex items-center justify-between gap-4">
-          <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
+          <h3 className="flex items-center gap-2 text-lg font-semibold text-beige">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-500/20 text-indigo-400">
               <Brain className="h-5 w-5" strokeWidth={1.75} />
             </div>
@@ -139,7 +139,7 @@ export function AiAnalysisSection() {
                   >
                     <FileText className="h-4 w-4 shrink-0 text-slate-500" />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-white">
+                      <p className="truncate text-sm font-medium text-beige">
                         Analysis
                       </p>
                       <p className="text-xs text-slate-500">
@@ -160,7 +160,7 @@ export function AiAnalysisSection() {
             <div className="relative max-h-[420px] overflow-y-auto p-5">
               <button
                 onClick={() => setSelectedId(null)}
-                className="absolute right-4 top-4 rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
+                className="absolute right-4 top-4 rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-beige"
                 aria-label="Close"
               >
                 <X className="h-5 w-5" />
@@ -168,7 +168,7 @@ export function AiAnalysisSection() {
               <p className="mb-4 text-xs text-slate-500">
                 {formatDate(selected.createdAt)}
               </p>
-              <div className="prose prose-invert prose-sm max-w-none prose-headings:text-white prose-p:text-slate-300 prose-li:text-slate-300 prose-strong:text-white">
+              <div className="prose prose-invert prose-sm max-w-none prose-headings:text-beige prose-p:text-slate-300 prose-li:text-slate-300 prose-strong:text-beige">
                 <ReactMarkdown>{selected.content}</ReactMarkdown>
               </div>
             </div>

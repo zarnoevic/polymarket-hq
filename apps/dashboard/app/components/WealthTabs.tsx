@@ -33,7 +33,7 @@ export function WealthTabs({ tabs }: { tabs: TabDef[] }) {
               className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
                 active === id
                   ? "bg-indigo-500/20 text-indigo-400"
-                  : "text-slate-400 hover:bg-slate-800/60 hover:text-white"
+                  : "text-slate-400 hover:bg-slate-800/60 hover:text-beige"
               }`}
             >
               <Icon className="h-4 w-4" />

@@ -1007,14 +1007,14 @@ export function ScreenerContent({
                   }
                 }}
                 placeholder="Search markets by id, slug, or name…"
-                className="w-full rounded-xl border border-slate-700/60 bg-slate-800/40 py-2.5 pl-10 pr-10 text-sm text-white placeholder-slate-500 focus:border-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-600"
+                className="w-full rounded-xl border border-slate-700/60 bg-slate-800/40 py-2.5 pl-10 pr-10 text-sm text-beige placeholder-slate-500 focus:border-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-600"
                 aria-label="Search markets by id, slug, or name"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-500 transition-colors hover:bg-slate-700/60 hover:text-white"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-500 transition-colors hover:bg-slate-700/60 hover:text-beige"
                   aria-label="Clear search"
                 >
                   <X className="h-4 w-4" />
@@ -1024,7 +1024,7 @@ export function ScreenerContent({
             <button
               type="button"
               onClick={() => searchInputRef.current?.focus()}
-              className="flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-700/60 bg-slate-800/60 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-700/60"
+              className="flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-700/60 bg-slate-800/60 px-4 py-2.5 text-sm font-medium text-beige transition-colors hover:bg-slate-700/60"
               aria-label="Search"
             >
               <Search className="h-4 w-4" />
@@ -1044,8 +1044,8 @@ export function ScreenerContent({
                   onClick={() => setActiveTab(tab)}
                   className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                     activeTab === tab
-                      ? "bg-slate-700/60 text-white"
-                      : "text-slate-400 hover:text-white"
+                      ? "bg-slate-700/60 text-beige"
+                      : "text-slate-400 hover:text-beige"
                   }`}
                 >
                   <Icon className="h-4 w-4" />
@@ -1063,7 +1063,7 @@ export function ScreenerContent({
                 onClick={() => setCategoryOpen(!categoryOpen)}
                 className={`flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
                   activeTab === "unknowable" || activeTab === "well_priced" || activeTab === "disputed" || activeTab === "uninformed" || activeTab === "under_10" || activeTab === "under_2k_vol" || activeTab === "spread_gt_5c"
-                    ? "bg-slate-700/60 text-white"
+                    ? "bg-slate-700/60 text-beige"
                     : "text-slate-500 hover:text-slate-400"
                 }`}
                 title="More categories"
@@ -1089,7 +1089,7 @@ export function ScreenerContent({
                           setCategoryOpen(false);
                         }}
                         className={`flex items-center gap-2 px-3 py-2 text-left text-sm ${
-                          activeTab === tab ? "bg-slate-700/60 text-white rounded" : "text-slate-300 hover:bg-slate-700/60 hover:text-white rounded"
+                          activeTab === tab ? "bg-slate-700/60 text-beige rounded" : "text-slate-300 hover:bg-slate-700/60 hover:text-beige rounded"
                         }`}
                       >
                         <Icon className="h-4 w-4 shrink-0" />
@@ -1110,7 +1110,7 @@ export function ScreenerContent({
                 onClick={() => setTagsOpen(!tagsOpen)}
                 className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
                   selectedTagPrefs.length > 0 || excludedTagPrefs.length > 0
-                    ? "bg-slate-700/60 text-white"
+                    ? "bg-slate-700/60 text-beige"
                     : "text-slate-500 hover:text-slate-400"
                 }`}
                 title="Select tags for refresh (Refresh fetches markets for selected tags only)"
@@ -1141,7 +1141,7 @@ export function ScreenerContent({
                       value={tagSearchInput}
                       onChange={(e) => setTagSearchInput(e.target.value)}
                       placeholder="Search tags (from DB)…"
-                      className="w-full rounded border border-slate-600/60 bg-slate-900/50 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-slate-500 focus:outline-none"
+                      className="w-full rounded border border-slate-600/60 bg-slate-900/50 px-3 py-2 text-sm text-beige placeholder-slate-500 focus:border-slate-500 focus:outline-none"
                       autoFocus
                     />
                     <button
@@ -1319,7 +1319,7 @@ export function ScreenerContent({
               <button
                 onClick={handleRefresh}
                 disabled={refreshing}
-                className="flex items-center gap-2 rounded-xl border border-slate-700/60 bg-slate-800/60 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-700/60 disabled:opacity-50"
+                className="flex items-center gap-2 rounded-xl border border-slate-700/60 bg-slate-800/60 px-4 py-2.5 text-sm font-medium text-beige transition-colors hover:bg-slate-700/60 disabled:opacity-50"
               >
                 {refreshing ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -1375,7 +1375,7 @@ export function ScreenerContent({
             <div className="relative" ref={addBySlugRef}>
               <button
                 onClick={() => setAddBySlugOpen(!addBySlugOpen)}
-                className="flex items-center gap-2 rounded-xl border border-slate-700/60 bg-slate-800/60 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-700/60"
+                className="flex items-center gap-2 rounded-xl border border-slate-700/60 bg-slate-800/60 px-4 py-2.5 text-sm font-medium text-beige transition-colors hover:bg-slate-700/60"
                 title="Add event(s) by Polymarket slug"
               >
                 <Plus className="h-4 w-4" />
@@ -1390,14 +1390,14 @@ export function ScreenerContent({
                     onChange={(e) => setInsertSlugInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleInsertBySlug()}
                     placeholder="Enter Polymarket slug or event URL…"
-                    className="w-full rounded-lg border border-slate-700/60 bg-slate-800/60 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-slate-600 focus:outline-none"
+                    className="w-full rounded-lg border border-slate-700/60 bg-slate-800/60 px-3 py-2 text-sm text-beige placeholder-slate-500 focus:border-slate-600 focus:outline-none"
                     disabled={insertSlugLoading}
                     autoFocus
                   />
                   <button
                     onClick={handleInsertBySlug}
                     disabled={insertSlugLoading || !insertSlugInput.trim()}
-                    className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-700/60 bg-slate-800/60 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700/60 disabled:opacity-50"
+                    className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-700/60 bg-slate-800/60 px-3 py-2 text-sm font-medium text-beige transition-colors hover:bg-slate-700/60 disabled:opacity-50"
                     title="Insert event(s) into discovery by Polymarket slug"
                   >
                     {insertSlugLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
@@ -1415,7 +1415,7 @@ export function ScreenerContent({
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-700/50 text-slate-500">
             <Filter className="h-8 w-8" />
           </div>
-          <h3 className="mt-4 text-lg font-semibold text-white">
+          <h3 className="mt-4 text-lg font-semibold text-beige">
             No events yet
           </h3>
           <p className="mt-2 text-slate-400">
@@ -1424,7 +1424,7 @@ export function ScreenerContent({
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-indigo-500 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-600 disabled:opacity-50"
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-indigo-500 px-5 py-2.5 text-sm font-medium text-beige transition-colors hover:bg-indigo-600 disabled:opacity-50"
           >
             {refreshing ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -1509,7 +1509,7 @@ export function ScreenerContent({
                             {e.label != null && (
                               <button
                                 onClick={() => handleSetLabel(e.id, null)}
-                                className="rounded p-0.5 text-slate-500 transition-colors hover:text-white"
+                                className="rounded p-0.5 text-slate-500 transition-colors hover:text-beige"
                                 title="Clear label (back to discovery)"
                               >
                                 <X className="h-5 w-5" />
@@ -1542,7 +1542,7 @@ export function ScreenerContent({
                           )}
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <h3 className="min-w-0 flex-1 font-medium text-white">{e.title}</h3>
+                              <h3 className="min-w-0 flex-1 font-medium text-beige">{e.title}</h3>
                               <button
                                 type="button"
                                 onClick={(ev) => {
@@ -1620,7 +1620,7 @@ export function ScreenerContent({
                               })()}
                               <div>
                                 <p className="text-xs text-slate-500">Volume</p>
-                                <p className="font-mono font-medium text-white">{formatCompact(e.volume)}</p>
+                                <p className="font-mono font-medium text-beige">{formatCompact(e.volume)}</p>
                               </div>
                               <div>
                                 <p className="text-xs text-slate-500">Liquidity</p>
@@ -1640,7 +1640,7 @@ export function ScreenerContent({
                                 <button
                                   onClick={() => handleAppraise(e.id, "reappraise")}
                                   disabled={appraisingIds.has(e.id) || e.lastAppraised == null}
-                                  className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-slate-700/60 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-beige transition-colors hover:bg-slate-700/60 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   {appraisingIds.has(e.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCw className="h-3 w-3" />}
                                   Reappraise
@@ -1757,7 +1757,7 @@ export function ScreenerContent({
               <BadgeCheck className="h-8 w-8" />
             )}
           </div>
-          <h3 className="mt-4 text-lg font-semibold text-white">
+          <h3 className="mt-4 text-lg font-semibold text-beige">
             {activeTab === "discovery"
               ? "No events in discovery"
               : activeTab === "under_10"
@@ -1806,7 +1806,7 @@ export function ScreenerContent({
           <button
             onClick={activeTab === "discovery" ? handleRefresh : () => setActiveTab("discovery")}
             disabled={activeTab === "discovery" && refreshing}
-            className="mt-6 inline-flex items-center gap-2 rounded-xl border border-slate-600/60 bg-slate-800/60 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-700/60 disabled:opacity-50"
+            className="mt-6 inline-flex items-center gap-2 rounded-xl border border-slate-600/60 bg-slate-800/60 px-5 py-2.5 text-sm font-medium text-beige transition-colors hover:bg-slate-700/60 disabled:opacity-50"
           >
             {activeTab === "discovery" ? (
               refreshing ? (
@@ -1962,7 +1962,7 @@ export function ScreenerContent({
                     {e.label != null && (
                       <button
                         onClick={() => handleSetLabel(e.id, null)}
-                        className="rounded p-0.5 text-slate-500 transition-colors hover:text-white"
+                        className="rounded p-0.5 text-slate-500 transition-colors hover:text-beige"
                         title="Clear label (back to discovery)"
                       >
                         <X className="h-5 w-5" />
@@ -2003,7 +2003,7 @@ export function ScreenerContent({
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="min-w-0 flex-1 font-medium text-white">{e.title}</h3>
+                      <h3 className="min-w-0 flex-1 font-medium text-beige">{e.title}</h3>
                       <button
                         type="button"
                         onClick={(ev) => {
@@ -2109,7 +2109,7 @@ export function ScreenerContent({
                         })()}
                         <div>
                           <p className="text-xs text-slate-500">Volume</p>
-                          <p className="font-mono font-medium text-white">
+                          <p className="font-mono font-medium text-beige">
                             {formatCompact(e.volume)}
                           </p>
                         </div>
@@ -2281,7 +2281,7 @@ export function ScreenerContent({
                             }
                           }}
                           placeholder={(e.traderAppraisedYes ?? e.appraisedYes) != null ? ((e.traderAppraisedYes ?? e.appraisedYes)! * 100).toString() : ""}
-                          className="w-16 rounded border border-slate-600/60 bg-slate-900/50 px-2 py-1 text-xs font-mono text-white"
+                          className="w-16 rounded border border-slate-600/60 bg-slate-900/50 px-2 py-1 text-xs font-mono text-beige"
                         />
                         <span className="text-xs text-slate-400">%</span>
                       </div>
@@ -2301,7 +2301,7 @@ export function ScreenerContent({
                               handleSetKelly(e.id, pVal / 100, cVal, def.position);
                             }
                           }}
-                          className="rounded border border-slate-600/60 bg-slate-900/50 px-2 py-1 text-xs font-mono text-white"
+                          className="rounded border border-slate-600/60 bg-slate-900/50 px-2 py-1 text-xs font-mono text-beige"
                         >
                           {kellyCOptions.map((n) => (
                             <option key={n} value={n}>
@@ -2367,7 +2367,7 @@ export function ScreenerContent({
                       <button
                         onClick={() => handleAppraise(e.id, "reappraise")}
                         disabled={appraisingIds.has(e.id) || e.lastAppraised == null}
-                        className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-slate-700/60 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-beige transition-colors hover:bg-slate-700/60 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {appraisingIds.has(e.id) ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
@@ -2512,10 +2512,10 @@ export function ScreenerContent({
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between border-b border-slate-700/60 px-5 py-3">
-                <h3 className="truncate font-medium text-white">{ev.title}</h3>
+                <h3 className="truncate font-medium text-beige">{ev.title}</h3>
                 <button
                   onClick={() => setRulesPopupEventId(null)}
-                  className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-700/60 hover:text-white"
+                  className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-700/60 hover:text-beige"
                   aria-label="Close"
                 >
                   <X className="h-5 w-5" />

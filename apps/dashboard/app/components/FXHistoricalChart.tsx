@@ -107,7 +107,7 @@ export function FXHistoricalChart({
         >
           <span className="text-slate-400">{hover.point.date}</span>
           <br />
-          <span className="font-semibold text-white">
+          <span className="font-semibold text-beige">
             1 EUR = {hover.point.rate.toFixed(2)} RSD
           </span>
         </div>

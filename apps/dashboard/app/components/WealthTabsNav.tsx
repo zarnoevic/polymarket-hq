@@ -59,7 +59,7 @@ export function WealthTabsNav() {
                 className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
                   active
                     ? "bg-indigo-500/20 text-indigo-400"
-                    : "text-slate-400 hover:bg-slate-800/60 hover:text-white"
+                    : "text-slate-400 hover:bg-slate-800/60 hover:text-beige"
                 }`}
               >
                 {"logo" in tab ? (
@@ -82,7 +82,7 @@ export function WealthTabsNav() {
         {/* Center: Wealth HQ — absolutely centered */}
         <Link
           href="/"
-          className="absolute left-1/2 -translate-x-1/2 flex shrink-0 items-center gap-2 text-lg font-semibold tracking-tight text-white transition-opacity hover:opacity-90"
+          className="absolute left-1/2 -translate-x-1/2 flex shrink-0 items-center gap-2 text-lg font-semibold tracking-tight text-beige transition-opacity hover:opacity-90"
         >
           <Image
             src="/diamond.svg"
@@ -106,7 +106,7 @@ export function WealthTabsNav() {
                 className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                   isActive
                     ? "bg-indigo-500/20 text-indigo-400"
-                    : "text-slate-400 hover:bg-slate-800/60 hover:text-white"
+                    : "text-slate-400 hover:bg-slate-800/60 hover:text-beige"
                 }`}
               >
                 <Icon className="h-4 w-4" />

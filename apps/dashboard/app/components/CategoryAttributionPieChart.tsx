@@ -421,7 +421,7 @@ function CategoryPieChartInner({
                 onMouseLeave={() => setHovered(null)}
                 onClick={() => handleSliceClick(i)}
                 style={{
-                  filter: active === i ? "drop-shadow(0 0 8px rgba(255,255,255,0.3))" : undefined,
+                  filter: active === i ? "drop-shadow(0 0 8px rgba(230,230,225,0.3))" : undefined,
                 }}
               />
             ))}
@@ -445,7 +445,7 @@ function CategoryPieChartInner({
               {selected != null && (
                 <p className="mb-1 text-[10px] uppercase tracking-wider text-slate-500">Click again to deselect</p>
               )}
-              <p className="text-sm font-medium text-slate-200 leading-snug">
+              <p className="text-sm font-medium text-beige leading-snug">
                 {activeSlice.title}
               </p>
               <div className="mt-2 flex flex-col items-center gap-1 text-sm">

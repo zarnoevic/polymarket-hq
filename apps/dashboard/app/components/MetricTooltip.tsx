@@ -49,12 +49,12 @@ export function MetricTooltip({ content, trigger }: MetricTooltipProps) {
       onMouseEnter={updatePositionAndShow}
       onMouseLeave={scheduleHide}
     >
-      <div className="rounded-xl border border-slate-600/60 bg-slate-800/98 px-4 py-3.5 shadow-2xl shadow-black/60 ring-1 ring-white/5 backdrop-blur-md">
+      <div className="rounded-xl border border-slate-600/60 bg-slate-800/98 px-4 py-3.5 shadow-2xl shadow-black/60 ring-1 ring-beige/5 backdrop-blur-md">
         <div className="space-y-2.5 text-[13px] leading-relaxed">
           {lines.map((line, i) => {
             if (line.startsWith("What:")) {
               return (
-                <p key={i} className="text-slate-200">
+                <p key={i} className="text-beige">
                   <span className="font-semibold text-indigo-400">What:</span>{" "}
                   {line.replace(/^What:\s*/, "").trim()}
                 </p>

@@ -5,8 +5,9 @@
 
 :root,
 html.dark {
-  --foreground-rgb: 226, 232, 240;
+  --foreground-rgb: 230, 230, 225;
   --foreground-muted-rgb: 148, 163, 184;
+  --beige-rgb: 230, 230, 225;
   --background-rgb: 3, 7, 18;
   --surface-rgb: 15, 23, 42;
   --accent-rgb: 99, 102, 241;

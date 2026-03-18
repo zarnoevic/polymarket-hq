@@ -200,7 +200,7 @@ export function PriceHistorySparkline({
           >
             <span className="text-slate-400">{formatShortDate(hover.point.t)}</span>
             <span className="mx-1.5 text-slate-600">·</span>
-            <span className="font-medium text-white">{(hover.point.p * 100).toFixed(1)}%</span>
+            <span className="font-medium text-beige">{(hover.point.p * 100).toFixed(1)}%</span>
           </div>,
           document.body
         )}

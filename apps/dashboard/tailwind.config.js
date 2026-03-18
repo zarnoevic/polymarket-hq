@@ -7,6 +7,9 @@ module.exports = {
       fontFamily: {
         sans: ["var(--font-dm-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
       },
+      colors: {
+        beige: "rgb(var(--beige-rgb))",
+      },
     },
   },
   plugins: [],

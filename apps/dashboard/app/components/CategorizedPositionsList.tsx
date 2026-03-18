@@ -286,12 +286,12 @@ export function CategorizedPositionsList({
                 if (e.key === "Escape") setAddMode(false);
               }}
               placeholder="Category name"
-              className="rounded border border-slate-700 bg-slate-800/80 px-2 py-1 text-sm text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+              className="rounded border border-slate-700 bg-slate-800/80 px-2 py-1 text-sm text-beige placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
               autoFocus
             />
             <button
               onClick={addCategory}
-              className="rounded bg-indigo-600 px-2 py-1 text-xs font-medium text-white hover:bg-indigo-500"
+              className="rounded bg-indigo-600 px-2 py-1 text-xs font-medium text-beige hover:bg-indigo-500"
             >
               Add
             </button>
@@ -350,7 +350,7 @@ export function CategorizedPositionsList({
                       if (e.key === "Enter") confirmEdit();
                       if (e.key === "Escape") setEditingCategoryId(null);
                     }}
-                    className="flex-1 rounded border border-slate-700 bg-slate-800 px-2 py-0.5 text-sm text-white focus:border-indigo-500 focus:outline-none"
+                    className="flex-1 rounded border border-slate-700 bg-slate-800 px-2 py-0.5 text-sm text-beige focus:border-indigo-500 focus:outline-none"
                     autoFocus
                   />
                   <button
