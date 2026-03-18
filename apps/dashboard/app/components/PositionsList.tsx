@@ -1,9 +1,10 @@
 "use client";
 
+import { ExternalLink } from "lucide-react";
 import { MetricTooltip } from "./MetricTooltip";
 import { PriceHistorySparkline } from "./PriceHistorySparkline";
 import { METRIC_TOOLTIPS } from "@/lib/metric-tooltips";
-import { formatRoi } from "@/lib/position-metrics";
+import { formatRoi, daysToResolution } from "@/lib/position-metrics";
 
 export type Position = {
   asset: string;
@@ -27,6 +28,8 @@ export type Position = {
   yesId?: string;
   /** Ask-bid spread for the outcome token (add to buy price for ROI/PAROI). */
   spread?: number | null;
+  /** Parent event slug (use for Polymarket link when market is child of event). */
+  eventSlug?: string | null;
 };
 
 function formatUsd(value: number, decimals = 0): string {
@@ -61,38 +64,6 @@ function formatPercent(value: number): string {
   return `${sign}${value.toFixed(1)}%`;
 }
 
-/** Extract date from title, e.g. "by March 15" or "March 31" */
-function parseDateFromTitle(title: string): Date | null {
-  const m = title.match(/(?:by\s+)?(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2})/i);
-  if (!m) return null;
-  const year = new Date().getFullYear();
-  const d = new Date(`${m[1]} ${m[2]}, ${year}`);
-  if (isNaN(d.getTime())) return null;
-  if (d < new Date()) d.setFullYear(year + 1); // if passed, assume next year
-  return d;
-}
-
-/** Days until resolution; null if endDate missing or in the past. Falls back to title when endDate empty. Uses UTC date diff. */
-function daysToResolution(endDateStr: string, title?: string): number | null {
-  let d: Date | null = null;
-  if (endDateStr) {
-    d = new Date(endDateStr);
-    if (isNaN(d.getTime())) {
-      const m = endDateStr.trim().replace(/,/g, "");
-      const year = new Date().getFullYear();
-      d = new Date(`${m} ${year}`);
-      if (isNaN(d.getTime())) d = new Date(`${m} ${year + 1}`);
-    }
-  }
-  if ((!d || isNaN(d.getTime())) && title) d = parseDateFromTitle(title);
-  if (!d || isNaN(d.getTime())) return null;
-  const now = new Date();
-  const resUtc = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
-  const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-  const days = Math.round((resUtc - todayUtc) / (24 * 60 * 60 * 1000));
-  return days > 0 ? Math.max(1, days) : null;
-}
-
 /** CROI (Cumulative ROI): simple (1 - buyPrice) / buyPrice, no annualization. */
 function computeCROI(avgPrice: number, spread?: number | null): string {
   const buyPrice = Math.min(0.99, avgPrice + (spread ?? 0));
@@ -109,31 +80,12 @@ function computePROI(curPrice: number, spread?: number | null): string {
   return Number.isFinite(r) ? formatRoi(r) : "—";
 }
 
-/** CAROI (Cumulative Annualized): r = (P1-P0)/P0, annual_return = r * (365/T). P0=entry+spread (buy price), P1=1. */
-function computeCAROI(avgPrice: number, days: number | null, spread?: number | null): string {
-  const buyPrice = Math.min(0.99, avgPrice + (spread ?? 0));
-  if (buyPrice <= 0) return "—";
-  if (days == null || days <= 0) return "—"; // need holding period to annualize
-  const r = (1 - buyPrice) / buyPrice;
-  return formatRoi(r * (365 / days));
-}
-
-/** PAROI (Present): returns numeric for sorting. Uses buyPrice = curPrice + spread. */
-function computePAROINumeric(curPrice: number, days: number | null, spread?: number | null): number {
+/** PROI numeric for sorting. Uses buyPrice = curPrice + spread. */
+function computePROINumeric(curPrice: number, spread?: number | null): number {
   const buyPrice = Math.min(0.99, curPrice + (spread ?? 0));
-  if (buyPrice <= 0) return -Infinity;
-  if (days == null || days <= 0) return -Infinity;
+  if (buyPrice <= 0 || buyPrice >= 1 || !Number.isFinite(buyPrice)) return -Infinity;
   const r = (1 - buyPrice) / buyPrice;
-  return r * (365 / days);
-}
-
-/** PAROI (Present Annualized): r = (P1-P0)/P0, annual_return = r * (365/T). P0=current+spread (buy price), P1=1. */
-function computePAROI(curPrice: number, days: number | null, spread?: number | null): string {
-  const buyPrice = Math.min(0.99, curPrice + (spread ?? 0));
-  if (buyPrice <= 0) return "—";
-  if (days == null || days <= 0) return "—"; // need holding period to annualize
-  const r = (1 - buyPrice) / buyPrice;
-  return formatRoi(r * (365 / days));
+  return Number.isFinite(r) ? r : -Infinity;
 }
 
 export function PositionCard({
@@ -148,16 +100,16 @@ export function PositionCard({
   const pos = position;
   const days = daysToResolution(pos.endDate, pos.title);
   const croi = computeCROI(pos.avgPrice, pos.spread);
-  const caroi = computeCAROI(pos.avgPrice, days, pos.spread);
   const proi = computePROI(pos.curPrice, pos.spread);
-  const paroi = computePAROI(pos.curPrice, days, pos.spread);
   const probabilityYes = pos.outcome.toLowerCase() === "yes" ? pos.curPrice : 1 - pos.curPrice;
   const probabilityNo = 1 - probabilityYes;
   const isYes = pos.outcome.toLowerCase() === "yes";
   const leftPct = isYes ? probabilityYes : probabilityNo;
   const rightPct = isYes ? probabilityNo : probabilityYes;
+  const eventSlug = pos.eventSlug?.trim() || pos.slug?.trim();
+  const marketUrl = eventSlug ? `https://polymarket.com/event/${eventSlug}` : null;
 
-  return (
+  const cardContent = (
     <div
       draggable={draggable}
       onDragStart={draggable ? (e) => onDragStart?.(e, pos.asset) : undefined}
@@ -166,7 +118,20 @@ export function PositionCard({
       <img src={pos.icon} alt="" className="h-9 w-9 shrink-0 rounded object-cover" />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="truncate text-sm font-medium text-white">{pos.title}</h3>
+          {marketUrl ? (
+            <a
+              href={marketUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex max-w-full shrink-0 items-center gap-1.5 text-sm hover:opacity-90"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span className="min-w-0 truncate font-medium text-white">{pos.title}</span>
+              <ExternalLink className="h-3 w-3 shrink-0 text-indigo-400" />
+            </a>
+          ) : (
+            <h3 className="min-w-0 truncate text-sm font-medium text-white">{pos.title}</h3>
+          )}
           <span
             className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-medium ${
               pos.outcome.toLowerCase() === "yes" ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
@@ -174,13 +139,15 @@ export function PositionCard({
           >
             {pos.outcome}
           </span>
-          {pos.endDate && <span className="text-xs text-slate-500">{pos.endDate}</span>}
+          {days != null && <span className="text-xs text-slate-500">{days} day{days !== 1 ? "s" : ""} left</span>}
         </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-4 text-xs">
           <span className="text-slate-400">
-            {formatCompactNum(pos.size)} @ {(pos.avgPrice * 100).toFixed(2)}¢ | {(pos.curPrice * 100).toFixed(2)}¢
+            {formatCompactNum(pos.size)} @ {(pos.avgPrice * 100).toFixed(2)}¢ → {(pos.curPrice * 100).toFixed(2)}¢
           </span>
-          <span className="text-slate-300">
+          <span className="text-slate-400">
+            {Math.abs(pos.initialValue) >= 1_000 ? formatCompactUsd(pos.initialValue, 0) : formatUsd(pos.initialValue, 2)}
+            <span className="text-slate-600 mx-1">→</span>
             {Math.abs(pos.currentValue) >= 1_000 ? formatCompactUsd(pos.currentValue, 0) : formatUsd(pos.currentValue, 2)}
           </span>
           <span
@@ -191,16 +158,11 @@ export function PositionCard({
             {formatPercent(pos.percentPnl)})
           </span>
           <span className="inline-flex items-center gap-1 text-slate-400">
-            <MetricTooltip content={METRIC_TOOLTIPS.CROI} trigger="CROI" /> {croi}
-          </span>
-          <span className="inline-flex items-center gap-1 text-slate-400">
-            <MetricTooltip content={METRIC_TOOLTIPS.CAROI} trigger="CAROI" /> {caroi}
-          </span>
-          <span className="inline-flex items-center gap-1 text-slate-400">
-            <MetricTooltip content={METRIC_TOOLTIPS.PROI} trigger="PROI" /> {proi}
-          </span>
-          <span className="inline-flex items-center gap-1 text-slate-400">
-            <MetricTooltip content={METRIC_TOOLTIPS.PAROI} trigger="PAROI" /> {paroi}
+            <MetricTooltip
+              content={`CROI (entry): ${METRIC_TOOLTIPS.CROI}\n\nPROI (current): ${METRIC_TOOLTIPS.PROI}`}
+              trigger="ROI"
+            />{" "}
+            {croi} → {proi}
           </span>
         </div>
       </div>
@@ -235,15 +197,15 @@ export function PositionCard({
       </div>
     </div>
   );
+
+  return cardContent;
 }
 
 export function PositionsList({ positions }: { positions: Position[] }) {
   const sorted = [...positions].sort((a, b) => {
-    const daysA = daysToResolution(a.endDate, a.title);
-    const daysB = daysToResolution(b.endDate, b.title);
-    const paroiA = computePAROINumeric(a.curPrice, daysA, a.spread);
-    const paroiB = computePAROINumeric(b.curPrice, daysB, b.spread);
-    return paroiB - paroiA; // descending: highest PAROI first
+    const proiA = computePROINumeric(a.curPrice, a.spread);
+    const proiB = computePROINumeric(b.curPrice, b.spread);
+    return proiB - proiA; // descending: highest PROI first
   });
 
   return (

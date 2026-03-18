@@ -48,21 +48,18 @@ function computePROINumeric(curPrice: number, spread?: number | null): number | 
   return Number.isFinite(r) ? r : null;
 }
 
-function computePAROINumeric(curPrice: number, days: number | null, spread?: number | null): number {
+function computePROINumericForSort(curPrice: number, spread?: number | null): number {
   const buyPrice = Math.min(0.99, curPrice + (spread ?? 0));
-  if (buyPrice <= 0) return -Infinity;
-  if (days == null || days <= 0) return -Infinity;
+  if (buyPrice <= 0 || buyPrice >= 1 || !Number.isFinite(buyPrice)) return -Infinity;
   const r = (1 - buyPrice) / buyPrice;
-  return r * (365 / days);
+  return Number.isFinite(r) ? r : -Infinity;
 }
 
-function sortByPAROI(positions: Position[]): Position[] {
+function sortByPROI(positions: Position[]): Position[] {
   return [...positions].sort((a, b) => {
-    const daysA = daysToResolution(a.endDate, a.title);
-    const daysB = daysToResolution(b.endDate, b.title);
-    const paroiA = computePAROINumeric(a.curPrice, daysA, a.spread);
-    const paroiB = computePAROINumeric(b.curPrice, daysB, b.spread);
-    return paroiB - paroiA;
+    const proiA = computePROINumericForSort(a.curPrice, a.spread);
+    const proiB = computePROINumericForSort(b.curPrice, b.spread);
+    return proiB - proiA;
   });
 }
 
@@ -79,64 +76,45 @@ function formatCompactUsd(value: number, decimals = 0): string {
   }).format(value);
 }
 
-function computeCAROINumeric(avgPrice: number, days: number | null, spread?: number | null): number {
-  const buyPrice = Math.min(0.99, avgPrice + (spread ?? 0));
-  if (buyPrice <= 0 || days == null || days <= 0) return -Infinity;
-  const r = (1 - buyPrice) / buyPrice;
-  return r * (365 / days);
-}
-
 function computeCategoryMetrics(posList: Position[]): {
-  totalValue: number;
+  totalInitialValue: number;
+  totalCurrentValue: number;
   totalReturn: number;
+  returnPct: number | null;
   croi: string;
-  caroi: string;
   proi: string;
-  paroi: string;
 } {
   if (posList.length === 0) {
-    return { totalValue: 0, totalReturn: 0, croi: "—", caroi: "—", proi: "—", paroi: "—" };
+    return { totalInitialValue: 0, totalCurrentValue: 0, totalReturn: 0, returnPct: null, croi: "—", proi: "—" };
   }
-  const totalValue = posList.reduce((s, p) => s + Math.abs(p.currentValue), 0);
+  const totalInitialValue = posList.reduce((s, p) => s + Math.abs(p.initialValue), 0);
+  const totalCurrentValue = posList.reduce((s, p) => s + Math.abs(p.currentValue), 0);
   const totalReturn = posList.reduce((s, p) => s + p.cashPnl, 0);
+  const returnPct =
+    totalInitialValue > 0 && Number.isFinite(totalReturn / totalInitialValue)
+      ? (totalReturn / totalInitialValue) * 100
+      : null;
   let croiSum = 0;
   let croiWeight = 0;
-  let caroiSum = 0;
-  let caroiWeight = 0;
   let proiSum = 0;
   let proiWeight = 0;
-  let paroiSum = 0;
-  let paroiWeight = 0;
   for (const pos of posList) {
     const val = Math.abs(pos.currentValue);
     if (val <= 0) continue;
-    const days = daysToResolution(pos.endDate, pos.title);
     const cro = computeROINumeric(pos.avgPrice, pos.spread); // CROI = (1 - buyPrice) / buyPrice at entry
-    const c = computeCAROINumeric(pos.avgPrice, days, pos.spread);
     const pro = computePROINumeric(pos.curPrice, pos.spread);
-    const p = computePAROINumeric(pos.curPrice, days, pos.spread);
     if (cro != null) {
       croiSum += cro * val;
       croiWeight += val;
-    }
-    if (Number.isFinite(c) && c > -Infinity) {
-      caroiSum += c * val;
-      caroiWeight += val;
     }
     if (pro != null) {
       proiSum += pro * val;
       proiWeight += val;
     }
-    if (Number.isFinite(p) && p > -Infinity) {
-      paroiSum += p * val;
-      paroiWeight += val;
-    }
   }
   const croi = croiWeight > 0 ? formatRoi(croiSum / croiWeight) : "—";
-  const caroi = caroiWeight > 0 ? formatRoi(caroiSum / caroiWeight) : "—";
   const proi = proiWeight > 0 ? formatRoi(proiSum / proiWeight) : "—";
-  const paroi = paroiWeight > 0 ? formatRoi(paroiSum / paroiWeight) : "—";
-  return { totalValue, totalReturn, croi, caroi, proi, paroi };
+  return { totalInitialValue, totalCurrentValue, totalReturn, returnPct, croi, proi };
 }
 
 export function CategorizedPositionsList({
@@ -346,7 +324,7 @@ export function CategorizedPositionsList({
       </div>
 
       {categoryList.map((cat) => {
-        const posList = sortByPAROI(posByCategory.get(cat.id) ?? []);
+        const posList = sortByPROI(posByCategory.get(cat.id) ?? []);
         const metrics = computeCategoryMetrics(posList);
         const isUncategorized = cat.id === UNCategorized_ID;
 
@@ -389,25 +367,28 @@ export function CategorizedPositionsList({
                   {posList.length > 0 && (
                     <div className="ml-3 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs">
                       <span className="font-mono text-slate-400">
-                        Value {formatCompactUsd(metrics.totalValue, 0)}
+                        {formatCompactUsd(metrics.totalInitialValue, 0)} →{" "}
+                        {formatCompactUsd(metrics.totalCurrentValue, 0)}
                       </span>
                       <span
                         className={`font-mono ${metrics.totalReturn >= 0 ? "text-emerald-400" : "text-red-400"}`}
                       >
-                        Return {metrics.totalReturn >= 0 ? "+" : ""}
+                        {metrics.totalReturn >= 0 ? "+" : ""}
                         {formatCompactUsd(metrics.totalReturn, 0)}
+                        {metrics.returnPct != null && (
+                          <>
+                            {" "}
+                            ({metrics.returnPct >= 0 ? "+" : ""}
+                            {metrics.returnPct.toFixed(1)}%)
+                          </>
+                        )}
                       </span>
                       <span className="inline-flex items-center gap-1 font-mono text-slate-400">
-                        <MetricTooltip content={METRIC_TOOLTIPS.CROI} trigger="CROI" /> {metrics.croi}
-                      </span>
-                      <span className="inline-flex items-center gap-1 font-mono text-slate-400">
-                        <MetricTooltip content={METRIC_TOOLTIPS.CAROI} trigger="CAROI" /> {metrics.caroi}
-                      </span>
-                      <span className="inline-flex items-center gap-1 font-mono text-slate-400">
-                        <MetricTooltip content={METRIC_TOOLTIPS.PROI} trigger="PROI" /> {metrics.proi}
-                      </span>
-                      <span className="inline-flex items-center gap-1 font-mono text-slate-400">
-                        <MetricTooltip content={METRIC_TOOLTIPS.PAROI} trigger="PAROI" /> {metrics.paroi}
+                        <MetricTooltip
+                          content={`CROI (entry): ${METRIC_TOOLTIPS.CROI}\n\nPROI (current): ${METRIC_TOOLTIPS.PROI}`}
+                          trigger="ROI"
+                        />{" "}
+                        {metrics.croi} → {metrics.proi}
                       </span>
                     </div>
                   )}

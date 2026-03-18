@@ -118,40 +118,41 @@ export function formatRoi(roi: number): string {
   return `${sign}${Math.abs(pct).toFixed(1)}%`;
 }
 
+/** PROI numeric: (1 - buyPrice) / buyPrice where buyPrice = curPrice + spread (present). */
+function computePROINumeric(curPrice: number, spread?: number | null): number | null {
+  const buyPrice = Math.min(0.99, curPrice + (spread ?? 0));
+  if (buyPrice <= 0 || buyPrice >= 1 || !Number.isFinite(buyPrice)) return null;
+  const roi = (1 - buyPrice) / buyPrice;
+  return Number.isFinite(roi) ? roi : null;
+}
+
 export function computePositionAverages(positions: PositionForMetrics[]): {
-  avgParoi: number | null;
-  avgCaroi: number | null;
   avgRoi: number | null;
+  avgProi: number | null;
   avgPositionSize: number;
   avgProfit: number;
   avgBettedChance: number | null;
   avgCurrentChance: number | null;
 } {
   if (positions.length === 0) {
-    return { avgParoi: null, avgCaroi: null, avgRoi: null, avgPositionSize: 0, avgProfit: 0, avgBettedChance: null, avgCurrentChance: null };
+    return { avgRoi: null, avgProi: null, avgPositionSize: 0, avgProfit: 0, avgBettedChance: null, avgCurrentChance: null };
   }
 
-  const paroiValues: number[] = [];
-  const caroiValues: number[] = [];
   const roiValues: number[] = [];
+  const proiValues: number[] = [];
   const bettedChanceValues: number[] = [];
   const currentChanceValues: number[] = [];
   let sumSize = 0;
   let sumProfit = 0;
 
   for (const pos of positions) {
-    const days = daysToResolution(pos.endDate, pos.title);
-    const paroi = computePAROINumeric(pos.curPrice, days, pos.spread);
-    if (Number.isFinite(paroi) && paroi > -Infinity) {
-      paroiValues.push(paroi);
-    }
-    const caroi = computeCAROINumeric(pos.avgPrice, days, pos.spread);
-    if (Number.isFinite(caroi) && caroi > -Infinity) {
-      caroiValues.push(caroi);
-    }
     const roi = computeROINumeric(pos.avgPrice, pos.spread);
     if (roi != null) {
       roiValues.push(roi);
+    }
+    const proi = computePROINumeric(pos.curPrice, pos.spread);
+    if (proi != null) {
+      proiValues.push(proi);
     }
     if (pos.avgPrice > 0 && pos.avgPrice < 1 && Number.isFinite(pos.avgPrice)) {
       bettedChanceValues.push(pos.avgPrice);
@@ -163,17 +164,13 @@ export function computePositionAverages(positions: PositionForMetrics[]): {
     sumProfit += pos.cashPnl;
   }
 
-  const avgParoi =
-    paroiValues.length > 0
-      ? paroiValues.reduce((a, b) => a + b, 0) / paroiValues.length
-      : null;
-  const avgCaroi =
-    caroiValues.length > 0
-      ? caroiValues.reduce((a, b) => a + b, 0) / caroiValues.length
-      : null;
   const avgRoi =
     roiValues.length > 0
       ? roiValues.reduce((a, b) => a + b, 0) / roiValues.length
+      : null;
+  const avgProi =
+    proiValues.length > 0
+      ? proiValues.reduce((a, b) => a + b, 0) / proiValues.length
       : null;
   const avgPositionSize = positions.length > 0 ? sumSize / positions.length : 0;
   const avgProfit = positions.length > 0 ? sumProfit / positions.length : 0;
@@ -186,7 +183,7 @@ export function computePositionAverages(positions: PositionForMetrics[]): {
       ? currentChanceValues.reduce((a, b) => a + b, 0) / currentChanceValues.length
       : null;
 
-  return { avgParoi, avgCaroi, avgRoi, avgPositionSize, avgProfit, avgBettedChance, avgCurrentChance };
+  return { avgRoi, avgProi, avgPositionSize, avgProfit, avgBettedChance, avgCurrentChance };
 }
 
 /** Product of probabilities: chance that all positions win (assuming independence). */
