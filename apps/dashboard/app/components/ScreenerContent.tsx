@@ -22,6 +22,7 @@ function SiblingsIcon({ className }: { className?: string }) {
 }
 import { toast } from "sonner";
 import { PriceHistorySparkline } from "./PriceHistorySparkline";
+import { VolatilityDaysEstimate } from "./VolatilityDaysEstimate";
 import { OrderBookLabel } from "./OrderBookLabel";
 import { MarketFees } from "./MarketFees";
 import { SpreadLabel } from "./SpreadLabel";
@@ -830,6 +831,14 @@ export function ScreenerContent({
       setRefreshElapsedSec(0);
     }
   }
+
+  const handleRefreshRef = useRef(handleRefresh);
+  handleRefreshRef.current = handleRefresh;
+  useEffect(() => {
+    const handler = () => handleRefreshRef.current();
+    window.addEventListener("dashboard:refresh-on-visibility", handler);
+    return () => window.removeEventListener("dashboard:refresh-on-visibility", handler);
+  }, []);
 
   function extractSlugFromInput(input: string): string {
     const trimmed = input.trim();
@@ -1854,6 +1863,16 @@ export function ScreenerContent({
                   : null;
               const rawCreated = (e.raw as { createdAt?: string } | null)?.createdAt;
               const displayCreatedAt = e.createdAt ?? (rawCreated || null);
+              const isKellyTab = (kellyTabs as readonly string[]).includes(activeTab);
+              const hasProbs = e.probabilityYes != null || e.probabilityNo != null;
+              const kellyCOptions = [1, 2, 4] as const;
+              const kellyDef = isKellyTab && hasProbs
+                ? (kellyDrafts[e.id] ?? {
+                    p: ((e.traderAppraisedYes ?? e.appraisedYes) != null ? ((e.traderAppraisedYes ?? e.appraisedYes)! * 100).toString() : ""),
+                    c: e.kellyC != null && kellyCOptions.includes(e.kellyC as 1 | 2 | 4) ? e.kellyC.toString() : "4",
+                    position: (e.kellyPosition ?? "no") as "yes" | "no",
+                  })
+                : null;
               return (
               <div key={e.id} className="flex w-full gap-4 items-stretch">
                 <div className="w-1/2 min-w-0 shrink-0 overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-700/60">
@@ -2186,12 +2205,8 @@ export function ScreenerContent({
                         </div>
                       )}
                     </div>
-                    {(kellyTabs as readonly string[]).includes(activeTab) && e.probabilityYes != null && (() => {
-                      const def = kellyDrafts[e.id] ?? {
-                        p: ((e.traderAppraisedYes ?? e.appraisedYes) != null ? ((e.traderAppraisedYes ?? e.appraisedYes)! * 100).toString() : ""),
-                        c: e.kellyC != null ? e.kellyC.toString() : "4",
-                        position: (e.kellyPosition ?? "no") as "yes" | "no",
-                      };
+                    {isKellyTab && kellyDef && (() => {
+                      const def = kellyDef;
                       const pNum = parseFloat(def.p);
                       const cNum = parseFloat(def.c);
                       const quotedYes = e.probabilityYes ?? (e.probabilityNo != null ? 1 - e.probabilityNo : null);
@@ -2225,12 +2240,11 @@ export function ScreenerContent({
                       };
                       return (
                     <div className="mt-2 flex flex-wrap items-center gap-3 rounded-lg border border-slate-700/60 bg-slate-800/30 px-3 py-2">
-                      <span className="text-xs text-slate-500 self-center">Kelly</span>
                       <button
                         type="button"
                         role="switch"
                         aria-label="Kelly position (YES or NO)"
-                        title={`Entering ${def.position === "yes" ? "NO" : "YES"} — click to switch`}
+                        title={`Entering ${def.position === "yes" ? "YES" : "NO"} — click to switch`}
                         onClick={() => {
                           const next = def.position === "yes" ? "no" : "yes";
                           setKellyDrafts((d) => ({ ...d, [e.id]: { ...def, position: next } }));
@@ -2245,6 +2259,7 @@ export function ScreenerContent({
                       >
                         <span className="text-[10px] font-bold leading-tight">{def.position.toUpperCase()}</span>
                       </button>
+                      <span className="text-xs text-slate-500 self-center">Kelly</span>
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-slate-400"><span className="italic">p</span><sub>YES</sub></span>
                         <input
@@ -2272,11 +2287,8 @@ export function ScreenerContent({
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-slate-400">c</span>
-                        <input
-                          type="number"
-                          min={0.1}
-                          step={0.1}
-                          value={def.c}
+                        <select
+                          value={["1", "2", "4"].includes(def.c) ? def.c : "4"}
                           onChange={(ev) => {
                             const v = ev.target.value;
                             setKellyDrafts((d) => ({ ...d, [e.id]: { ...def, c: v } }));
@@ -2285,12 +2297,18 @@ export function ScreenerContent({
                           onBlur={() => {
                             const pVal = parseFloat(def.p);
                             const cVal = parseFloat(def.c);
-                            if (Number.isFinite(pVal) && pVal >= 0 && pVal <= 100 && Number.isFinite(cVal) && cVal > 0) {
+                            if (Number.isFinite(pVal) && pVal >= 0 && pVal <= 100 && kellyCOptions.includes(cVal as 1 | 2 | 4)) {
                               handleSetKelly(e.id, pVal / 100, cVal, def.position);
                             }
                           }}
-                          className="w-14 rounded border border-slate-600/60 bg-slate-900/50 px-2 py-1 text-xs font-mono text-white"
-                        />
+                          className="rounded border border-slate-600/60 bg-slate-900/50 px-2 py-1 text-xs font-mono text-white"
+                        >
+                          {kellyCOptions.map((n) => (
+                            <option key={n} value={n}>
+                              {n}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       {kellyResult != null && (
                         <span className="font-mono text-sm font-medium text-amber-400/90 tabular-nums">
@@ -2309,6 +2327,24 @@ export function ScreenerContent({
                     </div>
                       );
                     })()}
+                    {isKellyTab && kellyDef && (e.yesId || e.noId) && (
+                      <div className="mt-2">
+                        <VolatilityDaysEstimate
+                          asset={kellyDef.position}
+                          onAssetChange={(pos) => {
+                            setKellyDrafts((d) => ({ ...d, [e.id]: { ...kellyDef!, position: pos } }));
+                            handleToggleKellyPosition(e.id);
+                          }}
+                          yesId={e.yesId}
+                          noId={e.noId}
+                          probabilityYes={e.probabilityYes ?? (e.probabilityNo != null ? 1 - e.probabilityNo : null)}
+                          probabilityNo={e.probabilityNo ?? (e.probabilityYes != null ? 1 - e.probabilityYes : null)}
+                          yesSpread={e.yesSpread}
+                          noSpread={e.noSpread}
+                          defaultTargetPrice={90}
+                        />
+                      </div>
+                    )}
                     {activeTab !== "discovery" && (
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
                       <button

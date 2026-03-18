@@ -540,6 +540,81 @@ export default function MathPage() {
             <MathBlock>{"\\text{HHI} = \\sum_i w_i^2 \\quad \\text{Herfindahl Index}"}</MathBlock>
             <MathBlock>{"\\text{Diversification Ratio} = \\frac{1}{\\sqrt{\\text{HHI}}}"}</MathBlock>
           </Section>
+
+          {/* 6. Volatility Days Estimate */}
+          <Section title="6. Volatility Days Estimate — When Will the Bid Reach Target?" icon={IntegralIcon}>
+            <TheoryBox title="What does this estimate?">
+              <p>
+                In the screener, the <strong>Volatility Days Estimate</strong> answers: <em>how many days until the bid reaches my target price?</em> You want to sell at a specific bid — the price at which buyers are willing to take your shares. The estimate uses price history to compute daily volatility and projects how long it will take for the market to move far enough.
+              </p>
+              <p>
+                The key wrinkle: <strong>bid = mid − spread/2</strong>. The spread changes with market conditions and price level. We have mid-price history from the CLOB API, but not spread history. So we <em>estimate</em> what the spread will be when the price reaches the target.
+              </p>
+            </TheoryBox>
+
+            <PracticeBox title="Current implementation (no spread history)">
+              We use CLOB <code>/prices-history</code> for mid price only. Spread is taken from the screener (current snapshot). To estimate spread at the target, we use a heuristic: spread tends to scale with <MathInline>{"p(1-p)"}</MathInline> — uncertainty is highest at 50¢, lower near extremes.
+            </PracticeBox>
+
+            <h3 className="text-sm font-medium text-indigo-300">6.1 Mid price volatility</h3>
+            <p className="text-sm text-slate-400">
+              Group price history by day (UTC), take last price per day. Compute day-over-day absolute changes; volatility = standard deviation of those changes.
+            </p>
+            <MathBlock>{"\\sigma_{\\text{mid}} = \\text{std}(\\{|p_i - p_{i-1}|\\}) \\quad \\text{over days}"}</MathBlock>
+
+            <h3 className="text-sm font-medium text-indigo-300">6.2 Estimated spread at target</h3>
+            <p className="text-sm text-slate-400">
+              Since we don&apos;t have spread history, we estimate: spread at target scales with &quot;uncertainty&quot; at that price level. Use <MathInline>{"f(p) = p(1-p)"}</MathInline> with a floor to avoid division by zero.
+            </p>
+            <MathBlock>{"\\hat{s}_{\\text{target}} = s_{\\text{current}} \\cdot \\frac{f(p_{\\text{target}})}{f(p_{\\text{current}})} \\quad f(p) = \\max(0.01,\\; p(1-p))"}</MathBlock>
+            <p className="text-sm text-slate-500">
+              At 50¢, <MathInline>{"f(0.5) = 0.25"}</MathInline> (max). At 90¢, <MathInline>{"f(0.9) = 0.09"}</MathInline>. Going 60¢→90¢ narrows estimated spread by factor 0.09/0.24 ≈ 0.375.
+            </p>
+
+            <h3 className="text-sm font-medium text-indigo-300">6.3 Days to reach target bid</h3>
+            <p className="text-sm text-slate-400">
+              Target is the <strong>bid</strong> — the price you can sell at. For bid = target, we need mid = target + spread/2. Use estimated spread at target for the exit.
+            </p>
+            <MathBlock>{"\\text{mid}_{\\text{needed}} = p_{\\text{target}} + \\frac{\\hat{s}_{\\text{target}}}{2}"}</MathBlock>
+            <MathBlock>{"\\Delta = |\\text{mid}_{\\text{needed}} - p_{\\text{current}}|"}</MathBlock>
+            <MathBlock>{"\\text{days} = \\frac{\\Delta}{\\sigma_{\\text{mid}}}"}</MathBlock>
+
+            <ExampleBox title="Worked example: 60¢ → 90¢ bid, 4¢ spread, σ_mid = 0.02">
+              <p><MathInline>{"f(0.6) = 0.24"}</MathInline>, <MathInline>{"f(0.9) = 0.09"}</MathInline></p>
+              <p><MathInline>{"\\hat{s}_{\\text{target}} = 0.04 \\times 0.09/0.24 = 0.015"}</MathInline> (1.5¢)</p>
+              <p><MathInline>{"\\text{mid}_{\\text{needed}} = 0.90 + 0.0075 = 0.9075"}</MathInline></p>
+              <p><MathInline>{"\\Delta = 0.9075 - 0.60 = 0.3075"}</MathInline></p>
+              <p><MathInline>{"\\text{days} = 0.3075 / 0.02 \\approx 15.4"}</MathInline> days</p>
+            </ExampleBox>
+
+            <h3 className="text-sm font-medium text-indigo-300">6.4 Ideal case: with spread history</h3>
+            <TheoryBox title="If we had spread history">
+              Polymarket&apos;s API does not provide spread history. In an ideal setup, we would have time-series <MathInline>{"\\{(t_i, s_i)\\}"}</MathInline> of spread. Then we could:
+            </TheoryBox>
+
+            <p className="text-sm text-slate-400 mt-2">Compute spread volatility (same day-over-day logic):</p>
+            <MathBlock>{"\\sigma_s = \\text{std}(\\{|s_i - s_{i-1}|\\}) \\quad \\text{over days}"}</MathBlock>
+
+            <p className="text-sm text-slate-400 mt-2">Because <MathInline>{"\\text{bid} = \\text{mid} - s/2"}</MathInline>, the bid changes due to both mid and spread. If we assume independent daily moves:</p>
+            <MathBlock>{"\\sigma_{\\text{bid}}^2 = \\sigma_{\\text{mid}}^2 + \\left(\\frac{\\sigma_s}{2}\\right)^2"}</MathBlock>
+            <MathBlock>{"\\sigma_{\\text{bid}} = \\sqrt{\\sigma_{\\text{mid}}^2 + \\frac{\\sigma_s^2}{4}}"}</MathBlock>
+
+            <p className="text-sm text-slate-400 mt-2">Then use bid volatility for the days estimate:</p>
+            <MathBlock>{"\\text{current bid} = p_{\\text{current}} - \\frac{s_{\\text{current}}}{2}"}</MathBlock>
+            <MathBlock>{"\\Delta_{\\text{bid}} = |p_{\\text{target}} - \\text{current bid}|"}</MathBlock>
+            <MathBlock>{"\\text{days} = \\frac{\\Delta_{\\text{bid}}}{\\sigma_{\\text{bid}}}"}</MathBlock>
+
+            <ExampleBox title="Ideal example: σ_mid = 0.02, σ_s = 0.005">
+              <p><MathInline>{"\\sigma_{\\text{bid}} = \\sqrt{0.02^2 + 0.0025^2} = \\sqrt{0.0004625} \\approx 0.0215"}</MathInline></p>
+              <p>Current bid = 0.60 − 0.02 = 0.58. Target bid = 0.90.</p>
+              <p><MathInline>{"\\Delta_{\\text{bid}} = 0.32"}</MathInline>, <MathInline>{"\\text{days} = 0.32 / 0.0215 \\approx 14.9"}</MathInline> days</p>
+              <p className="text-sm text-slate-500 mt-2">Spread volatility slightly increases effective bid volatility → slightly fewer days (or more conservative depending on direction). With spread history we avoid the spread-estimation heuristic and model both paths.</p>
+            </ExampleBox>
+
+            <PracticeBox title="Summary">
+              <strong>Current:</strong> Mid vol from prices-history. Estimate spread at target via <MathInline>{"p(1-p)"}</MathInline> heuristic. Days = (mid_needed − current_mid) / σ_mid. <strong>Ideal:</strong> With spread history, compute σ_s, combine into σ_bid, use bid distance and σ_bid for days.
+            </PracticeBox>
+          </Section>
         </div>
       </div>
     </div>

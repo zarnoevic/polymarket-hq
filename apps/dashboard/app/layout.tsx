@@ -3,6 +3,7 @@ import { DM_Sans } from "next/font/google";
 import "./globals.css";
 import { WealthTabsNav } from "./components/WealthTabsNav";
 import { ToasterClient } from "./components/ToasterClient";
+import { RefreshOnVisibility } from "./components/RefreshOnVisibility";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -24,6 +25,7 @@ export default function RootLayout({
     <html lang="en" className={`dark ${dmSans.variable}`} suppressHydrationWarning>
       <body className="antialiased flex min-h-screen flex-col font-sans">
         <ToasterClient />
+        <RefreshOnVisibility />
         <WealthTabsNav />
         {children}
       </body>
