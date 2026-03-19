@@ -95,6 +95,74 @@ function IntegralIcon({ className }: { className?: string }) {
   );
 }
 
+/** ROI r = (1-P)/P vs entry price P. Lower entry = higher return to payoff. */
+function RoiVsEntryGraph() {
+  const pad = 32;
+  const w = 400;
+  const h = 180;
+  const pMin = 0.05;
+  const pMax = 0.95;
+  const rMax = 5;
+  const pts: { p: number; r: number }[] = [];
+  for (let i = 0; i <= 50; i++) {
+    const p = pMin + (i / 50) * (pMax - pMin);
+    const r = p > 0 ? (1 - p) / p : 0;
+    pts.push({ p, r: Math.min(r, rMax) });
+  }
+  const xScale = (p: number) => pad + ((p - pMin) / (pMax - pMin)) * (w - 2 * pad);
+  const yScale = (r: number) => h - pad - (r / rMax) * (h - 2 * pad);
+  const pathD = pts.map(({ p, r }, i) => `${i === 0 ? "M" : "L"} ${xScale(p)} ${yScale(r)}`).join(" ");
+  return (
+    <svg width={w} height={h} className="w-full max-w-md">
+      <line x1={pad} y1={h - pad} x2={w - pad} y2={h - pad} stroke="rgb(100 116 139 / 0.5)" strokeWidth={1} />
+      <line x1={pad} y1={pad} x2={pad} y2={h - pad} stroke="rgb(100 116 139 / 0.5)" strokeWidth={1} />
+      <path d={pathD} fill="none" stroke="rgb(129 140 248)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      <text x={w / 2} y={h - 6} fill="rgb(148 163 184)" fontSize={10} textAnchor="middle">P_entry (entry price)</text>
+      <text x={14} y={h / 2} fill="rgb(148 163 184)" fontSize={10} textAnchor="middle" transform={`rotate(-90, 14, ${h / 2})`}>r (ROI)</text>
+      <text x={xScale(0.2)} y={h - pad + 14} fill="rgb(148 163 184)" fontSize={9}>0.2</text>
+      <text x={xScale(0.5)} y={h - pad + 14} fill="rgb(148 163 184)" fontSize={9}>0.5</text>
+      <text x={xScale(0.8)} y={h - pad + 14} fill="rgb(148 163 184)" fontSize={9}>0.8</text>
+      <text x={pad - 6} y={yScale(1) + 4} fill="rgb(148 163 184)" fontSize={9} textAnchor="end">1</text>
+      <text x={pad - 6} y={yScale(4) + 4} fill="rgb(148 163 184)" fontSize={9} textAnchor="end">4</text>
+    </svg>
+  );
+}
+
+/** Return vs entry = (P_cur - P_entry)/P_entry. P_entry fixed; shows profit/loss as price moves. */
+function ValueVsPriceGraph() {
+  const pad = 32;
+  const w = 400;
+  const h = 180;
+  const pEntry = 0.5;
+  const pts: { p: number; ret: number }[] = [];
+  for (let i = 0; i <= 50; i++) {
+    const p = (i / 50) * 1;
+    const ret = pEntry > 0 ? (p - pEntry) / pEntry : 0;
+    pts.push({ p, ret });
+  }
+  const rMin = -1;
+  const rMax = 1;
+  const xScale = (p: number) => pad + p * (w - 2 * pad);
+  const yScale = (r: number) => h - pad - ((r - rMin) / (rMax - rMin)) * (h - 2 * pad);
+  const zeroY = yScale(0);
+  const pathD = pts.map(({ p, ret }, i) => `${i === 0 ? "M" : "L"} ${xScale(p)} ${yScale(ret)}`).join(" ");
+  return (
+    <svg width={w} height={h} className="w-full max-w-md">
+      <line x1={pad} y1={h - pad} x2={w - pad} y2={h - pad} stroke="rgb(100 116 139 / 0.5)" strokeWidth={1} />
+      <line x1={pad} y1={pad} x2={pad} y2={h - pad} stroke="rgb(100 116 139 / 0.5)" strokeWidth={1} />
+      <line x1={pad} y1={zeroY} x2={w - pad} y2={zeroY} stroke="rgb(100 116 139 / 0.3)" strokeWidth={1} strokeDasharray="4" />
+      <path d={pathD} fill="none" stroke="rgb(34 197 94)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      <line x1={xScale(pEntry)} y1={zeroY} x2={xScale(pEntry)} y2={h - pad} stroke="rgb(251 191 36 / 0.6)" strokeWidth={1} strokeDasharray="4" />
+      <text x={w / 2} y={h - 6} fill="rgb(148 163 184)" fontSize={10} textAnchor="middle">P_current (current price)</text>
+      <text x={14} y={h / 2} fill="rgb(148 163 184)" fontSize={10} textAnchor="middle" transform={`rotate(-90, 14, ${h / 2})`}>Return vs entry</text>
+      <text x={xScale(0.5)} y={h - pad + 14} fill="rgb(251 191 36)" fontSize={9}>entry 0.5</text>
+      <text x={pad - 6} y={zeroY + 4} fill="rgb(148 163 184)" fontSize={9} textAnchor="end">0</text>
+      <text x={pad - 6} y={yScale(0.5) + 4} fill="rgb(34 197 94)" fontSize={9} textAnchor="end">+50%</text>
+      <text x={pad - 6} y={yScale(-0.5) + 4} fill="rgb(239 68 68)" fontSize={9} textAnchor="end">-50%</text>
+    </svg>
+  );
+}
+
 export default function MathPage() {
   return (
     <div className="min-h-screen bg-[rgb(var(--background-rgb))]">
@@ -255,6 +323,31 @@ export default function MathPage() {
             <h3 className="text-sm font-medium text-indigo-300">CROI — Cumulative ROI (entry, non-annualized)</h3>
             <MathBlock>{"\\text{CROI} = \\frac{1 - (P_{\\text{avg}} + s)}{P_{\\text{avg}} + s}"}</MathBlock>
             <p className="text-sm text-slate-500">Same ROI formula as PROI but using <MathInline>{"P_{\\text{avg}}"}</MathInline> (average entry price).</p>
+
+            <h3 className="text-sm font-medium text-indigo-300">ROI as entry price changes</h3>
+            <TheoryBox title="How ROI varies with entry price">
+              <p>
+                ROI to resolution is <MathInline>{"r = (1 - P_{\\text{buy}})/P_{\\text{buy}}"}</MathInline>. Lower entry price ⇒ higher ROI. A share at 20¢ pays out 1, so profit 80¢ per share → <MathInline>{"r = 0.80/0.20 = 4"}</MathInline> (400%). At 80¢, profit 20¢ → <MathInline>{"r = 0.20/0.80 = 0.25"}</MathInline> (25%). CROI and CAROI use your actual entry; PROI and PAROI use the current market price.
+              </p>
+            </TheoryBox>
+            <div className="rounded-lg border border-slate-700/50 bg-slate-900/80 p-4">
+              <p className="mb-2 text-xs font-medium text-indigo-400">ROI (r) vs entry price — lower entry = higher return to payoff</p>
+              <RoiVsEntryGraph />
+            </div>
+
+            <h3 className="text-sm font-medium text-indigo-300">Investment value change vs current price</h3>
+            <TheoryBox title="Mark-to-market: how your position value moves">
+              <p>
+                You hold <MathInline>{"N"}</MathInline> shares bought at <MathInline>{"P_{\\text{entry}}"}</MathInline>. Cost = <MathInline>{"N \\cdot P_{\\text{entry}}"}</MathInline>. Current value = <MathInline>{"N \\cdot P_{\\text{cur}}"}</MathInline>. Unrealized PnL = <MathInline>{"N(P_{\\text{cur}} - P_{\\text{entry}})"}</MathInline>. Return vs entry = <MathInline>{"\\frac{P_{\\text{cur}} - P_{\\text{entry}}}{P_{\\text{entry}}} = \\frac{P_{\\text{cur}}}{P_{\\text{entry}}} - 1"}</MathInline>.
+              </p>
+              <p>
+                If <MathInline>{"P_{\\text{cur}} > P_{\\text{entry}}"}</MathInline> → profit (+). If <MathInline>{"P_{\\text{cur}} < P_{\\text{entry}}"}</MathInline> → loss (−). This is <em>mark-to-market</em>: it reflects how the market values your position now, independent of resolution. Dashboard &quot;24h change&quot; and PnL use this.
+              </p>
+            </TheoryBox>
+            <div className="rounded-lg border border-slate-700/50 bg-slate-900/80 p-4">
+              <p className="mb-2 text-xs font-medium text-indigo-400">Return vs entry (P_entry fixed): value rises when price goes up, falls when price goes down</p>
+              <ValueVsPriceGraph />
+            </div>
 
             <h3 className="text-sm font-medium text-indigo-300">YES vs NO PAROI (screener)</h3>
             <p className="text-sm text-slate-400">

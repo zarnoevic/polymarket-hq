@@ -543,7 +543,9 @@ export function ScreenerContent({
 
   async function handleSetLabel(eventId: string, label: LabelType) {
     const idsToUpdate =
-      label !== "evaluating" && alsoClassifySiblingsIds.has(eventId)
+      label !== "evaluating" &&
+      label !== "vetted" &&
+      alsoClassifySiblingsIds.has(eventId)
         ? getSiblingIds(eventId)
         : [eventId];
     try {

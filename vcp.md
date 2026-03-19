@@ -1,3 +1,5 @@
+game theorizing board (interactive)
+
 volatility proxy
 
 rename to wealth hq everything
