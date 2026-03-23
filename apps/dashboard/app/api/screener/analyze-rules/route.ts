@@ -1,8 +1,34 @@
 import { NextResponse } from "next/server";
+import { marked } from "marked";
+import sanitizeHtml from "sanitize-html";
 import { prisma } from "@polymarket-hq/dashboard-prisma";
 import OpenAI from "openai";
 
 const ID_PATTERN = /^[a-z]+_[a-f0-9]{20,}$/i;
+
+/** Converts markdown to styled HTML and sanitizes. Used for blindspots report. */
+function formatBlindspotsReport(markdown: string): string {
+  const raw = marked.parse(markdown, { async: false }) as string;
+  // Add Tailwind classes via regex replacements for report styling
+  let html = raw
+    .replace(/<h1>/g, '<h1 class="font-semibold text-slate-200 text-base border-b border-slate-600/60 pb-2 mb-4">')
+    .replace(/<h2>/g, '<h2 class="font-semibold text-slate-200 text-sm mt-5 mb-2">')
+    .replace(/<h3>/g, '<h3 class="font-semibold text-slate-200 text-sm mt-3 mb-1.5">')
+    .replace(/<p>/g, '<p class="text-slate-300 leading-relaxed my-2">')
+    .replace(/<strong>/g, '<strong class="text-slate-100 font-semibold">')
+    .replace(/<em>/g, '<em class="text-amber-200/90">')
+    .replace(/<blockquote>/g, '<blockquote class="border-l-2 border-amber-500/50 bg-amber-500/5 py-0.5 px-3 rounded-r text-slate-300 font-normal my-3">')
+    .replace(/<ul>/g, '<ul class="my-2 list-disc pl-5">')
+    .replace(/<ol>/g, '<ol class="my-2 list-decimal pl-5">')
+    .replace(/<li>/g, '<li class="my-0.5">')
+    .replace(/<code>/g, '<code class="rounded bg-slate-700/50 px-1 py-0.5 text-xs text-slate-300">')
+    .replace(/<a /g, '<a class="text-amber-400 hover:text-amber-300 underline" ');
+
+  return sanitizeHtml(html, {
+    allowedTags: ["h1", "h2", "h3", "p", "strong", "em", "blockquote", "ul", "ol", "li", "code", "a", "br"],
+    allowedAttributes: { "*": ["class"], a: ["href", "target", "rel", "class"] },
+  });
+}
 
 function extractTextFromOutput(output: unknown): string {
   const texts: string[] = [];
@@ -36,13 +62,23 @@ Focus specifically on:
 
 5. **Missing definitions**: What key terms are used without being defined? (e.g., "official", "confirmed", "major", specific dates, sources that count) These definition gaps are blindspots that create resolution risk.
 
-6. **Temporal or source ambiguities**: If the rules reference dates, deadlines, or sources of truth, are they unambiguous? Could time zones, publication timing, or source hierarchy cause disputes?
+When the market resolves is NEVER ambiguous—Polymarket defines the end date; do not flag this.
 
-7. **Recommendations**: What clarifications would reduce blindspots and dispute risk? Suggest specific wording improvements if helpful.
+You are analyzing the market as-is. We have no power to change it. Do NOT suggest alternative wording, rephrasings, or "improved" resolution clauses. Do NOT include a recommendations section that proposes text changes. Focus only on identifying risks and ambiguities in the existing rules.
 
 Be thorough and precise. Quote the rules verbatim when discussing specific ambiguities. Emphasize what traders are most likely to miss.
 
-Format your response in markdown: use ## for section headers, ### for subheaders, **bold** for key terms and phrases, *italic* for emphasis, and - for bullet points. Do not truncate—provide the complete analysis.
+Format your response as a professional report document. Structure:
+
+- Start with a brief **Executive Summary** (2–4 sentences).
+- Use numbered sections: 1. Blindspots & Hidden Risks, 2. Ambiguities, 3. Edge Cases, 4. Potential Misunderstandings, 5. Missing Definitions, 6. Temporal/Source Ambiguities.
+- Use > blockquotes when quoting rules verbatim.
+- Use **bold** for key terms, *italic* for emphasis.
+- Use ### for subsection headers within each numbered section.
+- Use - for bullet points. Keep paragraphs concise.
+- End with a brief **Key Takeaways** if helpful.
+
+Do not truncate—provide the complete analysis.
 
 Do NOT include meta-offers or follow-up suggestions such as "If you want, I can draft...", "Would you like me to...", "I can help with...", or offers to propose replacement clauses. Only output the analysis itself.`;
 
@@ -103,18 +139,19 @@ export async function POST(req: Request) {
       );
     }
 
+    const formattedAnalysis = formatBlindspotsReport(rulesAnalysis);
     const now = new Date();
     await prisma.screenerEvent.update({
       where: { id: eventId },
       data: {
-        rulesAnalysis,
+        rulesAnalysis: formattedAnalysis,
         rulesAnalysisAt: now,
       },
     });
 
     return NextResponse.json({
       ok: true,
-      rulesAnalysis,
+      rulesAnalysis: formattedAnalysis,
       rulesAnalysisAt: now.toISOString(),
     });
   } catch (err) {

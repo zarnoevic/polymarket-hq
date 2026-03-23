@@ -16,17 +16,20 @@
     "@polymarket-hq/dashboard-prisma": "workspace:*",
     "katex": "^0.16.38",
     "lucide-react": "0.563.0",
+    "marked": "^17.0.5",
     "next": "15.5.12",
     "openai": "^6.27.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-markdown": "^10.1.0",
+    "sanitize-html": "^2.17.2",
     "sonner": "^2.0.7"
   },
   "devDependencies": {
     "@types/node": "22.10.2",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
+    "@types/sanitize-html": "^2.16.1",
     "postcss": "8.5.6",
     "tailwindcss": "3.4.17",
     "vitest": "^3.2.4"

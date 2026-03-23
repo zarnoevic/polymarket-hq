@@ -21,7 +21,6 @@ function SiblingsIcon({ className }: { className?: string }) {
   );
 }
 import { toast } from "sonner";
-import ReactMarkdown from "react-markdown";
 import { PriceHistorySparkline } from "./PriceHistorySparkline";
 import { VolatilityDaysEstimate } from "./VolatilityDaysEstimate";
 import { OrderBookLabel } from "./OrderBookLabel";
@@ -1752,9 +1751,10 @@ export function ScreenerContent({
                             e.description ? <ExplanationText text={e.description} /> : <span className="text-slate-500">No rules available</span>
                           ) : (
                             e.rulesAnalysis ? (
-                              <div className="prose prose-invert prose-sm max-w-none text-slate-300 prose-headings:text-slate-200 prose-strong:text-slate-100 prose-em:text-amber-200/90">
-                                <ReactMarkdown>{e.rulesAnalysis}</ReactMarkdown>
-                              </div>
+                              <div
+                                className="blindspots-report min-h-0 flex-1 overflow-y-auto rounded-lg border border-slate-700/40 bg-slate-900/30 px-4 py-3 [&_a]:text-amber-400 [&_a]:underline [&_a:hover]:text-amber-300"
+                                dangerouslySetInnerHTML={{ __html: e.rulesAnalysis }}
+                              />
                             ) : e.description ? (
                               <div className="flex min-h-0 flex-1 items-center justify-center">
                                 <span className="text-slate-500">No blindspots analysis yet. Click Analyze rules above.</span>
@@ -2549,9 +2549,10 @@ export function ScreenerContent({
                       e.description ? <ExplanationText text={e.description} /> : <span className="text-slate-500">No rules available</span>
                     ) : (
                       e.rulesAnalysis ? (
-                        <div className="prose prose-invert prose-sm max-w-none text-slate-300 prose-headings:text-slate-200 prose-strong:text-slate-100 prose-em:text-amber-200/90">
-                          <ReactMarkdown>{e.rulesAnalysis}</ReactMarkdown>
-                        </div>
+                        <div
+                          className="blindspots-report min-h-0 flex-1 overflow-y-auto rounded-lg border border-slate-700/40 bg-slate-900/30 px-4 py-3 [&_a]:text-amber-400 [&_a]:underline [&_a:hover]:text-amber-300"
+                          dangerouslySetInnerHTML={{ __html: e.rulesAnalysis }}
+                        />
                       ) : e.description ? (
                         <div className="flex min-h-0 flex-1 items-center justify-center">
                           <span className="text-slate-500">No blindspots analysis yet. Click Analyze rules above.</span>

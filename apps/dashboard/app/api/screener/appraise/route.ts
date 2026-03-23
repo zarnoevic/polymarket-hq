@@ -197,8 +197,11 @@ async function appraiseOne(
       ? `\n\nImportant: the market was created on ${createdStr ?? "unknown"} and will end on ${endStr ?? "unknown"}. Unless specified otherwise, the event(s) referenced apply only to this specific period.`
       : "";
 
-  const blindspotsSuffix = event.rulesAnalysis?.trim()
-    ? `\n\nBlindspots / rules analysis (consider these resolution risks and ambiguities in your appraisal):\n${event.rulesAnalysis.trim()}`
+  const rulesAnalysisPlain = event.rulesAnalysis?.trim()
+    ? event.rulesAnalysis.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()
+    : "";
+  const blindspotsSuffix = rulesAnalysisPlain
+    ? `\n\nBlindspots / rules analysis (consider these resolution risks and ambiguities in your appraisal):\n${rulesAnalysisPlain}`
     : "";
 
   const userMessage = `Event: ${event.title}\n${event.description ? `\nDescription: ${event.description}\n` : ""}${dateRangeSuffix}${noteSuffix}${blindspotsSuffix}\n\n${prompt}`;
