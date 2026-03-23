@@ -23,12 +23,13 @@ export async function POST(req: Request) {
     }
 
     const value = typeof note === "string" ? note : note === null || note === undefined ? null : String(note);
-    await prisma.screenerEvent.update({
+    const now = new Date();
+    const updated = await prisma.screenerEvent.update({
       where: { id: eventId },
-      data: { note: value || null },
+      data: { note: value || null, noteUpdatedAt: now },
     });
 
-    return NextResponse.json({ ok: true, note: value || null });
+    return NextResponse.json({ ok: true, note: value || null, noteUpdatedAt: updated.noteUpdatedAt?.toISOString() ?? now.toISOString() });
   } catch (err) {
     console.error("Note update error:", err);
     return NextResponse.json(

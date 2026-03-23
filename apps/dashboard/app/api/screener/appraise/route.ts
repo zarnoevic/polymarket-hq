@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { formatReportMarkdown } from "@/lib/format-markdown";
 import { prisma } from "@polymarket-hq/dashboard-prisma";
 import OpenAI from "openai";
 
@@ -240,9 +241,10 @@ async function appraiseOne(
     }
 
     const sourcesSuffix = extractCitationsFromOutput(response.output);
-    const explanation = parsed.explanation
+    const explanationRaw = parsed.explanation
       ? parsed.explanation + sourcesSuffix
       : sourcesSuffix || null;
+    const explanation = explanationRaw ? formatReportMarkdown(explanationRaw) : null;
 
     const { yev, nev } = computeYevNev(
       parsed.appraised_yes,

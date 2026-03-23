@@ -1,4 +1,5 @@
 import type { ComponentProps } from "react";
+import { formatReportMarkdown } from "@/lib/format-markdown";
 import { prisma } from "@polymarket-hq/dashboard-prisma";
 import { ScreenerContent } from "../../components/ScreenerContent";
 
@@ -23,11 +24,17 @@ export default async function ScreenerPage() {
   });
 
   // Narrow kellyPosition from Prisma's string to "yes" | "no" for ScreenerContent
-  const normalized = sorted.map((e) => ({
-    ...e,
-    kellyPosition:
-      e.kellyPosition === "yes" ? "yes" : e.kellyPosition === "no" ? "no" : null,
-  }));
+  const normalized = sorted.map((e) => {
+    const formattedDescription = e.description?.trim() ? formatReportMarkdown(e.description) : null;
+    const formattedAppraisal = e.appraisalExplanation?.trim() ? formatReportMarkdown(e.appraisalExplanation) : null;
+    return {
+      ...e,
+      kellyPosition:
+        e.kellyPosition === "yes" ? "yes" : e.kellyPosition === "no" ? "no" : null,
+      formattedDescription,
+      formattedAppraisal,
+    };
+  });
 
   return (
     <div className="min-h-screen bg-[rgb(var(--background-rgb))]">
@@ -40,7 +47,7 @@ export default async function ScreenerPage() {
         }}
       />
 
-      <div className="relative z-10 mx-auto w-[90vw] max-w-[90vw] px-4 py-12">
+      <div className="relative z-10 mx-auto w-[90vw] max-w-[90vw] overflow-x-auto px-4 py-12">
         <ScreenerContent
           initialEvents={
             normalized as ComponentProps<typeof ScreenerContent>["initialEvents"]

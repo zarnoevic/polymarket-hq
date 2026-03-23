@@ -78,6 +78,7 @@ type ScreenerEvent = {
   label: LabelType;
   labelUpdatedAt?: Date | null;
   note: string | null;
+  noteUpdatedAt?: Date | null;
   syncedAt: Date;
   yesId: string | null;
   noId: string | null;
@@ -89,6 +90,8 @@ type ScreenerEvent = {
   kellyCriterion?: number | null;
   rulesAnalysis?: string | null;
   rulesAnalysisAt?: Date | null;
+  formattedDescription?: string | null;
+  formattedAppraisal?: string | null;
   raw?: unknown;
   tags?: unknown; // Gamma API tags: JsonValue from DB
 };
@@ -198,53 +201,6 @@ function computeROI(curPrice: number, spread?: number | null): string {
   return formatRoi(r);
 }
 
-const URL_REGEX = /(https?:\/\/[^\s]+)/g;
-
-/** Trim trailing punctuation that wraps URLs, e.g. ) or ). from (https://example.com). */
-function trimUrlTrailingPunct(url: string): string {
-  return url.replace(/[)\]\.,;!?]+$/, "");
-}
-
-function ExplanationText({ text }: { text: string }) {
-  const segments: Array<{ type: "text" | "link"; content: string }> = [];
-  let lastEnd = 0;
-  for (const m of text.matchAll(URL_REGEX)) {
-    const full = m[0];
-    const url = trimUrlTrailingPunct(full);
-    const trailing = full.slice(url.length);
-    if (m.index! > lastEnd) {
-      segments.push({ type: "text", content: text.slice(lastEnd, m.index) });
-    }
-    segments.push({ type: "link", content: url });
-    if (trailing) {
-      segments.push({ type: "text", content: trailing });
-    }
-    lastEnd = m.index! + full.length;
-  }
-  if (lastEnd < text.length) {
-    segments.push({ type: "text", content: text.slice(lastEnd) });
-  }
-  return (
-    <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">
-      {segments.map((seg, i) =>
-        seg.type === "link" ? (
-          <a
-            key={i}
-            href={seg.content}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-indigo-400 underline hover:text-indigo-300"
-          >
-            {seg.content}
-          </a>
-        ) : (
-          <span key={i}>{seg.content}</span>
-        )
-      )}
-    </div>
-  );
-}
-
 export function ScreenerContent({
   initialEvents,
 }: {
@@ -298,7 +254,7 @@ export function ScreenerContent({
       return changed ? next : prev;
     });
   }, [events]);
-  const [rightPanelTab, setRightPanelTab] = useState<Record<string, "appraisal" | "rules" | "blindspots">>({});
+  const [rightPanelTab, setRightPanelTab] = useState<Record<string, "appraisal" | "rules" | "blindspots" | "notes">>({});
   const [analyzingRulesId, setAnalyzingRulesId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [portfolioSummary, setPortfolioSummary] = useState<{
@@ -635,8 +591,9 @@ export function ScreenerContent({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Failed to update note");
+      const savedAt = data.noteUpdatedAt ? new Date(data.noteUpdatedAt) : new Date();
       setEvents((prev) =>
-        prev.map((e) => (e.id === eventId ? { ...e, note: note || null } : e))
+        prev.map((e) => (e.id === eventId ? { ...e, note: note || null, noteUpdatedAt: savedAt } : e))
       );
       setNoteEditingId(null);
       setNoteDraft("");
@@ -1470,15 +1427,16 @@ export function ScreenerContent({
                 <Search className="h-4 w-4" />
                 <span>Search results: {searchResultsEvents.length} markets (all categories)</span>
               </div>
-              <div className="space-y-2">
+              <div className="min-w-0 space-y-2">
                 {paginatedSearchResults.map((e) => {
                   const rawCreated = (e.raw as { createdAt?: string } | null)?.createdAt;
                   const displayCreatedAt = e.createdAt ?? (rawCreated || null);
                   const showAppraise = e.label != null;
                   return (
-                    <div key={`search-${e.id}`} className="flex max-h-[400px] w-full gap-3 items-stretch overflow-hidden">
-                      <div className="w-1/2 min-w-0 shrink-0 overflow-y-auto rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-700/60">
+                    <div key={`search-${e.id}`} className="flex max-h-[400px] w-full min-w-0 gap-3 items-stretch">
+                      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-700/60">
                         <div className="flex gap-3 p-3">
+                          {(rightPanelTab[e.id] ?? "appraisal") === "appraisal" ? (
                           <div className="flex shrink-0 flex-col items-center gap-0.5">
                             <button
                               onClick={() => handleSetLabel(e.id, "evaluating")}
@@ -1560,6 +1518,9 @@ export function ScreenerContent({
                               </button>
                             )}
                           </div>
+                          ) : (
+                          <div className="w-2 shrink-0" />
+                          )}
                           {(e.image ?? e.icon) && (
                             <img src={e.image ?? e.icon ?? ""} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
                           )}
@@ -1650,68 +1611,10 @@ export function ScreenerContent({
                                 <p className="font-mono text-sm font-medium text-slate-300">{formatCompact(e.liquidity)}</p>
                               </div>
                             </div>
-                            {showAppraise && (
-                              <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                                <button
-                                  onClick={() => handleAppraise(e.id, "think")}
-                                  disabled={appraisingIds.has(e.id) || !e.rulesAnalysis}
-                                  title={!e.rulesAnalysis ? "Run Analyze rules in Blindspots tab first" : undefined}
-                                  className="flex items-center gap-1.5 rounded-lg border border-indigo-500/60 bg-indigo-500/20 px-3 py-1.5 text-xs font-medium text-indigo-300 transition-colors hover:bg-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                  {appraisingIds.has(e.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Brain className="h-3 w-3" />}
-                                  Deep Appraise
-                                </button>
-                                <button
-                                  onClick={() => handleAppraise(e.id, "reappraise")}
-                                  disabled={appraisingIds.has(e.id) || !canReappraise(e)}
-                                  className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-beige transition-colors hover:bg-slate-700/60 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  {appraisingIds.has(e.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCw className="h-3 w-3" />}
-                                  Reappraise
-                                </button>
-                                {appraisingIds.has(e.id) && (
-                                  <button
-                                    onClick={() => handleCancelAppraise(e.id)}
-                                    className="flex items-center gap-1.5 rounded-lg border border-red-500/60 bg-red-500/20 px-3 py-1.5 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/30"
-                                  >
-                                    <X className="h-3 w-3" />
-                                    Cancel
-                                  </button>
-                                )}
-                              </div>
-                            )}
-                            {showAppraise && (
-                              <div className="mt-2">
-                                {noteEditingId === e.id ? (
-                                  <div className="flex flex-col gap-2">
-                                    <textarea
-                                      value={noteDraft}
-                                      onChange={(ev) => setNoteDraft(ev.target.value)}
-                                      placeholder="Note (included in appraisal)"
-                                      className="w-full rounded border border-slate-600/60 bg-transparent px-0 py-1 text-sm text-slate-300 placeholder-slate-500 focus:border-slate-500 focus:outline-none"
-                                      rows={2}
-                                      autoFocus
-                                    />
-                                    <div className="flex gap-2">
-                                      <button onClick={() => handleSetNote(e.id, noteDraft.trim() || null)} disabled={savingNoteId === e.id} className="text-xs text-indigo-400 hover:text-indigo-300 disabled:opacity-50">Save</button>
-                                      <button onClick={() => { setNoteEditingId(null); setNoteDraft(""); }} className="text-xs text-slate-500 hover:text-slate-400">Cancel</button>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <button
-                                    onClick={() => { setNoteEditingId(e.id); setNoteDraft(e.note ?? ""); }}
-                                    className="flex items-center gap-2 text-left text-sm text-slate-500 hover:text-slate-400"
-                                  >
-                                    <StickyNote className={`h-3.5 w-3.5 shrink-0 ${e.note ? "text-amber-500/70" : ""}`} />
-                                    {e.note ? <span className="text-slate-400">{e.note}</span> : <span>Add note</span>}
-                                  </button>
-                                )}
-                              </div>
-                            )}
                           </div>
                         </div>
                       </div>
-                      <div className="flex w-1/2 min-w-0 shrink-0 flex-col rounded-xl border border-slate-700/60 bg-slate-800/30 p-3">
+                      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-700/60 bg-slate-800/30 p-4">
                         <div className="mb-2 flex shrink-0 items-center justify-between gap-2">
                           <div className="flex gap-1">
                             <button
@@ -1732,27 +1635,137 @@ export function ScreenerContent({
                             >
                               Blindspots
                             </button>
-                          </div>
-                          {(rightPanelTab[e.id] ?? "appraisal") === "blindspots" && e.description && (
                             <button
-                              onClick={() => handleAnalyzeRules(e.id)}
-                              disabled={analyzingRulesId === e.id}
-                              className="ml-auto flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-beige transition-colors hover:bg-slate-700/60 disabled:cursor-not-allowed disabled:opacity-50"
+                              onClick={() => {
+                                setRightPanelTab((prev) => ({ ...prev, [e.id]: "notes" }));
+                                setNoteEditingId(e.id);
+                                setNoteDraft(e.note ?? "");
+                              }}
+                              className={`rounded px-2 py-1 text-xs font-medium transition-colors ${(rightPanelTab[e.id] ?? "appraisal") === "notes" ? "bg-slate-600/60 text-beige" : "text-slate-400 hover:bg-slate-700/50 hover:text-slate-300"}`}
                             >
-                              {analyzingRulesId === e.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <SearchCheck className="h-3 w-3" />}
-                              {analyzingRulesId === e.id ? "Analyzing…" : e.rulesAnalysis ? "Reanalyze rules" : "Analyze rules"}
+                              Notes
                             </button>
-                          )}
+                          </div>
+                          <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                            {(rightPanelTab[e.id] ?? "appraisal") === "notes" && showAppraise && (
+                              <>
+                                <button
+                                  onClick={() => handleSetNote(e.id, (noteEditingId === e.id ? noteDraft : e.note ?? "").trim() || null)}
+                                  disabled={savingNoteId === e.id}
+                                  className="flex items-center gap-1.5 rounded-lg border border-indigo-500/60 bg-indigo-500/20 px-3 py-1.5 text-xs font-medium text-indigo-300 transition-colors hover:bg-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  {savingNoteId === e.id ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                                  {savingNoteId === e.id ? "Saving…" : "Save"}
+                                </button>
+                                <span className="text-xs text-slate-500 tabular-nums" title={e.noteUpdatedAt ? "Last saved" : undefined}>
+                                  {e.noteUpdatedAt
+                                    ? `Last saved: ${formatTimeAgo(e.noteUpdatedAt instanceof Date ? e.noteUpdatedAt.toISOString() : String(e.noteUpdatedAt))}`
+                                    : "Not saved yet"}
+                                </span>
+                              </>
+                            )}
+                            {(rightPanelTab[e.id] ?? "appraisal") === "blindspots" && e.description && (
+                              <button
+                                onClick={() => handleAnalyzeRules(e.id)}
+                                disabled={analyzingRulesId === e.id}
+                                className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-beige transition-colors hover:bg-slate-700/60 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {analyzingRulesId === e.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <SearchCheck className="h-3 w-3" />}
+                                {analyzingRulesId === e.id ? "Analyzing…" : e.rulesAnalysis ? "Reanalyze rules" : "Analyze rules"}
+                              </button>
+                            )}
+                            {(rightPanelTab[e.id] ?? "appraisal") === "appraisal" && showAppraise && (
+                              <>
+                                <button
+                                  onClick={() => handleAppraise(e.id, "think")}
+                                  disabled={appraisingIds.has(e.id) || !e.rulesAnalysis}
+                                  title={!e.rulesAnalysis ? "Run Analyze rules in Blindspots tab first" : undefined}
+                                  className="flex items-center gap-1.5 rounded-lg border border-indigo-500/60 bg-indigo-500/20 px-3 py-1.5 text-xs font-medium text-indigo-300 transition-colors hover:bg-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  {appraisingIds.has(e.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Brain className="h-3 w-3" />}
+                                  Deep Appraise
+                                </button>
+                                {e.lastThinkAppraisalDurationSeconds != null && !appraisingIds.has(e.id) && (
+                                  <span className="text-xs text-slate-500 tabular-nums" title="Last deep appraisal">
+                                    Deep: {formatDurationSeconds(e.lastThinkAppraisalDurationSeconds)}
+                                  </span>
+                                )}
+                                <button
+                                  onClick={() => handleAppraise(e.id, "reappraise")}
+                                  disabled={appraisingIds.has(e.id) || !canReappraise(e)}
+                                  className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-beige transition-colors hover:bg-slate-700/60 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {appraisingIds.has(e.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCw className="h-3 w-3" />}
+                                  Reappraise
+                                </button>
+                                {e.lastReappraisalDurationSeconds != null && !appraisingIds.has(e.id) && (
+                                  <span className="text-xs text-slate-500 tabular-nums" title="Last reappraisal">
+                                    Reappraise: {formatDurationSeconds(e.lastReappraisalDurationSeconds)}
+                                  </span>
+                                )}
+                                {appraisingIds.has(e.id) && (
+                                  <>
+                                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/40 px-2.5 py-1.5 text-xs text-slate-400 tabular-nums">
+                                      <Clock className="h-3 w-3 shrink-0" />
+                                      {formatElapsed(e.id)}
+                                    </span>
+                                    <button
+                                      onClick={() => handleCancelAppraise(e.id)}
+                                      className="flex items-center gap-1.5 rounded-lg border border-red-500/60 bg-red-500/20 px-3 py-1.5 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/30"
+                                    >
+                                      <X className="h-3 w-3" />
+                                      Cancel
+                                    </button>
+                                  </>
+                                )}
+                              </>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pr-2 text-sm leading-relaxed">
+                        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pr-3 text-sm leading-relaxed">
                           {(rightPanelTab[e.id] ?? "appraisal") === "appraisal" ? (
-                            e.appraisalExplanation ? <ExplanationText text={e.appraisalExplanation} /> : <span className="text-slate-500">No appraisal available</span>
+                            (e.formattedAppraisal ?? e.appraisalExplanation) ? (
+                              <div
+                                className="report-content min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-lg border border-slate-700/40 bg-slate-900/30 px-4 py-3 break-words [&_a]:break-all [&_a]:text-amber-400 [&_a]:underline [&_a:hover]:text-amber-300"
+                                dangerouslySetInnerHTML={{ __html: e.formattedAppraisal ?? e.appraisalExplanation ?? "" }}
+                              />
+                            ) : (
+                              <span className="text-slate-500">No appraisal available</span>
+                            )
                           ) : (rightPanelTab[e.id] ?? "appraisal") === "rules" ? (
-                            e.description ? <ExplanationText text={e.description} /> : <span className="text-slate-500">No rules available</span>
+                            (e.formattedDescription ?? e.description) ? (
+                              <div
+                                className="report-content min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-lg border border-slate-700/40 bg-slate-900/30 px-4 py-3 break-words [&_a]:break-all [&_a]:text-amber-400 [&_a]:underline [&_a:hover]:text-amber-300"
+                                dangerouslySetInnerHTML={{ __html: e.formattedDescription ?? e.description ?? "" }}
+                              />
+                            ) : (
+                              <span className="text-slate-500">No rules available</span>
+                            )
+                          ) : (rightPanelTab[e.id] ?? "appraisal") === "notes" ? (
+                            showAppraise ? (
+                              <div className="flex min-h-0 flex-1 flex-col gap-2">
+                                <textarea
+                                  value={noteEditingId === e.id ? noteDraft : e.note ?? ""}
+                                  onChange={(ev) => {
+                                    setNoteEditingId(e.id);
+                                    setNoteDraft(ev.target.value);
+                                  }}
+                                  onFocus={() => {
+                                    setNoteEditingId(e.id);
+                                    setNoteDraft(e.note ?? "");
+                                  }}
+                                  placeholder="Note (included in appraisal when you run Deep Appraise)"
+                                  className="min-h-24 flex-1 resize-none rounded-lg border border-slate-600/60 bg-slate-900/30 px-3 py-2 text-sm text-slate-300 placeholder-slate-500 focus:border-slate-500 focus:outline-none"
+                                  rows={6}
+                                />
+                              </div>
+                            ) : (
+                              <span className="text-slate-500">Add a label to unlock notes</span>
+                            )
                           ) : (
                             e.rulesAnalysis ? (
                               <div
-                                className="blindspots-report min-h-0 flex-1 overflow-y-auto rounded-lg border border-slate-700/40 bg-slate-900/30 px-4 py-3 [&_a]:text-amber-400 [&_a]:underline [&_a:hover]:text-amber-300"
+                                className="blindspots-report min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-lg border border-slate-700/40 bg-slate-900/30 px-4 py-3 break-words [&_a]:break-all [&_a]:text-amber-400 [&_a]:underline [&_a:hover]:text-amber-300"
                                 dangerouslySetInnerHTML={{ __html: e.rulesAnalysis }}
                               />
                             ) : e.description ? (
@@ -1917,7 +1930,7 @@ export function ScreenerContent({
             )}
           </div>
 
-          <div className="space-y-2">
+          <div className="min-w-0 space-y-2">
             {paginatedDisplayedEvents.map((e) => {
               const rawCreated = (e.raw as { createdAt?: string } | null)?.createdAt;
               const displayCreatedAt = e.createdAt ?? (rawCreated || null);
@@ -1932,9 +1945,10 @@ export function ScreenerContent({
                   })
                 : null;
               return (
-              <div key={e.id} className="flex max-h-[400px] w-full gap-3 items-stretch overflow-hidden">
-                <div className="w-1/2 min-w-0 shrink-0 overflow-y-auto rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-700/60">
+              <div key={e.id} className="flex max-h-[400px] w-full min-w-0 gap-3 items-stretch">
+                <div className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-700/60">
                 <div className="flex gap-3 p-3">
+                  {(rightPanelTab[e.id] ?? "appraisal") === "appraisal" ? (
                   <div className="flex shrink-0 flex-col items-center gap-0.5">
                     <button
                       onClick={() => handleSetLabel(e.id, "evaluating")}
@@ -2052,6 +2066,9 @@ export function ScreenerContent({
                       </button>
                     )}
                   </div>
+                  ) : (
+                  <div className="w-2 shrink-0" />
+                  )}
                   {(e.image ?? e.icon) && (
                     <img
                       src={e.image ?? e.icon ?? ""}
@@ -2403,113 +2420,10 @@ export function ScreenerContent({
                         />
                       </div>
                     )}
-                    {activeTab !== "discovery" && (
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                      <button
-                        onClick={() => handleAppraise(e.id, "think")}
-                        disabled={appraisingIds.has(e.id) || !e.rulesAnalysis}
-                        title={!e.rulesAnalysis ? "Run Analyze rules in Blindspots tab first" : undefined}
-                        className="flex items-center gap-1.5 rounded-lg border border-indigo-500/60 bg-indigo-500/20 px-3 py-1.5 text-xs font-medium text-indigo-300 transition-colors hover:bg-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {appraisingIds.has(e.id) ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <Brain className="h-3 w-3" />
-                        )}
-                        Deep Appraise
-                      </button>
-                      {e.lastThinkAppraisalDurationSeconds != null && !appraisingIds.has(e.id) && (
-                        <span className="text-xs text-slate-500 tabular-nums" title="Last deep appraisal">
-                          Deep: {formatDurationSeconds(e.lastThinkAppraisalDurationSeconds)}
-                        </span>
-                      )}
-                      <button
-                        onClick={() => handleAppraise(e.id, "reappraise")}
-                        disabled={appraisingIds.has(e.id) || !canReappraise(e)}
-                        className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-beige transition-colors hover:bg-slate-700/60 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {appraisingIds.has(e.id) ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <RotateCw className="h-3 w-3" />
-                        )}
-                        Reappraise
-                      </button>
-                      {e.lastReappraisalDurationSeconds != null && !appraisingIds.has(e.id) && (
-                        <span className="text-xs text-slate-500 tabular-nums" title="Last reappraisal">
-                          Reappraise: {formatDurationSeconds(e.lastReappraisalDurationSeconds)}
-                        </span>
-                      )}
-                      {appraisingIds.has(e.id) && (
-                        <>
-                          <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/40 px-2.5 py-1.5 text-xs text-slate-400 tabular-nums">
-                            <Clock className="h-3 w-3 shrink-0" />
-                            {formatElapsed(e.id)}
-                          </span>
-                          <button
-                            onClick={() => handleCancelAppraise(e.id)}
-                            className="flex items-center gap-1.5 rounded-lg border border-red-500/60 bg-red-500/20 px-3 py-1.5 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/30"
-                          >
-                            <X className="h-3 w-3" />
-                            Cancel
-                          </button>
-                        </>
-                      )}
-                    </div>
-                    )}
-                    {activeTab !== "discovery" && (
-                    <div className="mt-2">
-                      {noteEditingId === e.id ? (
-                        <div className="flex flex-col gap-2">
-                          <textarea
-                            value={noteDraft}
-                            onChange={(ev) => setNoteDraft(ev.target.value)}
-                            placeholder="Note (included in appraisal)"
-                            className="w-full rounded border border-slate-600/60 bg-transparent px-0 py-1 text-sm text-slate-300 placeholder-slate-500 focus:border-slate-500 focus:outline-none"
-                            rows={2}
-                            autoFocus
-                          />
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleSetNote(e.id, noteDraft.trim() || null)}
-                              disabled={savingNoteId === e.id}
-                              className="text-xs text-indigo-400 hover:text-indigo-300 disabled:opacity-50"
-                            >
-                              {savingNoteId === e.id ? "Saving…" : "Save"}
-                            </button>
-                            <button
-                              onClick={() => {
-                                setNoteEditingId(null);
-                                setNoteDraft("");
-                              }}
-                              className="text-xs text-slate-500 hover:text-slate-400"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            setNoteEditingId(e.id);
-                            setNoteDraft(e.note ?? "");
-                          }}
-                          className="flex items-center gap-2 text-left text-sm text-slate-500 hover:text-slate-400"
-                        >
-                          <StickyNote className={`h-3.5 w-3.5 shrink-0 ${e.note ? "text-amber-500/70" : ""}`} />
-                          {e.note ? (
-                            <span className="text-slate-400">{e.note}</span>
-                          ) : (
-                            <span>Add note</span>
-                          )}
-                        </button>
-                      )}
-                    </div>
-                    )}
                   </div>
                 </div>
                 </div>
-                <div className="flex w-1/2 min-w-0 shrink-0 flex-col rounded-xl border border-slate-700/60 bg-slate-800/30 p-3">
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-700/60 bg-slate-800/30 p-4">
                   <div className="mb-2 flex shrink-0 items-center justify-between gap-2">
                     <div className="flex gap-1">
                       <button
@@ -2530,27 +2444,137 @@ export function ScreenerContent({
                       >
                         Blindspots
                       </button>
-                    </div>
-                    {(rightPanelTab[e.id] ?? "appraisal") === "blindspots" && e.description && (
                       <button
-                        onClick={() => handleAnalyzeRules(e.id)}
-                        disabled={analyzingRulesId === e.id}
-                        className="ml-auto flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-beige transition-colors hover:bg-slate-700/60 disabled:cursor-not-allowed disabled:opacity-50"
+                        onClick={() => {
+                          setRightPanelTab((prev) => ({ ...prev, [e.id]: "notes" }));
+                          setNoteEditingId(e.id);
+                          setNoteDraft(e.note ?? "");
+                        }}
+                        className={`rounded px-2 py-1 text-xs font-medium transition-colors ${(rightPanelTab[e.id] ?? "appraisal") === "notes" ? "bg-slate-600/60 text-beige" : "text-slate-400 hover:bg-slate-700/50 hover:text-slate-300"}`}
                       >
-                        {analyzingRulesId === e.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <SearchCheck className="h-3 w-3" />}
-                        {analyzingRulesId === e.id ? "Analyzing…" : e.rulesAnalysis ? "Reanalyze rules" : "Analyze rules"}
+                        Notes
                       </button>
-                    )}
+                    </div>
+                    <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                      {(rightPanelTab[e.id] ?? "appraisal") === "notes" && (
+                        <>
+                          <button
+                            onClick={() => handleSetNote(e.id, (noteEditingId === e.id ? noteDraft : e.note ?? "").trim() || null)}
+                            disabled={savingNoteId === e.id}
+                            className="flex items-center gap-1.5 rounded-lg border border-indigo-500/60 bg-indigo-500/20 px-3 py-1.5 text-xs font-medium text-indigo-300 transition-colors hover:bg-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {savingNoteId === e.id ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                            {savingNoteId === e.id ? "Saving…" : "Save"}
+                          </button>
+                          <span className="text-xs text-slate-500 tabular-nums" title={e.noteUpdatedAt ? "Last saved" : undefined}>
+                            {e.noteUpdatedAt
+                              ? `Last saved: ${formatTimeAgo(e.noteUpdatedAt instanceof Date ? e.noteUpdatedAt.toISOString() : String(e.noteUpdatedAt))}`
+                              : "Not saved yet"}
+                          </span>
+                        </>
+                      )}
+                      {(rightPanelTab[e.id] ?? "appraisal") === "blindspots" && e.description && (
+                        <button
+                          onClick={() => handleAnalyzeRules(e.id)}
+                          disabled={analyzingRulesId === e.id}
+                          className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-beige transition-colors hover:bg-slate-700/60 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {analyzingRulesId === e.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <SearchCheck className="h-3 w-3" />}
+                          {analyzingRulesId === e.id ? "Analyzing…" : e.rulesAnalysis ? "Reanalyze rules" : "Analyze rules"}
+                        </button>
+                      )}
+                      {(rightPanelTab[e.id] ?? "appraisal") === "appraisal" && activeTab !== "discovery" && (
+                        <>
+                          <button
+                            onClick={() => handleAppraise(e.id, "think")}
+                            disabled={appraisingIds.has(e.id) || !e.rulesAnalysis}
+                            title={!e.rulesAnalysis ? "Run Analyze rules in Blindspots tab first" : undefined}
+                            className="flex items-center gap-1.5 rounded-lg border border-indigo-500/60 bg-indigo-500/20 px-3 py-1.5 text-xs font-medium text-indigo-300 transition-colors hover:bg-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {appraisingIds.has(e.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Brain className="h-3 w-3" />}
+                            Deep Appraise
+                          </button>
+                          {e.lastThinkAppraisalDurationSeconds != null && !appraisingIds.has(e.id) && (
+                            <span className="text-xs text-slate-500 tabular-nums" title="Last deep appraisal">
+                              Deep: {formatDurationSeconds(e.lastThinkAppraisalDurationSeconds)}
+                            </span>
+                          )}
+                          <button
+                            onClick={() => handleAppraise(e.id, "reappraise")}
+                            disabled={appraisingIds.has(e.id) || !canReappraise(e)}
+                            className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-beige transition-colors hover:bg-slate-700/60 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {appraisingIds.has(e.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCw className="h-3 w-3" />}
+                            Reappraise
+                          </button>
+                          {e.lastReappraisalDurationSeconds != null && !appraisingIds.has(e.id) && (
+                            <span className="text-xs text-slate-500 tabular-nums" title="Last reappraisal">
+                              Reappraise: {formatDurationSeconds(e.lastReappraisalDurationSeconds)}
+                            </span>
+                          )}
+                          {appraisingIds.has(e.id) && (
+                            <>
+                              <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/40 px-2.5 py-1.5 text-xs text-slate-400 tabular-nums">
+                                <Clock className="h-3 w-3 shrink-0" />
+                                {formatElapsed(e.id)}
+                              </span>
+                              <button
+                                onClick={() => handleCancelAppraise(e.id)}
+                                className="flex items-center gap-1.5 rounded-lg border border-red-500/60 bg-red-500/20 px-3 py-1.5 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/30"
+                              >
+                                <X className="h-3 w-3" />
+                                Cancel
+                              </button>
+                            </>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pr-2 text-sm leading-relaxed">
+                  <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pr-3 text-sm leading-relaxed">
                     {(rightPanelTab[e.id] ?? "appraisal") === "appraisal" ? (
-                      e.appraisalExplanation ? <ExplanationText text={e.appraisalExplanation} /> : <span className="text-slate-500">No appraisal available</span>
+                      (e.formattedAppraisal ?? e.appraisalExplanation) ? (
+                        <div
+                          className="report-content min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-lg border border-slate-700/40 bg-slate-900/30 px-4 py-3 break-words [&_a]:break-all [&_a]:text-amber-400 [&_a]:underline [&_a:hover]:text-amber-300"
+                          dangerouslySetInnerHTML={{ __html: e.formattedAppraisal ?? e.appraisalExplanation ?? "" }}
+                        />
+                      ) : (
+                        <span className="text-slate-500">No appraisal available</span>
+                      )
                     ) : (rightPanelTab[e.id] ?? "appraisal") === "rules" ? (
-                      e.description ? <ExplanationText text={e.description} /> : <span className="text-slate-500">No rules available</span>
+                      (e.formattedDescription ?? e.description) ? (
+                        <div
+                          className="report-content min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-lg border border-slate-700/40 bg-slate-900/30 px-4 py-3 break-words [&_a]:break-all [&_a]:text-amber-400 [&_a]:underline [&_a:hover]:text-amber-300"
+                          dangerouslySetInnerHTML={{ __html: e.formattedDescription ?? e.description ?? "" }}
+                        />
+                      ) : (
+                        <span className="text-slate-500">No rules available</span>
+                      )
+                    ) : (rightPanelTab[e.id] ?? "appraisal") === "notes" ? (
+                      activeTab !== "discovery" ? (
+                        <div className="flex min-h-0 flex-1 flex-col gap-2">
+                          <textarea
+                            value={noteEditingId === e.id ? noteDraft : e.note ?? ""}
+                            onChange={(ev) => {
+                              setNoteEditingId(e.id);
+                              setNoteDraft(ev.target.value);
+                            }}
+                            onFocus={() => {
+                              setNoteEditingId(e.id);
+                              setNoteDraft(e.note ?? "");
+                            }}
+                            placeholder="Note (included in appraisal when you run Deep Appraise)"
+                            className="min-h-24 flex-1 resize-none rounded-lg border border-slate-600/60 bg-slate-900/30 px-3 py-2 text-sm text-slate-300 placeholder-slate-500 focus:border-slate-500 focus:outline-none"
+                            rows={6}
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-slate-500">Add a label to unlock notes</span>
+                      )
                     ) : (
                       e.rulesAnalysis ? (
                         <div
-                          className="blindspots-report min-h-0 flex-1 overflow-y-auto rounded-lg border border-slate-700/40 bg-slate-900/30 px-4 py-3 [&_a]:text-amber-400 [&_a]:underline [&_a:hover]:text-amber-300"
+                          className="blindspots-report min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-lg border border-slate-700/40 bg-slate-900/30 px-4 py-3 break-words [&_a]:break-all [&_a]:text-amber-400 [&_a]:underline [&_a:hover]:text-amber-300"
                           dangerouslySetInnerHTML={{ __html: e.rulesAnalysis }}
                         />
                       ) : e.description ? (

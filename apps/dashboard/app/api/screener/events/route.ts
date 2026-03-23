@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { formatReportMarkdown } from "@/lib/format-markdown";
 import { prisma } from "@polymarket-hq/dashboard-prisma";
 
 const DEFAULT_LIMIT = 10_000;
@@ -34,7 +35,14 @@ export async function GET(req: Request) {
       const maxB = b.yev != null && b.nev != null ? Math.max(b.yev, b.nev) : -1;
       return maxB - maxA;
     });
-    return NextResponse.json(sorted);
+
+    const withFormatted = sorted.map((e) => {
+      const formattedDescription = e.description?.trim() ? formatReportMarkdown(e.description) : null;
+      const formattedAppraisal = e.appraisalExplanation?.trim() ? formatReportMarkdown(e.appraisalExplanation) : null;
+      return { ...e, formattedDescription, formattedAppraisal };
+    });
+
+    return NextResponse.json(withFormatted);
   } catch (err) {
     console.error("Screener events fetch error:", err);
     return NextResponse.json(

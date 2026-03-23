@@ -47,6 +47,7 @@ model ScreenerEvent {
   label         String?  @map("label") // "opportunity" | "unknowable" | "well_priced" | null (null = discovery)
   labelUpdatedAt DateTime? @map("label_updated_at") // When label was last set (for sorting evaluating by recency)
   note          String?  @db.Text @map("note") // User note; included in appraisal prompts
+  noteUpdatedAt DateTime? @map("note_updated_at") // When note was last saved
   tags          Json?    @map("tags") // Gamma API /markets/{id}/tags (array of {id, label, slug, ...})
   yesId         String?  @map("yes_id") // First clobTokenId (Yes outcome)
   noId          String?  @map("no_id")  // Second clobTokenId (No outcome)
