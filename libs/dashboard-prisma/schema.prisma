@@ -56,6 +56,8 @@ model ScreenerEvent {
   kellyPosition String?  @map("kelly_position") // "yes" | "no" - which side you're entering (default yes)
   kellyC        Float?   @map("kelly_c") // Kelly scaling factor (fractional Kelly = full Kelly / c)
   kellyCriterion Float?  @map("kelly_criterion") // Calculated Kelly criterion (fractional), displayed as %
+  rulesAnalysis  String? @db.Text @map("rules_analysis") // AI analysis of resolution rules (ambiguities, edge cases)
+  rulesAnalysisAt DateTime? @map("rules_analysis_at") // When rules were last analyzed
   deletedAt      DateTime? @map("deleted_at") // Soft delete; null = active
 
   @@index([syncedAt])

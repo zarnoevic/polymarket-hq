@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { RefreshCw, Filter, Calendar, CalendarPlus, BarChart3, ExternalLink, Loader2, RotateCw, X, Brain, Star, Compass, HelpCircle, BadgeCheck, TrendingUp, ClipboardList, ChevronDown, ChevronLeft, ChevronRight, AlertTriangle, StickyNote, BookOpen, Percent, Copy, ScrollText, Clock, Search, Tag, Plus, Minus, DollarSign, ArrowLeftRight } from "lucide-react";
+import { RefreshCw, Filter, Calendar, CalendarPlus, BarChart3, ExternalLink, Loader2, RotateCw, X, Brain, Star, Compass, HelpCircle, BadgeCheck, TrendingUp, ClipboardList, ChevronDown, ChevronLeft, ChevronRight, AlertTriangle, StickyNote, BookOpen, Percent, Copy, Clock, Search, Tag, Plus, Minus, DollarSign, ArrowLeftRight, SearchCheck } from "lucide-react";
 
 /** Icon: one circle with smaller circles sprouting (tree/siblings) */
 function SiblingsIcon({ className }: { className?: string }) {
@@ -21,6 +21,7 @@ function SiblingsIcon({ className }: { className?: string }) {
   );
 }
 import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
 import { PriceHistorySparkline } from "./PriceHistorySparkline";
 import { VolatilityDaysEstimate } from "./VolatilityDaysEstimate";
 import { OrderBookLabel } from "./OrderBookLabel";
@@ -87,6 +88,8 @@ type ScreenerEvent = {
   kellyPosition?: string | null; // DB stores "yes" | "no"
   kellyC?: number | null;
   kellyCriterion?: number | null;
+  rulesAnalysis?: string | null;
+  rulesAnalysisAt?: Date | null;
   raw?: unknown;
   tags?: unknown; // Gamma API tags: JsonValue from DB
 };
@@ -296,7 +299,8 @@ export function ScreenerContent({
       return changed ? next : prev;
     });
   }, [events]);
-  const [rulesPopupEventId, setRulesPopupEventId] = useState<string | null>(null);
+  const [rightPanelTab, setRightPanelTab] = useState<Record<string, "appraisal" | "rules" | "blindspots">>({});
+  const [analyzingRulesId, setAnalyzingRulesId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [portfolioSummary, setPortfolioSummary] = useState<{
     portfolioValue: number;
@@ -831,6 +835,37 @@ export function ScreenerContent({
       setRefreshing(false);
       setRefreshStartTime(null);
       setRefreshElapsedSec(0);
+    }
+  }
+
+  async function handleAnalyzeRules(eventId: string) {
+    setAnalyzingRulesId(eventId);
+    toast.info("Analyzing rules…");
+    try {
+      const res = await fetch("/api/screener/analyze-rules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Analysis failed");
+      toast.success("Rules analysis saved");
+      setEvents((prev) =>
+        prev.map((e) =>
+          e.id === eventId
+            ? {
+                ...e,
+                rulesAnalysis: data.rulesAnalysis ?? null,
+                rulesAnalysisAt: data.rulesAnalysisAt ? new Date(data.rulesAnalysisAt) : null,
+              }
+            : e
+        )
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Analysis failed";
+      toast.error(msg);
+    } finally {
+      setAnalyzingRulesId(null);
     }
   }
 
@@ -1438,17 +1473,12 @@ export function ScreenerContent({
               </div>
               <div className="space-y-2">
                 {paginatedSearchResults.map((e) => {
-                  const rightContent = e.appraisalExplanation
-                    ? { title: "Appraisal explanation", text: e.appraisalExplanation }
-                    : e.description
-                      ? { title: "Market description", text: e.description }
-                      : null;
                   const rawCreated = (e.raw as { createdAt?: string } | null)?.createdAt;
                   const displayCreatedAt = e.createdAt ?? (rawCreated || null);
                   const showAppraise = e.label != null;
                   return (
-                    <div key={`search-${e.id}`} className="flex w-full gap-3 items-stretch">
-                      <div className="w-1/2 min-w-0 shrink-0 overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-700/60">
+                    <div key={`search-${e.id}`} className="flex max-h-[400px] w-full gap-3 items-stretch overflow-hidden">
+                      <div className="w-1/2 min-w-0 shrink-0 overflow-y-auto rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-700/60">
                         <div className="flex gap-3 p-3">
                           <div className="flex shrink-0 flex-col items-center gap-0.5">
                             <button
@@ -1625,15 +1655,16 @@ export function ScreenerContent({
                               <div className="mt-2 flex flex-wrap items-center gap-1.5">
                                 <button
                                   onClick={() => handleAppraise(e.id, "think")}
-                                  disabled={appraisingIds.has(e.id)}
-                                  className="flex items-center gap-1.5 rounded-lg border border-indigo-500/60 bg-indigo-500/20 px-3 py-1.5 text-xs font-medium text-indigo-300 transition-colors hover:bg-indigo-500/30 disabled:opacity-50"
+                                  disabled={appraisingIds.has(e.id) || !e.rulesAnalysis}
+                                  title={!e.rulesAnalysis ? "Run Analyze rules in Blindspots tab first" : undefined}
+                                  className="flex items-center gap-1.5 rounded-lg border border-indigo-500/60 bg-indigo-500/20 px-3 py-1.5 text-xs font-medium text-indigo-300 transition-colors hover:bg-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                   {appraisingIds.has(e.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Brain className="h-3 w-3" />}
-                                  Think Appraise
+                                  Deep Appraise
                                 </button>
                                 <button
                                   onClick={() => handleAppraise(e.id, "reappraise")}
-                                  disabled={appraisingIds.has(e.id) || e.lastAppraised == null}
+                                  disabled={appraisingIds.has(e.id) || !canReappraise(e)}
                                   className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-beige transition-colors hover:bg-slate-700/60 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   {appraisingIds.has(e.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCw className="h-3 w-3" />}
@@ -1646,15 +1677,6 @@ export function ScreenerContent({
                                   >
                                     <X className="h-3 w-3" />
                                     Cancel
-                                  </button>
-                                )}
-                                {e.description && (
-                                  <button
-                                    onClick={() => setRulesPopupEventId(e.id)}
-                                    className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-700/60"
-                                  >
-                                    <ScrollText className="h-3 w-3" />
-                                    Show rules
                                   </button>
                                 )}
                               </div>
@@ -1690,10 +1712,57 @@ export function ScreenerContent({
                           </div>
                         </div>
                       </div>
-                      <div className="w-1/2 min-w-0 shrink-0 rounded-xl border border-slate-700/60 bg-slate-800/30 p-3">
-                        <p className="mb-2 text-sm font-medium text-slate-400">{rightContent ? rightContent.title : "Market description"}</p>
-                        <div className="max-h-56 overflow-y-auto pr-2 text-sm leading-relaxed">
-                          {rightContent ? <ExplanationText text={rightContent.text} /> : <span className="text-slate-500">No description available</span>}
+                      <div className="flex w-1/2 min-w-0 shrink-0 flex-col rounded-xl border border-slate-700/60 bg-slate-800/30 p-3">
+                        <div className="mb-2 flex shrink-0 items-center justify-between gap-2">
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => setRightPanelTab((prev) => ({ ...prev, [e.id]: "appraisal" }))}
+                              className={`rounded px-2 py-1 text-xs font-medium transition-colors ${(rightPanelTab[e.id] ?? "appraisal") === "appraisal" ? "bg-slate-600/60 text-beige" : "text-slate-400 hover:bg-slate-700/50 hover:text-slate-300"}`}
+                            >
+                              Appraisal
+                            </button>
+                            <button
+                              onClick={() => setRightPanelTab((prev) => ({ ...prev, [e.id]: "rules" }))}
+                              className={`rounded px-2 py-1 text-xs font-medium transition-colors ${(rightPanelTab[e.id] ?? "appraisal") === "rules" ? "bg-slate-600/60 text-beige" : "text-slate-400 hover:bg-slate-700/50 hover:text-slate-300"}`}
+                            >
+                              Rules
+                            </button>
+                            <button
+                              onClick={() => setRightPanelTab((prev) => ({ ...prev, [e.id]: "blindspots" }))}
+                              className={`rounded px-2 py-1 text-xs font-medium transition-colors ${(rightPanelTab[e.id] ?? "appraisal") === "blindspots" ? "bg-slate-600/60 text-beige" : "text-slate-400 hover:bg-slate-700/50 hover:text-slate-300"}`}
+                            >
+                              Blindspots
+                            </button>
+                          </div>
+                          {(rightPanelTab[e.id] ?? "appraisal") === "blindspots" && e.description && (
+                            <button
+                              onClick={() => handleAnalyzeRules(e.id)}
+                              disabled={analyzingRulesId === e.id}
+                              className="ml-auto flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-beige transition-colors hover:bg-slate-700/60 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {analyzingRulesId === e.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <SearchCheck className="h-3 w-3" />}
+                              {analyzingRulesId === e.id ? "Analyzing…" : e.rulesAnalysis ? "Reanalyze rules" : "Analyze rules"}
+                            </button>
+                          )}
+                        </div>
+                        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pr-2 text-sm leading-relaxed">
+                          {(rightPanelTab[e.id] ?? "appraisal") === "appraisal" ? (
+                            e.appraisalExplanation ? <ExplanationText text={e.appraisalExplanation} /> : <span className="text-slate-500">No appraisal available</span>
+                          ) : (rightPanelTab[e.id] ?? "appraisal") === "rules" ? (
+                            e.description ? <ExplanationText text={e.description} /> : <span className="text-slate-500">No rules available</span>
+                          ) : (
+                            e.rulesAnalysis ? (
+                              <div className="prose prose-invert prose-sm max-w-none text-slate-300 prose-headings:text-slate-200 prose-strong:text-slate-100 prose-em:text-amber-200/90">
+                                <ReactMarkdown>{e.rulesAnalysis}</ReactMarkdown>
+                              </div>
+                            ) : e.description ? (
+                              <div className="flex min-h-0 flex-1 items-center justify-center">
+                                <span className="text-slate-500">No blindspots analysis yet. Click Analyze rules above.</span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-500">No rules available to analyze</span>
+                            )
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1850,11 +1919,6 @@ export function ScreenerContent({
 
           <div className="space-y-2">
             {paginatedDisplayedEvents.map((e) => {
-              const rightContent = e.appraisalExplanation
-                ? { title: "Appraisal explanation", text: e.appraisalExplanation }
-                : e.description
-                  ? { title: "Market description", text: e.description }
-                  : null;
               const rawCreated = (e.raw as { createdAt?: string } | null)?.createdAt;
               const displayCreatedAt = e.createdAt ?? (rawCreated || null);
               const isKellyTab = (kellyTabs as readonly string[]).includes(activeTab);
@@ -1868,8 +1932,8 @@ export function ScreenerContent({
                   })
                 : null;
               return (
-              <div key={e.id} className="flex w-full gap-3 items-stretch">
-                <div className="w-1/2 min-w-0 shrink-0 overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-700/60">
+              <div key={e.id} className="flex max-h-[400px] w-full gap-3 items-stretch overflow-hidden">
+                <div className="w-1/2 min-w-0 shrink-0 overflow-y-auto rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-700/60">
                 <div className="flex gap-3 p-3">
                   <div className="flex shrink-0 flex-col items-center gap-0.5">
                     <button
@@ -2343,24 +2407,25 @@ export function ScreenerContent({
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
                       <button
                         onClick={() => handleAppraise(e.id, "think")}
-                        disabled={appraisingIds.has(e.id)}
-                        className="flex items-center gap-1.5 rounded-lg border border-indigo-500/60 bg-indigo-500/20 px-3 py-1.5 text-xs font-medium text-indigo-300 transition-colors hover:bg-indigo-500/30 disabled:opacity-50"
+                        disabled={appraisingIds.has(e.id) || !e.rulesAnalysis}
+                        title={!e.rulesAnalysis ? "Run Analyze rules in Blindspots tab first" : undefined}
+                        className="flex items-center gap-1.5 rounded-lg border border-indigo-500/60 bg-indigo-500/20 px-3 py-1.5 text-xs font-medium text-indigo-300 transition-colors hover:bg-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {appraisingIds.has(e.id) ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
                         ) : (
                           <Brain className="h-3 w-3" />
                         )}
-                        Think Appraise
+                        Deep Appraise
                       </button>
                       {e.lastThinkAppraisalDurationSeconds != null && !appraisingIds.has(e.id) && (
-                        <span className="text-xs text-slate-500 tabular-nums" title="Last think appraisal">
-                          Think: {formatDurationSeconds(e.lastThinkAppraisalDurationSeconds)}
+                        <span className="text-xs text-slate-500 tabular-nums" title="Last deep appraisal">
+                          Deep: {formatDurationSeconds(e.lastThinkAppraisalDurationSeconds)}
                         </span>
                       )}
                       <button
                         onClick={() => handleAppraise(e.id, "reappraise")}
-                        disabled={appraisingIds.has(e.id) || e.lastAppraised == null}
+                        disabled={appraisingIds.has(e.id) || !canReappraise(e)}
                         className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-beige transition-colors hover:bg-slate-700/60 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {appraisingIds.has(e.id) ? (
@@ -2389,15 +2454,6 @@ export function ScreenerContent({
                             Cancel
                           </button>
                         </>
-                      )}
-                      {e.description && (
-                        <button
-                          onClick={() => setRulesPopupEventId(e.id)}
-                          className="flex items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-700/60"
-                        >
-                          <ScrollText className="h-3 w-3" />
-                          Show rules
-                        </button>
                       )}
                     </div>
                     )}
@@ -2453,13 +2509,56 @@ export function ScreenerContent({
                   </div>
                 </div>
                 </div>
-                <div className="w-1/2 min-w-0 shrink-0 rounded-xl border border-slate-700/60 bg-slate-800/30 p-3">
-                  <p className="mb-2 text-sm font-medium text-slate-400">{rightContent ? rightContent.title : "Market description"}</p>
-                  <div className="max-h-56 overflow-y-auto pr-2 text-sm leading-relaxed">
-                    {rightContent ? (
-                      <ExplanationText text={rightContent.text} />
+                <div className="flex w-1/2 min-w-0 shrink-0 flex-col rounded-xl border border-slate-700/60 bg-slate-800/30 p-3">
+                  <div className="mb-2 flex shrink-0 items-center justify-between gap-2">
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => setRightPanelTab((prev) => ({ ...prev, [e.id]: "appraisal" }))}
+                        className={`rounded px-2 py-1 text-xs font-medium transition-colors ${(rightPanelTab[e.id] ?? "appraisal") === "appraisal" ? "bg-slate-600/60 text-beige" : "text-slate-400 hover:bg-slate-700/50 hover:text-slate-300"}`}
+                      >
+                        Appraisal
+                      </button>
+                      <button
+                        onClick={() => setRightPanelTab((prev) => ({ ...prev, [e.id]: "rules" }))}
+                        className={`rounded px-2 py-1 text-xs font-medium transition-colors ${(rightPanelTab[e.id] ?? "appraisal") === "rules" ? "bg-slate-600/60 text-beige" : "text-slate-400 hover:bg-slate-700/50 hover:text-slate-300"}`}
+                      >
+                        Rules
+                      </button>
+                      <button
+                        onClick={() => setRightPanelTab((prev) => ({ ...prev, [e.id]: "blindspots" }))}
+                        className={`rounded px-2 py-1 text-xs font-medium transition-colors ${(rightPanelTab[e.id] ?? "appraisal") === "blindspots" ? "bg-slate-600/60 text-beige" : "text-slate-400 hover:bg-slate-700/50 hover:text-slate-300"}`}
+                      >
+                        Blindspots
+                      </button>
+                    </div>
+                    {(rightPanelTab[e.id] ?? "appraisal") === "blindspots" && e.description && (
+                      <button
+                        onClick={() => handleAnalyzeRules(e.id)}
+                        disabled={analyzingRulesId === e.id}
+                        className="ml-auto flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-600/60 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-beige transition-colors hover:bg-slate-700/60 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {analyzingRulesId === e.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <SearchCheck className="h-3 w-3" />}
+                        {analyzingRulesId === e.id ? "Analyzing…" : e.rulesAnalysis ? "Reanalyze rules" : "Analyze rules"}
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pr-2 text-sm leading-relaxed">
+                    {(rightPanelTab[e.id] ?? "appraisal") === "appraisal" ? (
+                      e.appraisalExplanation ? <ExplanationText text={e.appraisalExplanation} /> : <span className="text-slate-500">No appraisal available</span>
+                    ) : (rightPanelTab[e.id] ?? "appraisal") === "rules" ? (
+                      e.description ? <ExplanationText text={e.description} /> : <span className="text-slate-500">No rules available</span>
                     ) : (
-                      <span className="text-slate-500">No description available</span>
+                      e.rulesAnalysis ? (
+                        <div className="prose prose-invert prose-sm max-w-none text-slate-300 prose-headings:text-slate-200 prose-strong:text-slate-100 prose-em:text-amber-200/90">
+                          <ReactMarkdown>{e.rulesAnalysis}</ReactMarkdown>
+                        </div>
+                      ) : e.description ? (
+                        <div className="flex min-h-0 flex-1 items-center justify-center">
+                          <span className="text-slate-500">No blindspots analysis yet. Click Analyze rules above.</span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-500">No rules available to analyze</span>
+                      )
                     )}
                   </div>
                 </div>
@@ -2492,36 +2591,6 @@ export function ScreenerContent({
       )}
         </div>
       )}
-
-      {rulesPopupEventId && (() => {
-        const ev = events.find((e) => e.id === rulesPopupEventId);
-        if (!ev?.description) return null;
-        return (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-            onClick={() => setRulesPopupEventId(null)}
-          >
-            <div
-              className="max-h-[85vh] w-full max-w-2xl overflow-hidden rounded-xl border border-slate-700/60 bg-slate-900 shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between border-b border-slate-700/60 px-5 py-3">
-                <h3 className="truncate font-medium text-beige">{ev.title}</h3>
-                <button
-                  onClick={() => setRulesPopupEventId(null)}
-                  className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-700/60 hover:text-beige"
-                  aria-label="Close"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-              <div className="max-h-[calc(85vh-4rem)] overflow-y-auto p-5">
-                <ExplanationText text={ev.description} />
-              </div>
-            </div>
-          </div>
-        );
-      })()}
 
     </>
   );

@@ -141,7 +141,14 @@ async function appraiseOne(
     ) {
       return {
         ok: false,
-        error: "Reappraise requires a previous deep appraisal (last_appraised must exist)",
+        error: "Reappraise requires a previous appraisal (last_appraised must exist)",
+      };
+    }
+  } else {
+    if (!event.rulesAnalysis?.trim()) {
+      return {
+        ok: false,
+        error: "Appraise requires blindspots rules analysis. Run Analyze rules in the Blindspots tab first.",
       };
     }
   }
@@ -190,7 +197,11 @@ async function appraiseOne(
       ? `\n\nImportant: the market was created on ${createdStr ?? "unknown"} and will end on ${endStr ?? "unknown"}. Unless specified otherwise, the event(s) referenced apply only to this specific period.`
       : "";
 
-  const userMessage = `Event: ${event.title}\n${event.description ? `\nDescription: ${event.description}\n` : ""}${dateRangeSuffix}${noteSuffix}\n\n${prompt}`;
+  const blindspotsSuffix = event.rulesAnalysis?.trim()
+    ? `\n\nBlindspots / rules analysis (consider these resolution risks and ambiguities in your appraisal):\n${event.rulesAnalysis.trim()}`
+    : "";
+
+  const userMessage = `Event: ${event.title}\n${event.description ? `\nDescription: ${event.description}\n` : ""}${dateRangeSuffix}${noteSuffix}${blindspotsSuffix}\n\n${prompt}`;
 
   const model =
     isThink
