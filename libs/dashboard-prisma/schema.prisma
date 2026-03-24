@@ -140,6 +140,21 @@ model PositionCategoryAssignment {
 }
 
 
+// Portfolio value over time (one row per dashboard load / snapshot)
+model PortfolioPriceSnapshot {
+  id              String   @id @default(uuid()) @map("id")
+  wallet          String   @map("wallet")
+  capturedAt      DateTime @default(now()) @map("captured_at")
+  cash            Float    @map("cash")
+  positionsValue  Float    @map("positions_value")
+  totalValue      Float    @map("total_value")
+  /// Per-position current value (USD) keyed by asset (clob token id)
+  positionValues  Json     @map("position_values")
+
+  @@index([wallet, capturedAt])
+  @@map("portfolio_price_snapshots")
+}
+
 // Placeholder for future Polymarket data sync
 model SyncLog {
   id         String   @id @default(uuid()) @map("id")

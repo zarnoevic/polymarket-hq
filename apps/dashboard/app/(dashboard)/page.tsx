@@ -1,9 +1,15 @@
 import { fetchActivity } from "@/lib/polymarket";
 import {
+  buildPositionValueMap,
+  fetchPortfolioHistory,
+  recordPortfolioSnapshot,
+} from "@/lib/portfolio-snapshot";
+import {
   computePositionAverages,
   computeTotalWinChances,
   formatRoi,
 } from "@/lib/position-metrics";
+import { PortfolioValueChart } from "@/app/components/PortfolioValueChart";
 import {
   BarChart3,
   Trophy,
@@ -41,6 +47,7 @@ const DEFAULT_WALLET = "0x25012ec798e4861e38c645df919f86dc3c177e28";
 // Showing 1–100 of 2,406,343 results
 const TOTAL_TRADERS = 2_406_343;
 
+export const dynamic = "force-dynamic";
 
 // Polygon USDC.e (bridged) - 6 decimals
 const USDC_E_POLYGON = "0x2791bca1f2de4661ed88a30c99a7a9449aa84174" as const;
@@ -298,6 +305,30 @@ export default async function HomePage() {
     }, 0);
 
   const portfolioValue = (deployableCapital ?? 0) + (totalValue ?? 0);
+  const walletAddr = process.env.POLYMARKET_MAIN_WALLET ?? DEFAULT_WALLET;
+  const positionsValueForSnapshot =
+    totalValue != null
+      ? totalValue
+      : rawPositions.reduce((s, p) => s + p.currentValue, 0);
+  const cashForSnapshot = deployableCapital ?? 0;
+  const positionValuesMap = buildPositionValueMap(rawPositions);
+
+  await recordPortfolioSnapshot({
+    wallet: walletAddr,
+    cash: cashForSnapshot,
+    positionsValue: positionsValueForSnapshot,
+    totalValue: cashForSnapshot + positionsValueForSnapshot,
+    positionValues: positionValuesMap,
+  });
+
+  const portfolioHistoryRaw = await fetchPortfolioHistory(walletAddr);
+  const portfolioHistory = portfolioHistoryRaw.map((r) => ({
+    capturedAt: r.capturedAt,
+    totalValue: r.totalValue,
+    cash: r.cash,
+    positionsValue: r.positionsValue,
+  }));
+
   const positionsPct =
     portfolioValue > 0 && totalValue != null
       ? ((totalValue / portfolioValue) * 100)
@@ -510,7 +541,7 @@ export default async function HomePage() {
               </div>
               <CategoryCompositionPieChart
                 positions={positions}
-                wallet={process.env.POLYMARKET_MAIN_WALLET ?? DEFAULT_WALLET}
+                wallet={walletAddr}
               />
             </div>
           )}
@@ -653,12 +684,15 @@ export default async function HomePage() {
                 </div>
               </div>
 
+              <div className="border-t border-slate-700/50 px-6 py-4">
+                <PortfolioValueChart history={portfolioHistory} />
+              </div>
             </div>
 
             {positions.length > 0 && (
               <CategorizedPositionsList
                 positions={positions}
-                wallet={process.env.POLYMARKET_MAIN_WALLET ?? DEFAULT_WALLET}
+                wallet={walletAddr}
               />
             )}
 
@@ -682,7 +716,7 @@ export default async function HomePage() {
           {positions.length > 0 && (
             <DashboardPieCharts
               positions={positions}
-              wallet={process.env.POLYMARKET_MAIN_WALLET ?? DEFAULT_WALLET}
+              wallet={walletAddr}
             />
           )}
         </div>

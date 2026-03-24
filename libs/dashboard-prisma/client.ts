@@ -6,9 +6,8 @@ const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 // when DATABASE_URL is undefined or empty.
 const dbUrl = process.env.DATABASE_URL?.trim();
 
-const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
+function createPrismaClient() {
+  return new PrismaClient({
     datasourceUrl: dbUrl,
     log:
       process.env.NODE_ENV === "development"
@@ -19,9 +18,13 @@ const prisma =
           ]
         : ["error"],
   });
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
 }
+
+// Only cache on globalThis in production. In dev, caching a PrismaClient across hot reloads
+// leaves a stale instance without delegates added after `prisma generate` (e.g. new models).
+const prisma =
+  process.env.NODE_ENV === "production"
+    ? (globalForPrisma.prisma ??= createPrismaClient())
+    : createPrismaClient();
 
 export { prisma };

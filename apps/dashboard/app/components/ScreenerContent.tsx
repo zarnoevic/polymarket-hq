@@ -1433,11 +1433,10 @@ export function ScreenerContent({
                   const displayCreatedAt = e.createdAt ?? (rawCreated || null);
                   const showAppraise = e.label != null;
                   return (
-                    <div key={`search-${e.id}`} className="flex max-h-[400px] w-full min-w-0 gap-3 items-stretch">
-                      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-700/60">
-                        <div className="flex gap-3 p-3">
-                          {(rightPanelTab[e.id] ?? "appraisal") === "appraisal" ? (
-                          <div className="flex shrink-0 flex-col items-center gap-0.5">
+                    <div key={`search-${e.id}`} className="flex h-[400px] min-h-0 w-full min-w-0 gap-3 items-stretch">
+                      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-700/60">
+                        <div className="flex min-h-0 flex-1 gap-3 p-3">
+                          <div className="flex shrink-0 flex-col items-center gap-0.5 self-start">
                             <button
                               onClick={() => handleSetLabel(e.id, "evaluating")}
                               className={`rounded p-0.5 transition-colors ${e.label === "evaluating" ? "text-violet-400" : "text-slate-500 hover:text-violet-400/70"}`}
@@ -1518,9 +1517,8 @@ export function ScreenerContent({
                               </button>
                             )}
                           </div>
-                          ) : (
-                          <div className="w-2 shrink-0" />
-                          )}
+                          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
+                            <div className="flex gap-3">
                           {(e.image ?? e.icon) && (
                             <img src={e.image ?? e.icon ?? ""} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
                           )}
@@ -1612,6 +1610,8 @@ export function ScreenerContent({
                               </div>
                             </div>
                           </div>
+                        </div>
+                        </div>
                         </div>
                       </div>
                       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-700/60 bg-slate-800/30 p-4">
@@ -1945,11 +1945,10 @@ export function ScreenerContent({
                   })
                 : null;
               return (
-              <div key={e.id} className="flex max-h-[400px] w-full min-w-0 gap-3 items-stretch">
-                <div className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-700/60">
-                <div className="flex gap-3 p-3">
-                  {(rightPanelTab[e.id] ?? "appraisal") === "appraisal" ? (
-                  <div className="flex shrink-0 flex-col items-center gap-0.5">
+              <div key={e.id} className="flex h-[400px] min-h-0 w-full min-w-0 gap-3 items-stretch">
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900/50 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-700/60">
+                <div className="flex min-h-0 flex-1 gap-3 p-3">
+                  <div className="flex shrink-0 flex-col items-center gap-0.5 self-start">
                     <button
                       onClick={() => handleSetLabel(e.id, "evaluating")}
                       className={`rounded p-0.5 transition-colors ${
@@ -2066,9 +2065,8 @@ export function ScreenerContent({
                       </button>
                     )}
                   </div>
-                  ) : (
-                  <div className="w-2 shrink-0" />
-                  )}
+                  <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
+                    <div className="flex gap-3">
                   {(e.image ?? e.icon) && (
                     <img
                       src={e.image ?? e.icon ?? ""}
@@ -2421,6 +2419,8 @@ export function ScreenerContent({
                       </div>
                     )}
                   </div>
+                </div>
+                </div>
                 </div>
                 </div>
                 <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-700/60 bg-slate-800/30 p-4">
