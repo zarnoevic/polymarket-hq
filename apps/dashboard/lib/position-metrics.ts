@@ -91,6 +91,44 @@ export function computePAROINumeric(
   return r * (365 / days);
 }
 
+/**
+ * Category PAROI — one blended rate for the whole category (not an average of position PAROIs).
+ * Weight by |currentValue|. P_cat = Σ(P_i × w_i) / Σ(w_i), d_cat = Σ(d_i × w_i) / Σ(w_i)
+ * with P_i = min(0.99, curPrice_i + spread_i) and d_i = daysToResolution; then
+ * PAROI = ((1 − P_cat) / P_cat) × (365 / d_cat). Positions without valid P_i or d_i are skipped.
+ */
+export function computeCategoryPAROINumeric(
+  positions: Array<{
+    curPrice: number;
+    endDate: string;
+    title?: string;
+    currentValue: number;
+    spread?: number | null;
+  }>
+): number | null {
+  let sumW = 0;
+  let sumBuyPrice = 0;
+  let sumDays = 0;
+  for (const pos of positions) {
+    const w = Math.abs(pos.currentValue);
+    if (w <= 0 || !Number.isFinite(w)) continue;
+    const days = daysToResolution(pos.endDate, pos.title);
+    if (days == null || days <= 0) continue;
+    const buyPrice = Math.min(0.99, pos.curPrice + (pos.spread ?? 0));
+    if (buyPrice <= 0 || buyPrice >= 1 || !Number.isFinite(buyPrice)) continue;
+    sumW += w;
+    sumBuyPrice += buyPrice * w;
+    sumDays += days * w;
+  }
+  if (sumW <= 0) return null;
+  const pCat = sumBuyPrice / sumW;
+  const dCat = sumDays / sumW;
+  if (!Number.isFinite(pCat) || !Number.isFinite(dCat) || dCat <= 0) return null;
+  const r = (1 - pCat) / pCat;
+  if (!Number.isFinite(r)) return null;
+  return r * (365 / dCat);
+}
+
 /** ROI as "Xx" where 1x = 100% return. Supports negative values (e.g. -1.5x). */
 export function formatRoiAsX(roi: number): string {
   if (!Number.isFinite(roi)) return "—";

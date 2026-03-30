@@ -43,3 +43,9 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Inline KaTeX in position metric labels — match muted row text */
+.pm-katex .katex,
+.pm-katex .katex * {
+  color: rgb(var(--foreground-muted-rgb)) !important;
+}

@@ -3,9 +3,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { PositionCard, type Position } from "./PositionsList";
-import { formatRoi, computeROINumeric } from "@/lib/position-metrics";
-import { MetricTooltip } from "./MetricTooltip";
-import { METRIC_TOOLTIPS } from "@/lib/metric-tooltips";
+import {
+  formatRoi,
+  computeROINumeric,
+  computeCategoryPAROINumeric,
+} from "@/lib/position-metrics";
+import { ParoiLabel, RoiLabel } from "./PositionMetricLabels";
 import { FolderPlus, GripVertical, Pencil, Trash2, RefreshCw } from "lucide-react";
 import {
   fetchPositionCategories,
@@ -14,31 +17,6 @@ import {
 } from "@/lib/position-categories";
 
 type Category = { id: string; name: string };
-
-function daysToResolution(endDateStr: string, title?: string): number | null {
-  let d: Date | null = null;
-  if (endDateStr) {
-    d = new Date(endDateStr);
-    if (isNaN(d.getTime())) {
-      const m = endDateStr.trim().replace(/,/g, "");
-      const year = new Date().getFullYear();
-      d = new Date(`${m} ${year}`);
-      if (isNaN(d.getTime())) d = new Date(`${m} ${year + 1}`);
-    }
-  }
-  const m = title?.match(/(?:by\s+)?(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2})/i);
-  if (!d && m) {
-    const year = new Date().getFullYear();
-    d = new Date(`${m[1]} ${m[2]}, ${year}`);
-    if (d < new Date()) d.setFullYear(year + 1);
-  }
-  if (!d || isNaN(d.getTime())) return null;
-  const now = new Date();
-  const resUtc = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
-  const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-  const days = Math.round((resUtc - todayUtc) / (24 * 60 * 60 * 1000));
-  return days > 0 ? Math.max(1, days) : null;
-}
 
 /** PROI (Present): simple (1 - buyPrice) / buyPrice, no annualization. */
 function computePROINumeric(curPrice: number, spread?: number | null): number | null {
@@ -79,16 +57,28 @@ function formatCompactUsd(value: number, decimals = 0): string {
 function computeCategoryMetrics(posList: Position[]): {
   totalInitialValue: number;
   totalCurrentValue: number;
+  totalMaxPayout: number;
   totalReturn: number;
   returnPct: number | null;
   croi: string;
   proi: string;
+  paroi: string;
 } {
   if (posList.length === 0) {
-    return { totalInitialValue: 0, totalCurrentValue: 0, totalReturn: 0, returnPct: null, croi: "—", proi: "—" };
+    return {
+      totalInitialValue: 0,
+      totalCurrentValue: 0,
+      totalMaxPayout: 0,
+      totalReturn: 0,
+      returnPct: null,
+      croi: "—",
+      proi: "—",
+      paroi: "—",
+    };
   }
   const totalInitialValue = posList.reduce((s, p) => s + Math.abs(p.initialValue), 0);
   const totalCurrentValue = posList.reduce((s, p) => s + Math.abs(p.currentValue), 0);
+  const totalMaxPayout = posList.reduce((s, p) => s + Math.abs(p.size), 0);
   const totalReturn = posList.reduce((s, p) => s + p.cashPnl, 0);
   const returnPct =
     totalInitialValue > 0 && Number.isFinite(totalReturn / totalInitialValue)
@@ -114,7 +104,19 @@ function computeCategoryMetrics(posList: Position[]): {
   }
   const croi = croiWeight > 0 ? formatRoi(croiSum / croiWeight) : "—";
   const proi = proiWeight > 0 ? formatRoi(proiSum / proiWeight) : "—";
-  return { totalInitialValue, totalCurrentValue, totalReturn, returnPct, croi, proi };
+  const paroiNum = computeCategoryPAROINumeric(posList);
+  const paroi =
+    paroiNum != null && Number.isFinite(paroiNum) ? formatRoi(paroiNum) : "—";
+  return {
+    totalInitialValue,
+    totalCurrentValue,
+    totalMaxPayout,
+    totalReturn,
+    returnPct,
+    croi,
+    proi,
+    paroi,
+  };
 }
 
 export function CategorizedPositionsList({
@@ -365,30 +367,45 @@ export function CategorizedPositionsList({
                   <h3 className="text-sm font-medium text-slate-300">{cat.name}</h3>
                   <span className="text-xs text-slate-500">({posList.length})</span>
                   {posList.length > 0 && (
-                    <div className="ml-3 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs">
-                      <span className="font-mono text-slate-400">
+                    <div className="ml-3 flex flex-wrap items-baseline gap-y-0.5 text-xs">
+                      <span className="inline-flex flex-wrap items-baseline gap-0 font-mono text-slate-400">
+                        {metrics.totalMaxPayout > 0 ? (
+                          <>
+                            {((metrics.totalInitialValue / metrics.totalMaxPayout) * 100).toFixed(2)}¢ →{" "}
+                            {((metrics.totalCurrentValue / metrics.totalMaxPayout) * 100).toFixed(2)}¢
+                          </>
+                        ) : (
+                          "— → —"
+                        )}
+                        <span className="mx-1.5 text-slate-600">·</span>
                         {formatCompactUsd(metrics.totalInitialValue, 0)} →{" "}
                         {formatCompactUsd(metrics.totalCurrentValue, 0)}
-                      </span>
-                      <span
-                        className={`font-mono ${metrics.totalReturn >= 0 ? "text-emerald-400" : "text-red-400"}`}
-                      >
-                        {metrics.totalReturn >= 0 ? "+" : ""}
-                        {formatCompactUsd(metrics.totalReturn, 0)}
-                        {metrics.returnPct != null && (
-                          <>
-                            {" "}
-                            ({metrics.returnPct >= 0 ? "+" : ""}
-                            {metrics.returnPct.toFixed(1)}%)
-                          </>
-                        )}
-                      </span>
-                      <span className="inline-flex items-center gap-1 font-mono text-slate-400">
-                        <MetricTooltip
-                          content={`CROI (entry): ${METRIC_TOOLTIPS.CROI}\n\nPROI (current): ${METRIC_TOOLTIPS.PROI}`}
-                          trigger="ROI"
-                        />{" "}
-                        {metrics.croi} → {metrics.proi}
+                        <span className="mx-1.5 text-slate-600">·</span>
+                        <span
+                          className={
+                            metrics.totalReturn >= 0 ? "text-emerald-400" : "text-red-400"
+                          }
+                        >
+                          {metrics.totalReturn >= 0 ? "+" : ""}
+                          {formatCompactUsd(metrics.totalReturn, 0)}
+                          {metrics.returnPct != null && (
+                            <>
+                              {" "}
+                              ({metrics.returnPct >= 0 ? "+" : ""}
+                              {metrics.returnPct.toFixed(1)}%)
+                            </>
+                          )}
+                        </span>
+                        <span className="mx-1.5 text-slate-600">·</span>
+                        {formatCompactUsd(metrics.totalMaxPayout, 0)}
+                        <span className="mx-1.5 text-slate-600">·</span>
+                        <span className="inline-flex items-center gap-1">
+                          <RoiLabel /> {metrics.croi} → {metrics.proi}
+                        </span>
+                        <span className="mx-1.5 text-slate-600">·</span>
+                        <span className="inline-flex items-center gap-1">
+                          <ParoiLabel /> {metrics.paroi}
+                        </span>
                       </span>
                     </div>
                   )}

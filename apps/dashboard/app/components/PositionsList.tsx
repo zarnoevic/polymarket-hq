@@ -1,10 +1,9 @@
 "use client";
 
 import { ExternalLink } from "lucide-react";
-import { MetricTooltip } from "./MetricTooltip";
+import { ParoiLabel, RoiLabel } from "./PositionMetricLabels";
 import { PriceHistorySparkline } from "./PriceHistorySparkline";
-import { METRIC_TOOLTIPS } from "@/lib/metric-tooltips";
-import { formatRoi, daysToResolution } from "@/lib/position-metrics";
+import { formatRoi, daysToResolution, computePAROINumeric } from "@/lib/position-metrics";
 
 export type Position = {
   asset: string;
@@ -50,15 +49,6 @@ function formatCompactUsd(value: number, decimals = 0): string {
   return formatUsd(value, decimals);
 }
 
-/** Compact format for raw numbers: 1K, 100K, 1M */
-function formatCompactNum(value: number): string {
-  const abs = Math.abs(value);
-  const sign = value < 0 ? "−" : "";
-  if (abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toFixed(1)}M`;
-  if (abs >= 1_000) return `${sign}${(abs / 1_000).toFixed(1)}K`;
-  return abs.toLocaleString(undefined, { maximumFractionDigits: 0 });
-}
-
 function formatPercent(value: number): string {
   const sign = value >= 0 ? "+" : "";
   return `${sign}${value.toFixed(1)}%`;
@@ -101,6 +91,8 @@ export function PositionCard({
   const days = daysToResolution(pos.endDate, pos.title);
   const croi = computeCROI(pos.avgPrice, pos.spread);
   const proi = computePROI(pos.curPrice, pos.spread);
+  const paroiNum = computePAROINumeric(pos.curPrice, days, pos.spread);
+  const paroi = Number.isFinite(paroiNum) ? formatRoi(paroiNum) : "—";
   const probabilityYes = pos.outcome.toLowerCase() === "yes" ? pos.curPrice : 1 - pos.curPrice;
   const probabilityNo = 1 - probabilityYes;
   const isYes = pos.outcome.toLowerCase() === "yes";
@@ -108,6 +100,24 @@ export function PositionCard({
   const rightPct = isYes ? probabilityNo : probabilityYes;
   const eventSlug = pos.eventSlug?.trim() || pos.slug?.trim();
   const marketUrl = eventSlug ? `https://polymarket.com/event/${eventSlug}` : null;
+
+  const maxPayoutFormatted =
+    pos.size > 0 && Number.isFinite(pos.size)
+      ? Math.abs(pos.size) >= 1_000
+        ? formatCompactUsd(pos.size, 0)
+        : formatUsd(pos.size, 2)
+      : null;
+
+  const initialCapital =
+    Math.abs(pos.initialValue) >= 1_000
+      ? formatCompactUsd(pos.initialValue, 0)
+      : formatUsd(pos.initialValue, 2);
+  const currentCapital =
+    Math.abs(pos.currentValue) >= 1_000
+      ? formatCompactUsd(pos.currentValue, 0)
+      : formatUsd(pos.currentValue, 2);
+  const initialPriceStr = `${(pos.avgPrice * 100).toFixed(2)}¢`;
+  const currentPriceStr = `${(pos.curPrice * 100).toFixed(2)}¢`;
 
   const cardContent = (
     <div
@@ -117,21 +127,22 @@ export function PositionCard({
     >
       <img src={pos.icon} alt="" className="h-9 w-9 shrink-0 rounded object-cover" />
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-0 text-sm">
           {marketUrl ? (
             <a
               href={marketUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex max-w-full shrink-0 items-center gap-1.5 text-sm hover:opacity-90"
+              className="inline-flex max-w-full shrink-0 items-center gap-1.5 hover:opacity-90"
               onClick={(e) => e.stopPropagation()}
             >
               <span className="min-w-0 truncate font-medium text-beige">{pos.title}</span>
               <ExternalLink className="h-3 w-3 shrink-0 text-indigo-400" />
             </a>
           ) : (
-            <h3 className="min-w-0 truncate text-sm font-medium text-beige">{pos.title}</h3>
+            <h3 className="min-w-0 truncate font-medium text-beige">{pos.title}</h3>
           )}
+          <span className="mx-1.5 shrink-0 text-slate-600">·</span>
           <span
             className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-medium ${
               pos.outcome.toLowerCase() === "yes" ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
@@ -139,30 +150,36 @@ export function PositionCard({
           >
             {pos.outcome}
           </span>
-          {days != null && <span className="text-xs text-slate-500">{days} day{days !== 1 ? "s" : ""} left</span>}
+          {days != null && (
+            <>
+              <span className="mx-1.5 shrink-0 text-slate-600">·</span>
+              <span className="text-xs text-slate-500">
+                {days} day{days !== 1 ? "s" : ""} left
+              </span>
+            </>
+          )}
         </div>
-        <div className="mt-1.5 flex flex-wrap items-center gap-4 text-xs">
-          <span className="text-slate-400">
-            {formatCompactNum(pos.size)} @ {(pos.avgPrice * 100).toFixed(2)}¢ → {(pos.curPrice * 100).toFixed(2)}¢
-          </span>
-          <span className="text-slate-400">
-            {Math.abs(pos.initialValue) >= 1_000 ? formatCompactUsd(pos.initialValue, 0) : formatUsd(pos.initialValue, 2)}
-            <span className="text-slate-600 mx-1">→</span>
-            {Math.abs(pos.currentValue) >= 1_000 ? formatCompactUsd(pos.currentValue, 0) : formatUsd(pos.currentValue, 2)}
-          </span>
-          <span
-            className={`font-medium ${pos.cashPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}
-          >
-            {pos.cashPnl >= 0 ? "+" : ""}
-            {Math.abs(pos.cashPnl) >= 1_000 ? formatCompactUsd(pos.cashPnl, 0) : formatUsd(pos.cashPnl, 2)} (
-            {formatPercent(pos.percentPnl)})
-          </span>
-          <span className="inline-flex items-center gap-1 text-slate-400">
-            <MetricTooltip
-              content={`CROI (entry): ${METRIC_TOOLTIPS.CROI}\n\nPROI (current): ${METRIC_TOOLTIPS.PROI}`}
-              trigger="ROI"
-            />{" "}
-            {croi} → {proi}
+        <div className="mt-1.5 flex flex-wrap items-center text-xs">
+          <span className="inline-flex flex-wrap items-baseline gap-0 text-slate-400">
+            {initialPriceStr} → {currentPriceStr}
+            <span className="mx-1.5 text-slate-600">·</span>
+            {initialCapital} → {currentCapital}
+            <span className="mx-1.5 text-slate-600">·</span>
+            <span className={`font-medium ${pos.cashPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              {pos.cashPnl >= 0 ? "+" : ""}
+              {Math.abs(pos.cashPnl) >= 1_000 ? formatCompactUsd(pos.cashPnl, 0) : formatUsd(pos.cashPnl, 2)} (
+              {formatPercent(pos.percentPnl)})
+            </span>
+            <span className="mx-1.5 text-slate-600">·</span>
+            {maxPayoutFormatted != null ? maxPayoutFormatted : "—"}
+            <span className="mx-1.5 text-slate-600">·</span>
+            <span className="inline-flex items-center gap-1">
+              <RoiLabel /> {croi} → {proi}
+            </span>
+            <span className="mx-1.5 text-slate-600">·</span>
+            <span className="inline-flex items-center gap-1">
+              <ParoiLabel /> {paroi}
+            </span>
           </span>
         </div>
       </div>
@@ -176,10 +193,11 @@ export function PositionCard({
         />
       </div>
       <div className="shrink-0 flex min-w-[90px] w-24 flex-col gap-0.5">
-        <div className="flex justify-between gap-2 text-[11px] font-medium">
+        <div className="flex flex-wrap items-center justify-center gap-x-1 text-[11px] font-medium">
           <span className={isYes ? "text-emerald-600/90" : "text-red-600/90"}>
             {isYes ? "Yes" : "No"} {(leftPct * 100).toFixed(0)}%
           </span>
+          <span className="text-slate-600">·</span>
           <span className={isYes ? "text-red-600/90" : "text-emerald-600/90"}>
             {isYes ? "No" : "Yes"} {(rightPct * 100).toFixed(0)}%
           </span>

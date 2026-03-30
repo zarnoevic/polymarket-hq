@@ -1,10 +1,10 @@
 import { marked } from "marked";
 import sanitizeHtml from "sanitize-html";
 
-const SANITIZE_OPTS = {
+const SANITIZE_OPTS: Parameters<typeof sanitizeHtml>[1] = {
   allowedTags: ["h1", "h2", "h3", "p", "strong", "em", "blockquote", "ul", "ol", "li", "code", "a", "br"],
   allowedAttributes: { "*": ["class"], a: ["href", "target", "rel", "class"] },
-} as const;
+};
 
 /** Converts markdown to styled HTML. Use for appraisal, rules, blindspots. */
 export function formatReportMarkdown(text: string): string {

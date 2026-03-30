@@ -45,7 +45,7 @@ const DEFAULT_WALLET = "0x25012ec798e4861e38c645df919f86dc3c177e28";
 // Total traders on Polymarket (for percentile calculation; not displayed)
 // Go to https://polymarketanalytics.com/traders and get from bottom of page
 // Showing 1–100 of 2,406,343 results
-const TOTAL_TRADERS = 2_406_343;
+const TOTAL_TRADERS = 2525137;
 
 export const dynamic = "force-dynamic";
 
